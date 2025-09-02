@@ -11,6 +11,7 @@ import DataTransform from './pages/DataTransform';
 import DataLoad from './pages/DataLoad';
 import DataAnalyse from './pages/DataAnalyse';
 import DataLearn from './pages/DataLearn';
+import PocInput from './pages/PocInput';
 import './App.css'; // Importer le fichier CSS global
 
 const App = () => {
@@ -22,6 +23,7 @@ const App = () => {
             <PrivateRoute path="/home" component={HomePage} />
             <Route path="/auth" component={AuthPage} />
             <PrivateRoute path="/datalake" component={DataLake} />
+            <PrivateRoute path="/input" component={PocInput} />
             <PrivateRoute path="/datatransform" component={DataTransform} />
             <PrivateRoute path="/dataload" component={DataLoad} />
             <PrivateRoute path="/dataanalyse" component={DataAnalyse} />
