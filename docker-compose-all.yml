@@ -1,0 +1,130 @@
+services:
+  frontend:
+    build:
+      context: ./src/frontend
+      dockerfile: Dockerfile
+    container_name: frontend
+    ports:
+      - "3000:3000"
+  reverse-proxy:
+    build:
+      context: ./src/reverse-proxy
+      dockerfile: Dockerfile
+    container_name: reverse-proxy
+    ports:
+      - "443:443"
+
+  api-gateway:
+    build:
+      context: ./src/api-gateway
+      dockerfile: Dockerfile
+    container_name: api-gateway
+    ports:
+      - "9000:9000"
+
+  # kafka:
+  #   build:
+  #     context: ./src/kafka
+  #     dockerfile: Dockerfile
+  #   container_name: kafka
+  #   ports:
+  #     - "9092:9092"
+  #   environment:
+  #     KAFKA_ADVERTISED_LISTENERS: SSL://kafka:9093
+  #     KAFKA_LISTENERS: SSL://0.0.0.0:9093
+  #     KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+  #     KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  mongo:
+    build:
+      context: ./src/mongo
+      dockerfile: Dockerfile
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: example
+
+  api-mongodb:
+    build:
+      context: ./src/api-mongodb
+      dockerfile: Dockerfile
+    container_name: api-mongodb
+    ports:
+      - "8000:8000"
+    environment:
+      MONGO_URI: mongodb://root:example@mongo:27017/
+      VAULT_ADDR: "https://vault:8200"
+      VAULT_USERNAME: "api-mongodb"
+      VAULT_PASSWORD: "api-mongodb"
+
+  postgresql:
+    build:
+      context: ./src/postgresql
+      dockerfile: Dockerfile
+    container_name: postgresql
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRESQL_USER: root
+      POSTGRESQL_PASSWORD: example
+      POSTGRESQL_DB: mydb
+
+  api-postgresql:
+    build:
+      context: ./src/api-postgresql
+      dockerfile: Dockerfile
+    container_name: api-postgresql
+    ports:
+      - "8010:8010"
+    environment:
+      POSTGRESQL_URI: postgresql://root:example@postgresql:5432/mydb
+      VAULT_ADDR: "https://vault:8200"
+      VAULT_USERNAME: "api-postgresql"
+      VAULT_PASSWORD: "api-postgresql"
+
+  vault:
+    build:
+      context: ./src/vault
+      dockerfile: Dockerfile
+    container_name: vault
+    ports:
+      - "8200:8200"
+    environment:
+      SERVICE_NAME: "vault"
+      VAULT_ADDR: "https://vault:8200"
+      VAULT_USERNAME: "vault"
+      VAULT_PASSWORD: "vault"
+      CONSUL_ADDR: "http://consul:8500"
+      CONSUL_TLS_ADDR: "http://consul:8500"
+    cap_add:
+      - IPC_LOCK
+      - NET_ADMIN
+      - NET_RAW
+      
+  consul:
+    build: ./src/consul
+    container_name: consul
+    ports:
+      - "8500:8500"
+      - "8600:8600/udp"
+    environment:
+      CONSUL_ADDR: "https://consul:8500"
+      CONSUL_TLS_ADDR: "https://consul:8500"
+      VAULT_ADDR: "https://vault:8200"
+      VAULT_USERNAME: "consul"
+      VAULT_PASSWORD: "consul"
+
+  # zookeeper:
+  #   build:
+  #     context: ./src/zookeeper
+  #     dockerfile: Dockerfile
+  #   container_name: zookeeper
+  #   ports:
+  #     - "2181:2181"
+  #   # volumes:
+  #   #   - ./src/sources.list:/etc/apt/sources.list
+  #   environment:
+  #     ZOOKEEPER_CLIENT_PORT: 2181
+  #     ZOOKEEPER_TICK_TIME: 2000

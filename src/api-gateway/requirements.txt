@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+python-jose
+passlib
+pydantic-settings
+requests
+python-multipart
+cryptography
+pydantic-settings
+pytest
+httpx
