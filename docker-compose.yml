@@ -115,6 +115,21 @@ services:
       VAULT_ADDR: "https://vault:8200"
       VAULT_USERNAME: "consul"
       VAULT_PASSWORD: "consul"
+  
+  minio:
+    build: ./src/minio
+    container_name: minio
+    ports:
+      - "9011:9001"
+      - "9010:9000"
+    environment:
+      CONSUL_ADDR: "https://consul:8500"
+      CONSUL_TLS_ADDR: "https://consul:8500"
+      VAULT_ADDR: "https://vault:8200"
+      VAULT_USERNAME: "minio"
+      VAULT_PASSWORD: "minio"
+    volumes:
+      - minio-volume:/data
 
   # zookeeper:
   #   build:
@@ -128,3 +143,6 @@ services:
   #   environment:
   #     ZOOKEEPER_CLIENT_PORT: 2181
   #     ZOOKEEPER_TICK_TIME: 2000
+
+volumes:
+  minio-volume:
