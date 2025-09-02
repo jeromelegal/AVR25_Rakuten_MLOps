@@ -1,0 +1,16 @@
+fastapi
+uvicorn
+pytest
+httpx
+pymongo
+motor
+python-jose
+passlib
+fastapi-jwt-auth
+python-multipart
+anyio
+pytest-asyncio
+pytest-tornasync
+pytest-trio
+pytest-twisted
+twisted
