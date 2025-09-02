@@ -122,7 +122,7 @@ chmod 600 /etc/ssl/mongodb/mongodb-keyfile
 
 # Vérifier si le certificat et la clé Vault existent déjà
 if vault kv get -field=cert secret/mongodb/api-mongodb/certs > /dev/null 2>&1 && vault kv get -field=key secret/mongodb/api-mongodb/certs > /dev/null 2>&1; then
-  echo "Le certificat mTLS mongodb pour le api-mongodb existent déjà"
+  echo "Le certificat mTLS mongodb pour le service api-mongodb existe déjà"
 else
   # Générer le certificat et la clé pour Vault
   echo "Générer le certificat et la clé pour Vault"
