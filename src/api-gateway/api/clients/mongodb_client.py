@@ -71,3 +71,30 @@ class MongoDBClient:
         response = self.session.post(f"{self.base_url}/api/internal/mongodb/entity/user", json=user_data, headers=headers)
         response.raise_for_status()
         return response.json()
+    
+    def create_ad(self, ad_data: Dict[str, str, str, str, str, str]):
+        headers = self.get_headers()
+        response = self.session.post(f"{self.base_url}/api/internal/mongodb/entity/ad", json=ad_data, headers=headers)
+        response.raise_for_status()
+        return response.json()
+    
+    def get_ad(self, ad_data: Dict[str]):
+        headers = self.get_headers()
+        ad_id = ad_data['ad_id']
+        response = self.session.post(f"{self.base_url}/api/internal/mongodb/entity/ad/{ad_id}", json=ad_data, headers=headers)
+        response.raise_for_status()
+        return response.json()
+    
+    def update_ad(self, ad_data: Dict[str, str, str, str, str, str, str]):
+        headers = self.get_headers()
+        ad_id = ad_data['ad_id']
+        response = self.session.post(f"{self.base_url}/api/internal/mongodb/entity/ad/{ad_id}", json=ad_data, headers=headers)
+        response.raise_for_status()
+        return response.json()
+    
+    def delete_ad(self, ad_data: Dict[str]):
+        headers = self.get_headers()
+        ad_id = ad_data['ad_id']
+        response = self.session.post(f"{self.base_url}/api/internal/mongodb/entity/ad/{ad_id}", json=ad_data, headers=headers)
+        response.raise_for_status()
+        return response.json()
