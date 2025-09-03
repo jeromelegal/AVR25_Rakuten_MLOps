@@ -130,6 +130,21 @@ services:
       VAULT_PASSWORD: "minio"
     volumes:
       - minio-volume:/data
+  
+  api-minio:
+    build:
+      context: ./src/api-minio
+      dockerfile: Dockerfile
+    container_name: api-minio
+    ports:
+      - "8020:8020"
+    environment:
+      # MINIO_USER: minio-user
+      # MINIO_PASSWORD: minio-password
+      # MINIO_BUCKET: images
+      VAULT_ADDR: "https://vault:8200"
+      VAULT_USERNAME: "api-minio"
+      VAULT_PASSWORD: "api-minio"
 
   # zookeeper:
   #   build:

@@ -96,3 +96,5 @@ target/
 
 # Artifacts
 # /models/
+
+uv.lock
