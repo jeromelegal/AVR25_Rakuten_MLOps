@@ -15,7 +15,7 @@ echo "ENVIRONMENT: $ENVIRONMENT"
 if [[ "$ENVIRONMENT" == "test" ]]; then
     echo "Staring tests..."
     pip install --break-system-packages -r requirements/dev.txt
-    exec uvicorn main:app --host 0.0.0.0 --port $MINIO_SERVICE_PORT &
+    exec uvicorn main:app --host 0.0.0.0 --port $SERVICE_PORT &
 
     test.sh
 else
@@ -24,7 +24,7 @@ else
 
     set -m
 
-    exec uvicorn main:app --host 0.0.0.0 --port $MINIO_SERVICE_PORT --ssl-keyfile $API_MINIO_KEY_PATH --ssl-certfile $API_MINIO_CERT_PATH  --ssl-ca-certs $API_MINIO_CA_PATH --ssl-cert-reqs 2 &
+    exec uvicorn main:app --host 0.0.0.0 --port $SERVICE_PORT --ssl-keyfile $API_MINIO_KEY_PATH --ssl-certfile $API_MINIO_CERT_PATH  --ssl-ca-certs $API_MINIO_CA_PATH --ssl-cert-reqs 2 &
 
 
     jobs
