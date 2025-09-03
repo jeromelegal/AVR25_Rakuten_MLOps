@@ -38,5 +38,20 @@ db.getSiblingDB('file_storage').createUser({
   roles: [{ role: 'userManager', db: 'file_storage' }]
 });
 
-
-
+// create ads collection
+db.getSiblingDB('file_storage').createCollection('ads', {
+  validator: {
+      $jsonSchema: {
+        bsonType: "object",
+        required: ["ad_id", "designation", "description", "image", "created_at", "created_by"],
+        properties: {
+          ad_id:       { bsonType: "string" },
+          designation: { bsonType: "string" },
+          description: { bsonType: "string" },
+          image:       { bsonType: "string" },
+          created_at:  { bsonType: "string" },
+          created_by:  { bsonType: "string" }
+        }
+      }
+    }
+});
