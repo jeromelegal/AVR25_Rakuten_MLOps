@@ -50,7 +50,7 @@ class TestImages:
 
         assert len(res.names) > 1
 
-        self._delete_file(settings=mock_settings, image_id=image_id)
+        await self._delete_file(settings=mock_settings, image_id=image_id)
 
     async def test_get_a_single_files_from_bucket(self, mock_settings):
         res = await self._add_new_file(settings=mock_settings)
