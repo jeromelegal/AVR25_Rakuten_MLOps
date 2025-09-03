@@ -1,6 +1,6 @@
 import os
 
-from api.minio.entity.images import store_image, get_buckets, ImageRaw
+from api.minio.entity.images import store_image, get_buckets, list_files, ImageRaw
 
 
 class TestImages:
@@ -21,8 +21,10 @@ class TestImages:
         assert len(res.buckets) == 1
         assert res.buckets[0].name == mock_settings.MINIO_BUCKET_NAME
 
-    async def test_get_all_file_names_in_bucket(self, mock_settings):
-        pass
+    async def test_list_files_in_bucket(self, mock_settings):
+        res = await list_files(settings=mock_settings)
+
+        assert hasattr(res, "names")
 
     async def test_get_all_file_names_in_bucket_with_limit(self, mock_settings):
         pass

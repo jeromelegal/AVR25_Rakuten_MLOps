@@ -18,6 +18,7 @@ TEMP_FOLDER = os.path.join("tmp")
 DATETIME_FORMAT = "%Y-%m-%d %H:%M%S:Z"
 
 BUCKET_RESPONSE_KEY = "Buckets"
+CONTENT_RESPONSE_KEY = "Contents"
 
 
 class ImageRaw(BaseModel):
@@ -47,6 +48,10 @@ class Buckets(BaseModel):
 
 class ImageResponseWithContent(ImageResponse):
     content: bytes
+
+
+class ImageNames(BaseModel):
+    names: List[str]
 
 
 @router.post("/api/internal/minio/entity/image", response_model=ImageResponse)
@@ -114,7 +119,7 @@ def _delete_temp_file(tmp_path: str):
 
 @router.get(
     "/api/internal/minio/entity/buckets",
-    response_model=ImageResponseWithContent,
+    response_model=Buckets,
 )
 async def get_buckets(
     settings: Annotated[Settings, Depends(get_settings)],
@@ -139,6 +144,31 @@ async def get_buckets(
             for el in response[BUCKET_RESPONSE_KEY]
         ]
     )
+
+
+@router.get(
+    "/api/internal/minio/entity/images",
+    response_model=ImageNames,
+)
+async def list_files(
+    settings: Annotated[Settings, Depends(get_settings)],
+    limit: int = 1000,
+) -> ImageNames:
+    try:
+        client = get_client(settings=settings)
+        response = client.list_objects_v2(Bucket="images", MaxKeys=limit)
+
+    except ClientError as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Impossible to get the buckets from the Minio server: {e}",
+        )
+    if CONTENT_RESPONSE_KEY not in response:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unable to process get files from Minio server: {response}",
+        )
+    return ImageNames(names=[el["Key"] for el in response[CONTENT_RESPONSE_KEY]])
 
 
 # @router.get(
