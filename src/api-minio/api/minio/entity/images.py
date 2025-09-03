@@ -33,6 +33,10 @@ class ImageInfo(BaseModel):
     created_at: str
 
 
+class ImageUpdateRaw(ImageRaw):
+    image_id: str
+
+
 class ImageResponse(ImageInfo):
     created_by: str
 
@@ -46,12 +50,17 @@ class Buckets(BaseModel):
     buckets: List[Bucket]
 
 
-class ImageResponseWithContent(ImageResponse):
+class ImageContent(BaseModel):
+    image_id: str
     content: bytes
 
 
 class ImageNames(BaseModel):
     names: List[str]
+
+
+class ImageDeleted(BaseModel):
+    deleted_image: str
 
 
 @router.post("/api/internal/minio/entity/image", response_model=ImageResponse)
@@ -90,9 +99,10 @@ async def store_image(
 
 
 def _store_temp_image_from_bytes(
-    file: bytes, bucket: str, tmp_folder: str
+    file: bytes, bucket: str, tmp_folder: str, image_id: str = None
 ) -> tuple[str, ImageInfo]:
-    image_id = uuid.uuid4()
+    if image_id is None:
+        image_id = uuid.uuid4()
     # TODO: Accept other format on top of JPG
     image_path = os.path.join(bucket, f"{image_id}.jpg")
 
@@ -153,10 +163,13 @@ async def get_buckets(
 async def list_files(
     settings: Annotated[Settings, Depends(get_settings)],
     limit: int = 1000,
+    start_after: str = "",
 ) -> ImageNames:
     try:
         client = get_client(settings=settings)
-        response = client.list_objects_v2(Bucket="images", MaxKeys=limit)
+        response = client.list_objects_v2(
+            Bucket=settings.MINIO_BUCKET_NAME, MaxKeys=limit, StartAfter=start_after
+        )
 
     except ClientError as e:
         raise HTTPException(
@@ -171,66 +184,93 @@ async def list_files(
     return ImageNames(names=[el["Key"] for el in response[CONTENT_RESPONSE_KEY]])
 
 
-# @router.get(
-#     "/api/internal/minio/entity/image/{image_id}",
-#     response_model=ImageResponseWithContent,
-# )
-# async def get_image(
-#     image_id: str,
-#     settings: Annotated[Settings, Depends(get_settings)],
-# ):
-#     client = get_client(settings=settings)
+@router.get(
+    "/api/internal/minio/entity/image/{image_id}",
+    response_model=ImageContent,
+)
+async def get_image(
+    image_id: str,
+    settings: Annotated[Settings, Depends(get_settings)],
+    tmp_folder: str = TEMP_FOLDER,
+):
+    exception = None
+    try:
+        tmp_image_path = os.path.join(tmp_folder, f"{image_id}.jpg")
+        client = get_client(settings=settings)
+        client.download_file(
+            Bucket=settings.MINIO_BUCKET_NAME,
+            Key=image_id,
+            Filename=tmp_image_path,
+        )
+        with open(tmp_image_path, "rb") as f:
+            content = f.read()
+
+    except ClientError as e:
+        exception = HTTPException(
+            status_code=500,
+            detail=f"Impossible to download the file {image_id} from the Minio server: {e}",
+        )
+    finally:
+        _delete_temp_file(tmp_path=tmp_image_path)
+
+    if exception is not None:
+        raise exception
+
+    return ImageContent(image_id=image_id, content=content)
 
 
-#     if current_user["user_id"] != user_id and "superadmin" not in current_user.get(
-#         "roles", []
-#     ):
-#         raise HTTPException(status_code=403, detail="Not enough permissions")
+@router.put("/api/internal/minio/entity/image/{image_id}", response_model=ImageResponse)
+async def update_image(
+    update: ImageUpdateRaw,
+    settings: Annotated[Settings, Depends(get_settings)],
+    tmp_folder: str = TEMP_FOLDER,
+):
+    client = get_client(settings=settings)
+    tmp_path, info = _store_temp_image_from_bytes(
+        file=update.content,
+        bucket=settings.MINIO_BUCKET_NAME,
+        tmp_folder=tmp_folder,
+        image_id=update.image_id,
+    )
 
-#     async with get_db_client() as db:
-#         user = await db.users.find_one({"_id": ObjectId(user_id)})
-#         if user:
-#             user["user_id"] = str(user["_id"])
-#             return UserResponse(**user)
-#         raise HTTPException(status_code=404, detail="User not found")
+    exception = None
+
+    try:
+        client.upload_file(tmp_path, settings.MINIO_BUCKET_NAME, info.image_id)
+    except ClientError as e:
+        exception = HTTPException(
+            status_code=500,
+            detail=f"Impossible to store image {info.image_name}: {e}",
+        )
+    finally:
+        _delete_temp_file(tmp_path=tmp_path)
+
+    if exception is not None:
+        raise exception
+
+    return ImageResponse(
+        image_id=info.image_id,
+        image_name=info.image_name,
+        bucket_path=info.bucket_path,
+        created_at=info.created_at,
+        created_by=update.username,
+    )
 
 
-# @router.put("/api/internal/mongodb/entity/user/{user_id}", response_model=UserResponse)
-# async def update_user(
-#     user_id: str, user: User, current_user: dict = Depends(get_current_user)
-# ):
-#     if current_user["user_id"] != user_id and "superadmin" not in current_user.get(
-#         "roles", []
-#     ):
-#         raise HTTPException(status_code=403, detail="Not enough permissions")
+@router.delete(
+    "/api/internal/minio/entity/image/{image_id}", response_model=ImageDeleted
+)
+async def delete_image(
+    image_id: str,
+    settings: Annotated[Settings, Depends(get_settings)],
+):
+    try:
+        client = get_client(settings=settings)
+        response = client.delete_object(Bucket=settings.MINIO_BUCKET_NAME, Key=image_id)
 
-#     async with get_db_client() as db:
-#         user_dict = user.model_dump()
-#         user_dict["password"] = hash_password(
-#             user_dict["password"]
-#         )  # Hash the password before storing
-#         result = await db.users.update_one(
-#             {"_id": ObjectId(user_id)}, {"$set": user_dict}
-#         )
-#         if result.modified_count == 1:
-#             user = await db.users.find_one({"_id": ObjectId(user_id)})
-#             user["user_id"] = str(user["_id"])
-#             return UserResponse(**user)
-#         raise HTTPException(status_code=404, detail="User not found")
-
-
-# @router.delete("/api/internal/mongodb/entity/user/{user_id}", response_model=dict)
-# async def delete_user(user_id: str, current_user: dict = Depends(get_current_user)):
-#     if current_user["user_id"] != user_id and "superadmin" not in current_user.get(
-#         "roles", []
-#     ):
-#         raise HTTPException(status_code=403, detail="Not enough permissions")
-
-#     async with get_db_client() as db:
-#         result = await db.users.delete_one({"_id": ObjectId(user_id)})
-#         if result.deleted_count == 1:
-#             # Invalidate the user's JWT token
-#             # This can be done by removing the token from a blacklist or setting an expiration date
-#             # For simplicity, we'll assume tokens are short-lived and do not implement a blacklist here
-#             return {"message": "User deleted successfully"}
-#         raise HTTPException(status_code=404, detail="User not found")
+    except ClientError as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Impossible to delete the image {image_id} from the Minio server: {e}",
+        )
+    return ImageDeleted(deleted_image=image_id)
