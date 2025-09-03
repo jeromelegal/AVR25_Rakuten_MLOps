@@ -4,7 +4,7 @@ from PIL import Image
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from api.config.s3 import get_client
-from typing import Annotated, List
+from typing import Annotated, List, Optional
 from motor.motor_asyncio import AsyncIOMotorClient
 from bson import ObjectId
 from datetime import datetime, UTC
@@ -16,6 +16,8 @@ router = APIRouter()
 
 TEMP_FOLDER = os.path.join("tmp")
 DATETIME_FORMAT = "%Y-%m-%d %H:%M%S:Z"
+
+BUCKET_RESPONSE_KEY = "Buckets"
 
 
 class ImageRaw(BaseModel):
@@ -32,6 +34,19 @@ class ImageInfo(BaseModel):
 
 class ImageResponse(ImageInfo):
     created_by: str
+
+
+class Bucket(BaseModel):
+    name: str
+    creation_date: datetime
+
+
+class Buckets(BaseModel):
+    buckets: List[Bucket]
+
+
+class ImageResponseWithContent(ImageResponse):
+    content: bytes
 
 
 @router.post("/api/internal/minio/entity/image", response_model=ImageResponse)
@@ -97,8 +112,46 @@ def _delete_temp_file(tmp_path: str):
         os.remove(path=tmp_path)
 
 
-# @router.get("/api/internal/mongodb/entity/user/{user_id}", response_model=UserResponse)
-# async def get_user(user_id: str, current_user: dict = Depends(get_current_user)):
+@router.get(
+    "/api/internal/minio/entity/buckets",
+    response_model=ImageResponseWithContent,
+)
+async def get_buckets(
+    settings: Annotated[Settings, Depends(get_settings)],
+    limit: int = 1000,
+) -> Buckets:
+    client = get_client(settings=settings)
+    try:
+        response = client.list_buckets(MaxBuckets=limit)
+    except ClientError as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Impossible to get the buckets from the Minio server: {e}",
+        )
+    if BUCKET_RESPONSE_KEY not in response:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unable to process reponse from Minio server: {response}",
+        )
+    return Buckets(
+        buckets=[
+            Bucket(name=el["Name"], creation_date=el["CreationDate"])
+            for el in response[BUCKET_RESPONSE_KEY]
+        ]
+    )
+
+
+# @router.get(
+#     "/api/internal/minio/entity/image/{image_id}",
+#     response_model=ImageResponseWithContent,
+# )
+# async def get_image(
+#     image_id: str,
+#     settings: Annotated[Settings, Depends(get_settings)],
+# ):
+#     client = get_client(settings=settings)
+
+
 #     if current_user["user_id"] != user_id and "superadmin" not in current_user.get(
 #         "roles", []
 #     ):
