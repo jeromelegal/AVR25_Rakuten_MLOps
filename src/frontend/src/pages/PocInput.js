@@ -49,7 +49,6 @@ const PocInput = () => {
       <ProductCategoryModal
         show={categoryModalShow}
         onHide={() => setCategoryModalShow(false)}
-        categories={['Electronics', 'Clothing', 'Books']}
         onSelect={handleCategorySelect}
       />
       {selectedCategory && <p>Selected Category: {selectedCategory}</p>}
