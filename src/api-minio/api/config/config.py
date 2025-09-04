@@ -45,7 +45,6 @@ class Settings(BaseSettings):
     MINIO_DATABASE: str = os.getenv(
         "MINIO_API_MINIO_DATABASE", default="MINIO_DATABASE"
     )
-    MINIO_BUCKET_NAME: str = os.getenv("MINIO_BUCKET_NAME", default="MINIO_BUCKET_NAME")
 
 
 settings = Settings()
@@ -78,4 +77,3 @@ def get_settings():
 # MINIO_USER = os.getenv("MINIO_API_MINIO_USER")
 # MINIO_PASSWORD = os.getenv("MINIO_API_MINIO_PASSWORD")
 # MINIO_DATABASE = os.getenv("MINIO_API_MINIO_DATABASE")
-# MINIO_BUCKET_NAME = os.getenv("MINIO_BUCKET_NAME")

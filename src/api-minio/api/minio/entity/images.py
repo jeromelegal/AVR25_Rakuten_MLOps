@@ -55,19 +55,20 @@ class ImageDeleted(BaseModel):
 
 @router.post("/api/internal/minio/entity/image", response_model=ImageResponse)
 async def store_image(
+    bucket: str,
     image: ImageRaw,
     settings: Annotated[Settings, Depends(get_settings)],
     tmp_folder: str = TEMP_FOLDER,
 ):
     client = get_client(settings=settings)
     tmp_path, info = _store_temp_image_from_bytes(
-        file=image.content, bucket=settings.MINIO_BUCKET_NAME, tmp_folder=tmp_folder
+        file=image.content, bucket=bucket, tmp_folder=tmp_folder
     )
 
     exception = None
 
     try:
-        client.upload_file(tmp_path, settings.MINIO_BUCKET_NAME, info.image_id)
+        client.upload_file(tmp_path, bucket, info.image_id)
     except ClientError as e:
         exception = HTTPException(
             status_code=500,
@@ -122,6 +123,7 @@ def _delete_temp_file(tmp_path: str):
     response_model=ImageNames,
 )
 async def list_files(
+    bucket: str,
     settings: Annotated[Settings, Depends(get_settings)],
     limit: int = 1000,
     start_after: str = "",
@@ -129,7 +131,7 @@ async def list_files(
     try:
         client = get_client(settings=settings)
         response = client.list_objects_v2(
-            Bucket=settings.MINIO_BUCKET_NAME, MaxKeys=limit, StartAfter=start_after
+            Bucket=bucket, MaxKeys=limit, StartAfter=start_after
         )
 
     except ClientError as e:
@@ -150,6 +152,7 @@ async def list_files(
     response_model=ImageContent,
 )
 async def get_image(
+    bucket: str,
     image_id: str,
     settings: Annotated[Settings, Depends(get_settings)],
     tmp_folder: str = TEMP_FOLDER,
@@ -159,7 +162,7 @@ async def get_image(
         tmp_image_path = os.path.join(tmp_folder, f"{image_id}.jpg")
         client = get_client(settings=settings)
         client.download_file(
-            Bucket=settings.MINIO_BUCKET_NAME,
+            Bucket=bucket,
             Key=image_id,
             Filename=tmp_image_path,
         )
@@ -182,6 +185,7 @@ async def get_image(
 
 @router.put("/api/internal/minio/entity/image/{image_id}", response_model=ImageResponse)
 async def update_image(
+    bucket: str,
     update: ImageUpdateRaw,
     settings: Annotated[Settings, Depends(get_settings)],
     tmp_folder: str = TEMP_FOLDER,
@@ -189,7 +193,7 @@ async def update_image(
     client = get_client(settings=settings)
     tmp_path, info = _store_temp_image_from_bytes(
         file=update.content,
-        bucket=settings.MINIO_BUCKET_NAME,
+        bucket=bucket,
         tmp_folder=tmp_folder,
         image_id=update.image_id,
     )
@@ -197,7 +201,7 @@ async def update_image(
     exception = None
 
     try:
-        client.upload_file(tmp_path, settings.MINIO_BUCKET_NAME, info.image_id)
+        client.upload_file(tmp_path, bucket, info.image_id)
     except ClientError as e:
         exception = HTTPException(
             status_code=500,
@@ -222,12 +226,13 @@ async def update_image(
     "/api/internal/minio/entity/image/{image_id}", response_model=ImageDeleted
 )
 async def delete_image(
+    bucket: str,
     image_id: str,
     settings: Annotated[Settings, Depends(get_settings)],
 ):
     try:
         client = get_client(settings=settings)
-        response = client.delete_object(Bucket=settings.MINIO_BUCKET_NAME, Key=image_id)
+        response = client.delete_object(Bucket=bucket, Key=image_id)
 
     except ClientError as e:
         raise HTTPException(

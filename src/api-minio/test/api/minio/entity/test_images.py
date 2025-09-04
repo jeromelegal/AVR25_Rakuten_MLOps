@@ -10,6 +10,8 @@ from api.minio.entity.images import (
     ImageUpdateRaw,
 )
 
+DEFAULT_BUCKET = "raw-images"
+
 
 class TestImages:
     async def _add_new_file(self, settings):
@@ -18,11 +20,14 @@ class TestImages:
             "rb",
         ) as f:
             raw = ImageRaw(username="test", content=f.read())
-            res = await store_image(raw, tmp_folder=".", settings=settings)
+            res = await store_image(
+                image=raw, tmp_folder=".", settings=settings, bucket=DEFAULT_BUCKET
+            )
         return res
 
     async def _delete_file(self, settings, image_id: str):
         await delete_image(
+            bucket=DEFAULT_BUCKET,
             image_id=image_id,
             settings=settings,
         )
@@ -30,7 +35,7 @@ class TestImages:
     async def test_store_image(self, mock_settings):
         res = await self._add_new_file(settings=mock_settings)
 
-        assert mock_settings.MINIO_BUCKET_NAME in res.bucket_path
+        assert DEFAULT_BUCKET in res.bucket_path
         assert "demo_image.jpg" != res.image_id
 
         await self._delete_file(settings=mock_settings, image_id=res.image_id)
@@ -39,7 +44,7 @@ class TestImages:
         res = await self._add_new_file(settings=mock_settings)
         image_id = res.image_id
 
-        res = await list_files(settings=mock_settings)
+        res = await list_files(bucket=DEFAULT_BUCKET, settings=mock_settings)
 
         assert len(res.names) >= 1
 
@@ -49,6 +54,7 @@ class TestImages:
         res = await self._add_new_file(settings=mock_settings)
 
         res = await get_image(
+            bucket=DEFAULT_BUCKET,
             image_id=res.image_id,
             settings=mock_settings,
             tmp_folder=".",
@@ -63,6 +69,7 @@ class TestImages:
         image_id = res.image_id
 
         res = await delete_image(
+            bucket=DEFAULT_BUCKET,
             image_id=res.image_id,
             settings=mock_settings,
         )
@@ -76,16 +83,21 @@ class TestImages:
         ) as f:
             content = f.read()
             raw = ImageRaw(username="test", content=content)
-            res = await store_image(raw, tmp_folder=".", settings=mock_settings)
+            res = await store_image(
+                image=raw, tmp_folder=".", settings=mock_settings, bucket=DEFAULT_BUCKET
+            )
             update = ImageUpdateRaw(
                 username="test", content=content, image_id=res.image_id
             )
 
             res = await update_image(
-                update=update, settings=mock_settings, tmp_folder="."
+                bucket=DEFAULT_BUCKET,
+                update=update,
+                settings=mock_settings,
+                tmp_folder=".",
             )
 
-            assert mock_settings.MINIO_BUCKET_NAME in res.bucket_path
+            assert DEFAULT_BUCKET in res.bucket_path
             assert "demo_image.jpg" != res.image_id
 
             await self._delete_file(settings=mock_settings, image_id=res.image_id)

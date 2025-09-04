@@ -18,7 +18,6 @@ import os
 @pytest.fixture(scope="function")
 def mock_settings():
     mock = Mock()
-    mock.MINIO_BUCKET_NAME = os.getenv("MINIO_BUCKET_NAME", default="images")
     mock.MINIO_SERVICE_NAME = os.getenv("MINIO_SERVICE_NAME", default="localhost")
     mock.MINIO_SERVICE_PORT = os.getenv("MINIO_SERVICE_PORT", default="9010")
     mock.MINIO_USER = os.getenv("MINIO_USER", default="minio-user")
