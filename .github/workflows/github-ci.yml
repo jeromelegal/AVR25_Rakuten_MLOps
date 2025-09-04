@@ -238,6 +238,12 @@ jobs:
             fi
             sleep 1
           done
+  
+  lint:
+    uses: ./.github/workflows/github-lint.yml
+  
+  tests:
+    uses: ./.github/workflows/github-unit-tests.yml
 
   stop-containers:
     runs-on: [self-hosted, phil-host]
