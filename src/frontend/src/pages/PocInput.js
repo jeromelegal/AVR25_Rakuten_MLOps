@@ -59,6 +59,7 @@ const PocInput = () => {
         <ProductDescriptionInput value={description} onChange={handleDescriptionChange} />
         <div style={{ height: '2rem' }}></div> 
         <ProductCategoryButton onClick={handleCategoryButtonClick} />
+        <div style={{ height: '1rem' }}></div> 
         <ValidateButton
           onClick={handleValidateAll}
           disabled={!title || !description || !selectedCategory || !picture}
