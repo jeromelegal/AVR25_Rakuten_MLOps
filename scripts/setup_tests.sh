@@ -1,6 +1,6 @@
 #!/bin/bash
 
-DELAY_BEFORE_TESTS_IN_SECONDS=180
+DELAY_BEFORE_TESTS_IN_SECONDS=240
 
 # Waiting for all services to be up
 # TODO: Should be made using a ping or a request
