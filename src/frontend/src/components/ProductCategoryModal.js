@@ -1,9 +1,31 @@
-import React from 'react';
-import { Modal, Button } from 'react-bootstrap';
+import React, { useState } from 'react';
+import { Modal, Button, Form } from 'react-bootstrap';
+import ValidateButton from './ValidateButton';
 
-const ProductCategoryModal = ({ show, onHide, categories, onSelect }) => {
+const ProductCategoryModal = ({ show, onHide, categories = [], onSelect }) => {
+  const [changingCategory, setChangingCategory] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState('');
+
   // Example category proposal
   const categoryProposal = "Electronics";
+  const exampleCategories = categories.length > 0 ? categories : [
+    "Electronics",
+    "Books",
+    "Clothing",
+    "Home & Kitchen",
+    "Toys",
+    "Sports"
+  ];
+
+  const handleValidate = () => {
+    onSelect(changingCategory && selectedCategory ? selectedCategory : categoryProposal);
+    setChangingCategory(false);
+    setSelectedCategory('');
+  };
+
+  const handleChangeCategoryClick = () => {
+    setChangingCategory(true);
+  };
 
   return (
     <Modal show={show} onHide={onHide} centered>
@@ -28,12 +50,13 @@ const ProductCategoryModal = ({ show, onHide, categories, onSelect }) => {
       <Modal.Body>
         <div style={{
           padding: '1rem',
-          background: '#f8f9fa',
+          background: changingCategory ? '#f8d7da' : '#f8f9fa',
           borderRadius: '8px',
           marginBottom: '1.5rem',
           textAlign: 'center',
           fontSize: '1.2rem',
-          fontWeight: '500'
+          fontWeight: '500',
+          opacity: changingCategory ? 0.6 : 1
         }}>
           <span>Category proposal:</span>
           <div style={{
@@ -46,24 +69,45 @@ const ProductCategoryModal = ({ show, onHide, categories, onSelect }) => {
           }}>
             {categoryProposal}
           </div>
+          {changingCategory && (
+            <div style={{ color: '#a94442', marginTop: '0.5rem', fontSize: '0.95rem' }}>
+              This value is not taken into account, please select a new category below.
+            </div>
+          )}
         </div>
+        {changingCategory && (
+          <Form.Group controlId="selectCategory" style={{ marginBottom: '1.5rem' }}>
+            <Form.Label>Select a category</Form.Label>
+            <Form.Select
+              value={selectedCategory}
+              onChange={e => setSelectedCategory(e.target.value)}
+            >
+              <option value="">-- Choose a category --</option>
+              {exampleCategories.map(cat => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </Form.Select>
+          </Form.Group>
+        )}
         <div style={{
           display: 'flex',
           justifyContent: 'center',
           gap: '1rem'
         }}>
-          <Button
-            style={{ backgroundColor: '#ffe5b4', color: '#333', border: 'none' }}
-            onClick={() => {}}
-          >
-            Change category
-          </Button>
-          <Button
-            style={{ backgroundColor: '#d4edda', color: '#155724', border: 'none' }}
-            onClick={() => onSelect(categoryProposal)}
+          {!changingCategory && (
+            <Button
+              style={{ backgroundColor: '#ffe5b4', color: '#333', border: 'none' }}
+              onClick={handleChangeCategoryClick}
+            >
+              Change category
+            </Button>
+          )}
+          <ValidateButton
+            onClick={handleValidate}
+            disabled={changingCategory && !selectedCategory}
           >
             Validate
-          </Button>
+          </ValidateButton>
         </div>
       </Modal.Body>
     </Modal>

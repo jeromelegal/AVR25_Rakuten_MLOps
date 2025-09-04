@@ -5,6 +5,7 @@ import ProductPictureInput from '../components/ProductPictureInput';
 import ProductTitleInput from '../components/ProductTitleInput';
 import ProductCategoryButton from '../components/ProductCategoryButton';
 import ProductCategoryModal from '../components/ProductCategoryModal';
+import ValidateButton from '../components/ValidateButton';
 
 const PocInput = () => {
   const [description, setDescription] = useState('');
@@ -34,6 +35,19 @@ const PocInput = () => {
     setCategoryModalShow(false);
   };
 
+   // Example save handler
+  const handleValidateAll = () => {
+    // Save logic here (e.g., send to backend)
+    const productData = {
+      title,
+      description,
+      category: selectedCategory,
+      picture
+    };
+    console.log('Saving product:', productData);
+    // Add your save-to-database logic here
+  };
+
   return (
     <div>
       <h1>PocInput Page</h1>
@@ -45,6 +59,12 @@ const PocInput = () => {
         <ProductDescriptionInput value={description} onChange={handleDescriptionChange} />
         <div style={{ height: '2rem' }}></div> 
         <ProductCategoryButton onClick={handleCategoryButtonClick} />
+        <ValidateButton
+          onClick={handleValidateAll}
+          disabled={!title || !description || !selectedCategory || !picture}
+        >
+          Validate Product
+        </ValidateButton>
       </div>
       <ProductCategoryModal
         show={categoryModalShow}
