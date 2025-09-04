@@ -33,11 +33,17 @@ fi
 echo "Minio connection OK"
 
 # Generate bucket and exit if not possible
-echo "Checking Minio bucket..."
-mc mb --ignore-existing --region "eu-central-1" /data/$MINIO_BUCKET_NAME
-STATUS=$?
-if [ $STATUS -ne 0 ]; then
-    echo "Failed to create Minio bucket '$MINIO_BUCKET_NAME'"
-    exit $STATUS
-fi
+echo "Creating Minio buckets..."
+declare -a arr=("raw-images" "processed-images" "models" "ci-results" "results" "train-images" "test-images")
+for i in "${arr[@]}"
+do
+    echo "$i"
+    mc mb --ignore-existing --region "eu-central-1" /data/$i
+    STATUS=$?
+    if [ $STATUS -ne 0 ]; then
+        echo "Failed to create Minio bucket '$i'"
+        exit $STATUS
+    fi
+done
+
 echo "Minio bucket OK"

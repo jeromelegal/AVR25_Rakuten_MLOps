@@ -314,7 +314,7 @@ store_intermediate_certs() {
 }
 
 # Liste des services
-services=("vault" "consul" "mongodb" "api-mongodb" "postgresql" "api-postgresql"  "api-gateway" "frontend" "reverse-proxy" "zookeeper" "kafka" "minio")
+services=("vault" "consul" "mongodb" "api-mongodb" "postgresql" "api-postgresql"  "api-gateway" "frontend" "reverse-proxy" "zookeeper" "kafka" "minio" "api-minio")
 
 # Appel des fonctions pour chaque service
 for service in "${services[@]}"; do

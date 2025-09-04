@@ -96,3 +96,12 @@ target/
 
 # Artifacts
 # /models/
+
+# Ignore uv.lock used for local development
+uv.lock
+
+# Ignore test result files
+test_result/
+*test_result.xml
+*test_coverage.xml
+TODO.md

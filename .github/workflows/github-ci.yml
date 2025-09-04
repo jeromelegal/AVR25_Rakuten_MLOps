@@ -1,0 +1,317 @@
+name: AVR25 Rakuten MLOps - CI
+run-name: Test AVR25 Rakuten MLOps actions started by ${{ github.actor }}
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+env:
+  FORCE_COLOR: "1"
+
+jobs:
+  build:
+    runs-on: [self-hosted]
+    strategy:
+      max-parallel: 10
+      matrix:
+        service: [vault consul mongo api-mongodb postgresql api-postgresql api-gateway frontend reverse-proxy minio api-minio]
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: |
+            image=moby/buildkit:v0.16.0
+      - name: Set up Docker Compose
+        uses: docker/setup-compose-action@v1
+      - name: Start services
+        run: |
+          docker compose up -d --build --force-recreate ${{ matrix.service }}
+
+  # build-vault:
+  #   runs-on: [self-hosted]
+  #   permissions:
+  #     contents: 'read'
+  #     id-token: 'write'
+  #   steps:
+  #     - name: Check out repository code
+  #       uses: actions/checkout@v4
+  #     - name: Set up Docker Buildx
+  #       uses: docker/setup-buildx-action@v3
+  #       with:
+  #         driver-opts: |
+  #           image=moby/buildkit:v0.16.0
+  #     - name: Set up Docker Compose
+  #       uses: docker/setup-compose-action@v1
+  #     - name: Start services
+  #       run: |
+  #         docker compose up -d --build --force-recreate vault
+
+  # build-consul:
+  #   runs-on: [self-hosted]
+  #   permissions:
+  #     contents: 'read'
+  #     id-token: 'write'
+  #   steps:
+  #     - name: Check out repository code
+  #       uses: actions/checkout@v4
+  #     - name: Set up Docker Buildx
+  #       uses: docker/setup-buildx-action@v3
+  #       with:
+  #         driver-opts: |
+  #           image=moby/buildkit:v0.16.0
+  #     - name: Set up Docker Compose
+  #       uses: docker/setup-compose-action@v1
+  #     - name: Start services
+  #       run: |
+  #         docker compose up -d --build --force-recreate consul
+
+  # build-mongo:
+  #   runs-on: [self-hosted]
+  #   permissions:
+  #     contents: 'read'
+  #     id-token: 'write'
+  #   steps:
+  #     - name: Check out repository code
+  #       uses: actions/checkout@v4
+  #     - name: Set up Docker Buildx
+  #       uses: docker/setup-buildx-action@v3
+  #       with:
+  #         driver-opts: |
+  #           image=moby/buildkit:v0.16.0
+  #     - name: Set up Docker Compose
+  #       uses: docker/setup-compose-action@v1
+  #     - name: Start services
+  #       run: |
+  #         docker compose up -d --build --force-recreate mongo
+
+  # build-postgresql:
+  #   runs-on: [self-hosted]
+  #   permissions:
+  #     contents: 'read'
+  #     id-token: 'write'
+  #   steps:
+  #     - name: Check out repository code
+  #       uses: actions/checkout@v4
+  #     - name: Set up Docker Buildx
+  #       uses: docker/setup-buildx-action@v3
+  #       with:
+  #         driver-opts: |
+  #           image=moby/buildkit:v0.16.0
+  #     - name: Set up Docker Compose
+  #       uses: docker/setup-compose-action@v1
+  #     - name: Start services
+  #       run: |
+  #         docker compose up -d --build --force-recreate postgresql
+
+  # build-minio:
+  #   runs-on: [self-hosted]
+  #   permissions:
+  #     contents: 'read'
+  #     id-token: 'write'
+  #   steps:
+  #     - name: Check out repository code
+  #       uses: actions/checkout@v4
+  #     - name: Set up Docker Buildx
+  #       uses: docker/setup-buildx-action@v3
+  #       with:
+  #         driver-opts: |
+  #           image=moby/buildkit:v0.16.0
+  #     - name: Set up Docker Compose
+  #       uses: docker/setup-compose-action@v1
+  #     - name: Start services
+  #       run: |
+  #         docker compose up -d --build --force-recreate minio
+
+  # build-frontend:
+  #   runs-on: [self-hosted]
+  #   permissions:
+  #     contents: 'read'
+  #     id-token: 'write'
+  #   steps:
+  #     - name: Check out repository code
+  #       uses: actions/checkout@v4
+  #     - name: Set up Docker Buildx
+  #       uses: docker/setup-buildx-action@v3
+  #       with:
+  #         driver-opts: |
+  #           image=moby/buildkit:v0.16.0
+  #     - name: Set up Docker Compose
+  #       uses: docker/setup-compose-action@v1
+  #     - name: Start services
+  #       run: |
+  #         docker compose up -d --build --force-recreate frontend
+
+  # build-reverse-proxy:
+  #   runs-on: [self-hosted]
+  #   permissions:
+  #     contents: 'read'
+  #     id-token: 'write'
+  #   steps:
+  #     - name: Check out repository code
+  #       uses: actions/checkout@v4
+  #     - name: Set up Docker Buildx
+  #       uses: docker/setup-buildx-action@v3
+  #       with:
+  #         driver-opts: |
+  #           image=moby/buildkit:v0.16.0
+  #     - name: Set up Docker Compose
+  #       uses: docker/setup-compose-action@v1
+  #     - name: Start services
+  #       run: |
+  #         docker compose up -d --build --force-recreate reverse-proxy
+
+  # build-api-minio:
+  #   runs-on: [self-hosted]
+  #   permissions:
+  #     contents: 'read'
+  #     id-token: 'write'
+  #   steps:
+  #     - name: Check out repository code
+  #       uses: actions/checkout@v4
+  #     - name: Set up Docker Buildx
+  #       uses: docker/setup-buildx-action@v3
+  #       with:
+  #         driver-opts: |
+  #           image=moby/buildkit:v0.16.0
+  #     - name: Set up Docker Compose
+  #       uses: docker/setup-compose-action@v1
+  #     - name: Start services
+  #       run: |
+  #         docker compose up -d --build --force-recreate api-minio
+
+  # build-api-mongodb:
+  #   runs-on: [self-hosted]
+  #   permissions:
+  #     contents: 'read'
+  #     id-token: 'write'
+  #   steps:
+  #     - name: Check out repository code
+  #       uses: actions/checkout@v4
+  #     - name: Set up Docker Buildx
+  #       uses: docker/setup-buildx-action@v3
+  #       with:
+  #         driver-opts: |
+  #           image=moby/buildkit:v0.16.0
+  #     - name: Set up Docker Compose
+  #       uses: docker/setup-compose-action@v1
+  #     - name: Start services
+  #       run: |
+  #         docker compose up -d --build --force-recreate api-mongodb
+
+  # build-api-postgresql:
+  #   runs-on: [self-hosted]
+  #   permissions:
+  #     contents: 'read'
+  #     id-token: 'write'
+  #   steps:
+  #     - name: Check out repository code
+  #       uses: actions/checkout@v4
+  #     - name: Set up Docker Buildx
+  #       uses: docker/setup-buildx-action@v3
+  #       with:
+  #         driver-opts: |
+  #           image=moby/buildkit:v0.16.0
+  #     - name: Set up Docker Compose
+  #       uses: docker/setup-compose-action@v1
+  #     - name: Start services
+  #       run: |
+  #         docker compose up -d --build --force-recreate api-postgresql
+
+
+  tests:
+    runs-on: [self-hosted]
+    # needs: [build-vault, build-consul, build-mongo, build-postgresql, build-minio, build-frontend, build-reverse-proxy, build-api-minio, build-api-mongodb, build-api-postgresql]
+    needs: [build]
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: |
+            image=moby/buildkit:v0.16.0
+      - name: Set up Docker Compose
+        uses: docker/setup-compose-action@v1
+      # - name: Start services
+      #   run: |
+      #     docker compose up -d --build --force-recreate
+      - name: Wait for services to be up
+        run: |
+          sleep 120
+      - name: Launch unit tests
+        run: |
+          sh scripts/launch_test.sh
+      # - name: Set python version
+      #   uses: actions/setup-python@v5
+      #   with:
+      #     python-version: "3.12.3"
+      # - name: Setting up Python environment
+      #   run: |
+      #     mkdir coverage
+      #     pip install pipenv
+      #     pipenv install --dev --ignore-pipfile
+      # - name: Linting API
+      #   run: |
+      #     # printing linter configuration
+      #     echo --------------------------
+      #     echo "Executing linter with the following error code disabled"
+      #     echo "  - C0111: Missing docstrings"
+      #     echo "  - R0902: Too many instance attributes"
+      #     echo "  - W0511: Fix me"
+      #     echo "  - W0702: No exception type(s) specified"
+      #     echo "  - R0913: Too many arguments"
+      #     echo "  - R0903: Too few public methods"
+      #     echo "  - R0904: Too many public methods"
+      #     echo "  - R0912: Too many branches"
+      #     echo "  - R0801: Similar lines in 2 files"
+      #     echo "  - W1514: Using open without explicitly specifying an encoding"
+      #     echo "  - R0916: Too many boolean expressions in if statement"
+      #     echo "  - R0901: Too many ancestors"
+      #     echo --------------------------
+      #     pipenv run pylint --disable=C0111,R0902,W0511,W0702,R0913,R0903,R0904,R0912,R0801,W1514,R0916,R0901 app
+      # - name: Running API tests
+      #   run: pipenv run pytest --capture=sys --cov-report term-missing --cov=app tests | tee coverage/coverage.txt
+      - name: Archive CI test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ci-test_results
+          path: test_results/*test_result.xml
+      - name: Archive CI code coverages
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ci-test_coverages
+          path: test_results/*test_coverage.xml
+
+  stop-services:
+    runs-on: [self-hosted]
+    needs: [tests]
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: |
+            image=moby/buildkit:v0.16.0
+      - name: Set up Docker Compose
+        uses: docker/setup-compose-action@v1
+      - name: Stop services
+        run: |
+          docker compose down

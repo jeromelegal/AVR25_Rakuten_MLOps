@@ -26,22 +26,18 @@ FROM ubuntu:noble-20250127
 
 # Ajouter l'utilisateur et le groupe Minio
 RUN groupadd --gid 999 --system minio && \
-    useradd --uid 999 --system --gid minio --home-dir /data/db minio && \
-    mkdir -p /data/db /data/configdb && \
-    chown -R minio:minio /data/db /data/configdb
+    useradd --uid 999 --system --gid minio --home-dir /home/minio minio
 
 # Définir les variables d'environnement pour Minio et Vault
 ENV VAULT_ADDR=${VAULT_ADDR:-"https://vault:8200"}
 ENV VAULT_USERNAME=${VAULT_USERNAME:-"minio"}
 ENV VAULT_PASSWORD=${VAULT_PASSWORD:-"minio"}
 ENV VAULT_ROLE=${VAULT_ROLE:-"your-role"}
-ENV DB_PATH=${DB_PATH:-"/data/db"}
 ENV REPLSET_NAME=${REPLSET_NAME:-"rs0"}
 ENV PORT=${PORT:-"9000"}
 ENV GUI_PORT=${GUI_PORT:-"9001"}
 ENV BIND_IP=${BIND_IP:-"0.0.0.0"}
 ENV TLS_MODE=${TLS_MODE:-"requireTLS"}
-ENV MINIO_BUCKET_NAME=${MINIO_BUCKET_NAME:-"images"}
 ENV MINIO_ROOT_USER=${MINIO_ROOT_USER:-"minio-user"}
 ENV MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-"minio-password"}
 ENV MINIO_PEM_PATH=${MINIO_PEM_PATH:-"/etc/ssl/minio/minio.pem"}
