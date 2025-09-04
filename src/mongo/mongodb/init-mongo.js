@@ -43,9 +43,8 @@ db.getSiblingDB('file_storage').createCollection('ads', {
   validator: {
       $jsonSchema: {
         bsonType: "object",
-        required: ["ad_id", "designation", "description", "image", "created_at", "created_by"],
+        required: ["designation", "description", "image", "created_at", "created_by"],
         properties: {
-          ad_id:       { bsonType: "string" },
           designation: { bsonType: "string" },
           description: { bsonType: "string" },
           image:       { bsonType: "string" },
