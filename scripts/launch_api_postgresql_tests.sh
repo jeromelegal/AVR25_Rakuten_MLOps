@@ -1,6 +1,10 @@
 #!/bin/bash
 
-RESULT_FOLDER=test_results
+RESLUT_FOLDER=test_results
+
+# Create folder to store test results
+echo "Create test resutl folder"
+mkdir -p $RESLUT_FOLDER
 
 # Execute api-postgresql tests
 echo "Executing api-postgresql tests"
