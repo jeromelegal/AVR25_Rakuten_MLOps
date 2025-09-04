@@ -110,3 +110,4 @@ RUN chmod +x /usr/local/bin/*.sh
 ENTRYPOINT ["entrypoint.sh"]
 EXPOSE 27017
 #CMD ["mongod"]
+VOLUME ["/data/db"]
