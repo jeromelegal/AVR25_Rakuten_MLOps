@@ -17,7 +17,6 @@ router = APIRouter()
 TEMP_FOLDER = os.path.join("tmp")
 DATETIME_FORMAT = "%Y-%m-%d %H:%M%S:Z"
 
-BUCKET_RESPONSE_KEY = "Buckets"
 CONTENT_RESPONSE_KEY = "Contents"
 
 
@@ -39,15 +38,6 @@ class ImageUpdateRaw(ImageRaw):
 
 class ImageResponse(ImageInfo):
     created_by: str
-
-
-class Bucket(BaseModel):
-    name: str
-    creation_date: datetime
-
-
-class Buckets(BaseModel):
-    buckets: List[Bucket]
 
 
 class ImageContent(BaseModel):
@@ -125,35 +115,6 @@ def _store_temp_image_from_bytes(
 def _delete_temp_file(tmp_path: str):
     if os.path.exists(path=tmp_path):
         os.remove(path=tmp_path)
-
-
-@router.get(
-    "/api/internal/minio/entity/buckets",
-    response_model=Buckets,
-)
-async def get_buckets(
-    settings: Annotated[Settings, Depends(get_settings)],
-    limit: int = 1000,
-) -> Buckets:
-    client = get_client(settings=settings)
-    try:
-        response = client.list_buckets(MaxBuckets=limit)
-    except ClientError as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Impossible to get the buckets from the Minio server: {e}",
-        )
-    if BUCKET_RESPONSE_KEY not in response:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Unable to process reponse from Minio server: {response}",
-        )
-    return Buckets(
-        buckets=[
-            Bucket(name=el["Name"], creation_date=el["CreationDate"])
-            for el in response[BUCKET_RESPONSE_KEY]
-        ]
-    )
 
 
 @router.get(

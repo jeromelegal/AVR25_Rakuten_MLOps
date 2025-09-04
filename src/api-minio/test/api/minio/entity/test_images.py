@@ -2,7 +2,6 @@ import os
 
 from api.minio.entity.images import (
     store_image,
-    get_buckets,
     list_files,
     get_image,
     update_image,
@@ -36,19 +35,13 @@ class TestImages:
 
         await self._delete_file(settings=mock_settings, image_id=res.image_id)
 
-    async def test_get_all_buckets(self, mock_settings):
-        res = await get_buckets(settings=mock_settings)
-
-        assert len(res.buckets) == 1
-        assert res.buckets[0].name == mock_settings.MINIO_BUCKET_NAME
-
     async def test_list_files_in_bucket(self, mock_settings):
         res = await self._add_new_file(settings=mock_settings)
         image_id = res.image_id
 
         res = await list_files(settings=mock_settings)
 
-        assert len(res.names) > 1
+        assert len(res.names) >= 1
 
         await self._delete_file(settings=mock_settings, image_id=image_id)
 

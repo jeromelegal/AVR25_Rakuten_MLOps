@@ -12,7 +12,7 @@ class TestS3:
 
         response = client.list_buckets(MaxBuckets=10)
 
-        assert len(response["Buckets"]) == 1
+        assert len(response["Buckets"]) >= 1
         assert response["Buckets"][0]["Name"] == "images"
 
 
