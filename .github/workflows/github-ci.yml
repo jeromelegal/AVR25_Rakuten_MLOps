@@ -100,25 +100,18 @@ jobs:
             RUN_AS_ROOT=false
           fi
 
-          # ENV_VARS=""
-          # echo "$CONFIG" | /usr/local/bin/yq eval '.env_vars | to_entries | .[]' | while read -r line; do
-          #   key=$(/usr/local/bin/yq eval '.key' <<< "$line")
-          #   value=$(/usr/local/bin/yq eval '.value' <<< "$line")
-
-          #   # Remplacer les placeholders par leurs valeurs
-          #   value=${value//\${BRANCH_NAME}/$BRANCH_NAME}
-          #   value=${value//\${VERSION}/$VERSION}
-          #   ENV_VARS+=" -e $key=\"$value\""
-          # done
-
           ENV_VARS=""
-          echo "$CONFIG" | /usr/local/bin/yq eval '.env_vars | to_entries | .[]' - | while read -r line; do
-            key=$(echo "$line" | /usr/local/bin/yq eval '.key' -)
-            value=$(echo "$line" | /usr/local/bin/yq eval '.value' -)
+          echo "$CONFIG" | /usr/local/bin/yq eval '.env_vars | to_entries | .[]' | while read -r line; do
+            echo "Test"
+            key=$(/usr/local/bin/yq eval '.key' <<< "$line")
+            value=$(/usr/local/bin/yq eval '.value' <<< "$line")
+
+            # Remplacer les placeholders par leurs valeurs
             value=${value//\${BRANCH_NAME}/$BRANCH_NAME}
             value=${value//\${VERSION}/$VERSION}
             ENV_VARS+=" -e $key=\"$value\""
           done
+
 
 
 
