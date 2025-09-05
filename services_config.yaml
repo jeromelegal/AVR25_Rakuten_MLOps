@@ -1,5 +1,6 @@
 services:
   vault:
+    run_as_root: true
     env_vars:
       SERVICE_NAME: "vault-${BRANCH_NAME}-${VERSION}"
       SERVICE_PORT: "8200"
