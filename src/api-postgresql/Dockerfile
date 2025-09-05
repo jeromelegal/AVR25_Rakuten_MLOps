@@ -77,14 +77,6 @@ RUN vault --version
 # Installer Python et pip
 RUN apt update && apt install -y python3-full python3-pip
 
-# Copier le fichier requirements.txt dans le conteneur
-COPY requirements.txt requirements.txt
-
-# Installer les dépendances en contournant la restriction
-RUN pip install --break-system-packages -r requirements.txt
-
-COPY . .
-
 # Installer les dépendances nécessaires
 RUN apt-get update && apt-get install -y curl jq unzip
 
@@ -106,7 +98,14 @@ RUN chmod +x /usr/local/bin/health-check.sh
 RUN mv nginx/nginx-conf.sh /usr/local/bin/nginx-conf.sh
 RUN chmod +x /usr/local/bin/nginx-conf.sh
 
+# Copier le fichier requirements.txt dans le conteneur
+COPY requirements.txt requirements.txt
+
+# Installer les dépendances en contournant la restriction
+RUN pip install --break-system-packages -r requirements.txt
+
+COPY . .
+
 EXPOSE 8010
 
-# CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 ENTRYPOINT ["entrypoint.sh"]

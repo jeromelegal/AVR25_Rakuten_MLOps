@@ -74,10 +74,6 @@ RUN setcap -r /usr/bin/vault
 
 RUN vault --version
 
-
-COPY . . 
-
-
 RUN mv vault/vault.sh /usr/local/bin/vault.sh
 RUN chmod +x /usr/local/bin/vault.sh
 
@@ -97,13 +93,10 @@ RUN chmod +x /usr/local/bin/health-check.sh
 RUN mv nginx/nginx-conf.sh /usr/local/bin/nginx-conf.sh
 RUN chmod +x /usr/local/bin/nginx-conf.sh
 
-
+COPY . . 
 
 EXPOSE 8600/udp 8500 8501 80 443
 
 ENTRYPOINT ["entrypoint.sh"]
-
-# Définir la commande pour démarrer Consul
-#CMD ["consul" "agent "]
 
 

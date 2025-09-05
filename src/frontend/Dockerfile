@@ -107,16 +107,6 @@ RUN npm install papaparse
 
 RUN npm run build
 
-
-
-
-
 EXPOSE 3000
-# CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+
 ENTRYPOINT ["entrypoint.sh"]
-
-
-
-# EXPOSE 3000
-
-# CMD ["npx", "serve", "-s", "build"]

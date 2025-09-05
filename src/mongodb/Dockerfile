@@ -14,8 +14,6 @@ ENV MONGO_REPO=${MONGO_REPO}
 ENV MONGO_MAJOR=8.0
 ENV MONGO_VERSION=8.0.8
 
-
-
 # Définir les variables d'environnement pour MongoDB et Vault
 ENV VAULT_ADDR=${VAULT_ADDR:-"https://vault:8200"}
 ENV VAULT_USERNAME=${VAULT_USERNAME:-"mongodb"}
@@ -41,9 +39,6 @@ ENV mTLS=${mTLS:-"false"}
 ENV LOG_PATH=${LOG_PATH:-"/var/log/mongodb/mongod.log"}
 ENV NGINX_CONFIG_FILE="/etc/nginx/nginx.conf"
 ENV HEALTH_CHECK_FILE="/usr/local/bin/health-check.sh"
-
-
-
 
 # Mettre à jour les paquets et installer les dépendances
 RUN apt-get update && apt-get install -y \

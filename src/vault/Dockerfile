@@ -115,5 +115,3 @@ EXPOSE 8200 8201 8501 80 443
 
 # Commande pour démarrer Vault
 ENTRYPOINT  ["entrypoint.sh"]
-
-#CMD ["vault","server"]

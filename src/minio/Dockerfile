@@ -85,8 +85,6 @@ RUN setcap -r /usr/bin/vault
 # Vérifier les versions installées
 RUN consul --version && vault --version
 
-
-
 # Copier les scripts et les fichiers de configuration
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY minio/init-minio.sh /usr/local/bin/init-minio.sh
@@ -95,10 +93,10 @@ COPY nginx/nginx-conf.sh /usr/local/bin/nginx-conf.sh
 COPY nginx/nginx-fcgiwrap.sh /usr/local/bin/nginx-fcgiwrap.sh
 COPY vault/vault.sh /usr/local/bin/vault.sh
 
-
 # Rendre les scripts exécutables
 RUN chmod +x /usr/local/bin/*.sh
 
-# # Définir le point d'entrée et exposer le port
+# Définir le point d'entrée et exposer le port
 EXPOSE 9010 9011
+
 ENTRYPOINT ["entrypoint.sh"]
