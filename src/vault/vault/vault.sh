@@ -11,7 +11,7 @@ SERVER_VAULT_PID=$!
 echo "Vault server started with PID $SERVER_VAULT_PID"
 
 echo "Start auto-unseal"
-sudo /usr/bin/python3 /usr/local/bin/auto-unseal.py > python.log 2>&1 &
+su - root -c "/usr/bin/python3 /usr/local/bin/auto-unseal.py > python.log 2>&1" &
 export AUTO_UNSEAL_PID=$!
 echo "Started auto-unseal AUTO_UNSEAL_PID: $AUTO_UNSEAL_PID"
 
