@@ -44,53 +44,11 @@ jobs:
           docker build -t ${{ matrix.service }}:$TAG .
 
 
-  # start-containers:
-  #   runs-on: [self-hosted]
-  #   needs: build  # Ce job dépend de la réussite du job "build"
-  #   strategy:
-  #     # max-parallel: 10
-  #     matrix:
-  #       service: [vault, consul, mongo, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
-  #   steps:
-  #     - name: Check out repository code
-  #       uses: actions/checkout@v4
-
-  #     - name: Get version from file
-  #       id: get_version
-  #       run: echo "VERSION=$(cat .version)" >> $GITHUB_OUTPUT
-
-  #     - name: Install yq
-  #       run: |
-  #         # Télécharger yq dans le répertoire courant
-  #         wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O ./yq
-  #         chmod +x ./yq
-  #         sudo mv ./yq /usr/local/bin/yq
-
-  #     - name: Start containers
-  #       run: |
-  #         VERSION=${{ steps.get_version.outputs.VERSION }}
-  #         BRANCH_NAME=${GITHUB_REF#refs/heads/}
-  #         TAG="${VERSION}-${BRANCH_NAME}"
-  #         CONFIG=$(/usr/local/bin/yq eval ".services.frontend.env_vars" services_config.yaml)
-  #         ENV_VARS=""
-  #         echo "$CONFIG" | /usr/local/bin/yq eval '. | to_entries | .[]' | while read -r line; do
-  #           key=$(/usr/local/bin/yq eval '.key' <<< "$line")
-  #           value=$(/usr/local/bin/yq eval '.value' <<< "$line")
-
-  #           # Remplacer les placeholders par leurs valeurs
-  #           value=${value//\${BRANCH_NAME}/$BRANCH_NAME}
-  #           value=${value//\${VERSION}/$VERSION}
-  #           ENV_VARS+=" -e $key=\"$value\""
-  #         done
-  #         # Démarrer le conteneur avec le nom incluant la branche et la version
-  #         docker run -d --name ${{ matrix.service }}-${BRANCH_NAME}-${VERSION} $ENV_VARS ${{ matrix.service }}:$TAG
-
-
-
   start-containers:
     runs-on: [self-hosted]
     needs: build  # Ce job dépend de la réussite du job "build"
     strategy:
+      # max-parallel: 10
       matrix:
         service: [vault, consul, mongo, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
     steps:
@@ -103,6 +61,7 @@ jobs:
 
       - name: Install yq
         run: |
+          # Télécharger yq dans le répertoire courant
           wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O ./yq
           chmod +x ./yq
           sudo mv ./yq /usr/local/bin/yq
@@ -122,13 +81,59 @@ jobs:
           echo "$CONFIG" | /usr/local/bin/yq eval '. | to_entries | .[]' | while read -r line; do
             key=$(/usr/local/bin/yq eval '.key' <<< "$line")
             value=$(/usr/local/bin/yq eval '.value' <<< "$line")
+
             # Remplacer les placeholders par leurs valeurs
             value=${value//\${BRANCH_NAME}/$BRANCH_NAME}
             value=${value//\${VERSION}/$VERSION}
             ENV_VARS+=" -e $key=\"$value\""
           done
           # Démarrer le conteneur avec le nom incluant la branche et la version
-          docker run -d --name $CONTAINER_NAME $ENV_VARS ${{ matrix.service }}:$TAG
+          docker run -d --name ${{ matrix.service }}-${BRANCH_NAME}-${VERSION} $ENV_VARS ${{ matrix.service }}:$TAG
+
+
+
+  # start-containers:
+  #   runs-on: [self-hosted]
+  #   needs: build  # Ce job dépend de la réussite du job "build"
+  #   strategy:
+  #     matrix:
+  #       service: [vault, consul, mongo, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
+  #   steps:
+  #     - name: Check out repository code
+  #       uses: actions/checkout@v4
+
+  #     - name: Get version from file
+  #       id: get_version
+  #       run: echo "VERSION=$(cat .version)" >> $GITHUB_OUTPUT
+
+  #     - name: Install yq
+  #       run: |
+  #         wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O ./yq
+  #         chmod +x ./yq
+  #         sudo mv ./yq /usr/local/bin/yq
+
+  #     - name: Start containers
+  #       run: |
+  #         VERSION=${{ steps.get_version.outputs.VERSION }}
+  #         BRANCH_NAME=${GITHUB_REF#refs/heads/}
+  #         TAG="${VERSION}-${BRANCH_NAME}"
+  #         CONTAINER_NAME="${{ matrix.service }}-${BRANCH_NAME}-${VERSION}"
+  #         # Vérifie si le conteneur est en cours d'exécution et l'arrête
+  #         if [ "$(docker ps -q -f name=$CONTAINER_NAME)" ]; then
+  #           docker stop $CONTAINER_NAME
+  #         fi
+  #         CONFIG=$(/usr/local/bin/yq eval ".services.frontend.env_vars" services_config.yaml)
+  #         ENV_VARS=""
+  #         echo "$CONFIG" | /usr/local/bin/yq eval '. | to_entries | .[]' | while read -r line; do
+  #           key=$(/usr/local/bin/yq eval '.key' <<< "$line")
+  #           value=$(/usr/local/bin/yq eval '.value' <<< "$line")
+  #           # Remplacer les placeholders par leurs valeurs
+  #           value=${value//\${BRANCH_NAME}/$BRANCH_NAME}
+  #           value=${value//\${VERSION}/$VERSION}
+  #           ENV_VARS+=" -e $key=\"$value\""
+  #         done
+  #         # Démarrer le conteneur avec le nom incluant la branche et la version
+  #         docker run -d --name $CONTAINER_NAME $ENV_VARS ${{ matrix.service }}:$TAG
 
 
 
