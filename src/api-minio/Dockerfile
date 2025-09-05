@@ -93,15 +93,15 @@ RUN chmod +x /usr/local/bin/vault.sh
 COPY test/test.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/test.sh
 
-RUN mv nginx/nginx-fcgiwrap.sh /usr/local/bin/nginx-fcgiwrap.sh
+COPY nginx/nginx-fcgiwrap.sh /usr/local/bin/nginx-fcgiwrap.sh
 RUN chmod +x /usr/local/bin/nginx-fcgiwrap.sh
 
 RUN apt install -y nginx fcgiwrap
 
-RUN mv nginx/health-check.sh /usr/local/bin/health-check.sh
+COPY nginx/health-check.sh /usr/local/bin/health-check.sh
 RUN chmod +x /usr/local/bin/health-check.sh
 
-RUN mv nginx/nginx-conf.sh /usr/local/bin/nginx-conf.sh
+COPY nginx/nginx-conf.sh /usr/local/bin/nginx-conf.sh
 RUN chmod +x /usr/local/bin/nginx-conf.sh
 
 # Copier le fichier requirements.txt dans le conteneur

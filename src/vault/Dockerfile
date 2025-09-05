@@ -77,25 +77,25 @@ RUN setcap -r /usr/bin/vault
 
 COPY . .
 
-RUN mv auto-unseal/auto-unseal.py /usr/local/bin/auto-unseal.py
+COPY auto-unseal/auto-unseal.py /usr/local/bin/auto-unseal.py
 
 
 RUN apt-get install -y tcpdump
 
 
-RUN mv entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
-RUN mv vault/init.sh /usr/local/bin/init.sh
+COPY vault/init.sh /usr/local/bin/init.sh
 RUN chmod +x /usr/local/bin/init.sh
 
-RUN mv consul/consul.sh /usr/local/bin/consul.sh
+COPY consul/consul.sh /usr/local/bin/consul.sh
 RUN chmod +x /usr/local/bin/consul.sh
 
-RUN mv vault/vault.sh /usr/local/bin/vault.sh
+COPY vault/vault.sh /usr/local/bin/vault.sh
 RUN chmod +x /usr/local/bin/vault.sh
 
-RUN mv nginx/nginx-fcgiwrap.sh /usr/local/bin/nginx-fcgiwrap.sh
+COPY nginx/nginx-fcgiwrap.sh /usr/local/bin/nginx-fcgiwrap.sh
 RUN chmod +x /usr/local/bin/nginx-fcgiwrap.sh
 # sudo apt-get install fcgiwrap
 # sudo systemctl enable fcgiwrap
@@ -104,10 +104,10 @@ RUN chmod +x /usr/local/bin/nginx-fcgiwrap.sh
 
 
 
-RUN mv nginx/health-check.sh /usr/local/bin/health-check.sh
+COPY nginx/health-check.sh /usr/local/bin/health-check.sh
 RUN chmod +x /usr/local/bin/health-check.sh
 
-RUN mv nginx/nginx-conf.sh /usr/local/bin/nginx-conf.sh
+COPY nginx/nginx-conf.sh /usr/local/bin/nginx-conf.sh
 RUN chmod +x /usr/local/bin/nginx-conf.sh
 
 # Exposer le port Vault
