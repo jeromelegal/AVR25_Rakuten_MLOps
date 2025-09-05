@@ -44,6 +44,28 @@ jobs:
           docker build -t ${{ matrix.service }}:$TAG .
 
 
+  start-containers:
+    runs-on: [self-hosted]
+    needs: build  # Ce job dépend de la réussite du job "build"
+    strategy:
+      max-parallel: 10
+      matrix:
+        service: [vault, consul, mongo, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+
+      - name: Get version from file
+        id: get_version
+        run: echo "VERSION=$(cat .version)" >> $GITHUB_OUTPUT
+
+      - name: Start containers
+        run: |
+          VERSION=${{ steps.get_version.outputs.VERSION }}
+          BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          TAG="${VERSION}-${BRANCH_NAME}"
+          docker run -d --name ${{ matrix.service }} ${{ matrix.service }}:$TAG
+
 
 # name: AVR25 Rakuten MLOps - CI
 # run-name: Test AVR25 Rakuten MLOps actions started by ${{ github.actor }}
