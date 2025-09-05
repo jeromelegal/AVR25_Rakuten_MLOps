@@ -89,7 +89,7 @@ RUN setcap -r /usr/bin/vault
 # Vérifier les versions installées
 RUN consul --version && vault --version
 
-
+RUN ls -lah
 
 # Copier les scripts et les fichiers de configuration
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh

@@ -18,7 +18,8 @@ jobs:
     strategy:
       max-parallel: 10
       matrix:
-        service: [vault, consul, mongo, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
+        # service: [vault, consul, mongo, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
+        service: [vault, consul, mongo]
     permissions:
       contents: 'read'
       id-token: 'write'
