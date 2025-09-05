@@ -118,11 +118,11 @@ jobs:
               CAP_OPTIONS+=" --cap-add=$cap"
             done
           fi
-
+          echo "TEST AFFICHAGE RUN_AS_ROOT $RUN_AS_ROOT"
           # Démarrer le conteneur avec les privilèges root si nécessaire
           if [ "$RUN_AS_ROOT" = true ]; then
             echo "Started as root"
-            sudo docker run -d --user root $CAP_OPTIONS --name $CONTAINER_NAME $ENV_VARS ${{ matrix.service }}:$TAG
+            docker run -d --user root $CAP_OPTIONS --name $CONTAINER_NAME $ENV_VARS ${{ matrix.service }}:$TAG
           else
             docker run -d $CAP_OPTIONS --name $CONTAINER_NAME $ENV_VARS ${{ matrix.service }}:$TAG
           fi
