@@ -3,8 +3,7 @@ run-name: Test AVR25 Rakuten MLOps actions started by ${{ github.actor }}
 on:
   push:
     branches:
-      - main
-      - mlflow
+      - '*'  # Cela signifie toutes les branches
   pull_request:
     types:
       - opened
@@ -18,8 +17,7 @@ jobs:
     strategy:
       max-parallel: 10
       matrix:
-        # service: [vault, consul, mongo, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
-        service: [vault, consul, mongo]
+        service: [vault, consul, mongo, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
     permissions:
       contents: 'read'
       id-token: 'write'
@@ -42,8 +40,8 @@ jobs:
           VERSION=${{ steps.get_version.outputs.VERSION }}
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
           TAG="${VERSION}-${BRANCH_NAME}"
-          docker build -t ${{ matrix.service }}:$TAG -f src/${{ matrix.service }}/Dockerfile .
-
+          cd src/${{ matrix.service }}
+          docker build -t ${{ matrix.service }}:$TAG .
 
 
 # name: AVR25 Rakuten MLOps - CI
