@@ -1,0 +1,124 @@
+services:
+  vault:
+    env_vars:
+      SERVICE_NAME: "vault-${BRANCH_NAME}-${VERSION}"
+      SERVICE_PORT: "8200"
+      VAULT_ADDR: "https://vault:8200"
+      VAULT_USERNAME: "vault"
+      VAULT_PASSWORD: "vault"
+      CONSUL_SERVER_HOST: "consul-${BRANCH_NAME}-${VERSION}"
+      CONSUL_SERVER_PORT: "8501"
+  consul:
+    env_vars:
+      SERVICE_NAME: "consul-${BRANCH_NAME}-${VERSION}"
+      SERVICE_PORT: "8500"
+      VAULT_ADDR: "https://vault-${BRANCH_NAME}-${VERSION}:8200"
+      VAULT_USERNAME: "consul"
+      VAULT_PASSWORD: "consul"
+      CONSUL_SERVER_HOST: "consul-${BRANCH_NAME}-${VERSION}"
+      CONSUL_SERVER_PORT: "8501"
+      INITIALIZED: "false"
+  postgresql:
+    env_vars:
+      SERVICE_NAME: "postgresql-${BRANCH_NAME}-${VERSION}"
+      SERVICE_PORT: "5432"
+      VAULT_ADDR: "https://vault-${BRANCH_NAME}-${VERSION}:8200"
+      VAULT_USERNAME: "postgresql"
+      VAULT_PASSWORD: "postgresql"
+      PORT: "5432"
+      VAULT_SERVICE_NAME: "vault-${BRANCH_NAME}-${VERSION}"
+  api-postgresql:
+    env_vars:
+      SERVICE_NAME: "api-postgresql-${BRANCH_NAME}-${VERSION}"
+      SERVICE_PORT: "8080"
+      POSTGRESQL_SERVICE_NAME: "postgresql-${BRANCH_NAME}-${VERSION}"
+      POSTGRESQL_SERVICE_PORT: "5432"
+      VAULT_ADDR: "https://vault-${BRANCH_NAME}-${VERSION}:8200"
+      VAULT_USERNAME: "api-postgresql"
+      VAULT_PASSWORD: "api-postgresql"
+      VAULT_SERVICE_NAME: "vault-${BRANCH_NAME}-${VERSION}"
+      API_GATEWAY_SERVICE_NAME: "api-gateway-${BRANCH_NAME}-${VERSION}"
+  mongodb:
+    env_vars:
+      VAULT_SERVICE_NAME: "vault-${BRANCH_NAME}-${VERSION}"
+      VAULT_ADDR: "https://vault-${BRANCH_NAME}-${VERSION}:8200"
+      VAULT_USERNAME: "mongodb"
+      VAULT_PASSWORD: "mongodb"
+      PORT: "27017"
+      SERVICE_NAME: "mongodb-${BRANCH_NAME}-${VERSION}"
+  api-mongodb:
+    env_vars:
+      SERVICE_NAME: "api-mongodb-${BRANCH_NAME}-${VERSION}"
+      SERVICE_PORT: "8000"
+      VAULT_ADDR: "https://vault-${BRANCH_NAME}-${VERSION}:8200"
+      VAULT_USERNAME: "api-mongodb"
+      VAULT_PASSWORD: "api-mongodb"
+      VAULT_SERVICE_NAME: "vault-${BRANCH_NAME}-${VERSION}"
+      MONGODB_SERVICE_NAME: "mongodb-${BRANCH_NAME}-${VERSION}"
+      MONGODB_SERVICE_PORT: "27017"
+      API_GATEWAY_SERVICE_NAME: "api-gateway-${BRANCH_NAME}-${VERSION}"
+  minio:
+    env_vars:
+      VAULT_ADDR: "https://vault-${BRANCH_NAME}-${VERSION}:8200"
+      VAULT_USERNAME: "minio"
+      VAULT_PASSWORD: "minio"
+      PORT: "9010"
+      GUI_PORT: "9011"
+      SERVICE_NAME: "minio-${BRANCH_NAME}-${VERSION}"
+      VAULT_SERVICE_NAME: "vault-${BRANCH_NAME}-${VERSION}"
+  api-minio:
+    env_vars:
+      SERVICE_NAME: "api-minio-${BRANCH_NAME}-${VERSION}"
+      SERVICE_PORT: "8020"
+      SERVICE_VERSION: "v0.0.1"
+      VAULT_ADDR: "https://vault-${BRANCH_NAME}-${VERSION}:8200"
+      VAULT_USERNAME: "api-minio"
+      VAULT_PASSWORD: "api-password"
+      VAULT_SERVICE_NAME: "vault-${BRANCH_NAME}-${VERSION}"
+      MINIO_SERVICE_NAME: "minio-${BRANCH_NAME}-${VERSION}"
+      MINIO_SERVICE_PORT: "9010"
+      API_GATEWAY_SERVICE_NAME: "api-gateway-${BRANCH_NAME}-${VERSION}"
+  api-gateway:
+    env_vars:
+      SERVICE_NAME: "api-gateway-${BRANCH_NAME}-${VERSION}"
+      SERVICE_PORT: "9000"
+      VAULT_ADDR: "https://vault-${BRANCH_NAME}-${VERSION}:8200"
+      VAULT_SERVICE_NAME: "vault-${BRANCH_NAME}-${VERSION}"
+      VAULT_USERNAME: "api-gateway"
+      VAULT_PASSWORD: "api-gateway"
+      API_MONGODB_SERVICE_NAME: "api-mongodb-${BRANCH_NAME}-${VERSION}"
+      API_MONGODB_SERVICE_PORT: "8000"
+      API_POSTGRESQL_SERVICE_NAME: "api-postgresql-${BRANCH_NAME}-${VERSION}"
+      API_POSTGRESQL_SERVICE_PORT: "8010"
+  mlflow:
+    env_vars:
+      SERVICE_NAME: "mlflow-${BRANCH_NAME}-${VERSION}"
+      SERVICE_PORT: "8000"
+      VAULT_ADDR: "https://vault-${BRANCH_NAME}-${VERSION}:8200"
+      VAULT_USERNAME: "mlflow"
+      VAULT_PASSWORD: "mlflow"
+      VAULT_SERVICE_NAME: "vault-${BRANCH_NAME}-${VERSION}"
+      MONGODB_SERVICE_NAME: "mongodb-${BRANCH_NAME}-${VERSION}"
+      MONGODB_SERVICE_PORT: "27017"
+      MINIO_SERVICE_NAME: "minio-${BRANCH_NAME}-${VERSION}"
+      MINIO_SERVICE_PORT: "9010"
+  frontend:
+    env_vars:
+      SERVICE_NAME: "frontend-${BRANCH_NAME}-${VERSION}"
+      VAULT_ADDR: "https://vault-${BRANCH_NAME}-${VERSION}:8200"
+      VAULT_SERVICE_NAME: "vault-${BRANCH_NAME}-${VERSION}"
+      VAULT_USERNAME: "frontend"
+      VAULT_PASSWORD: "frontend"
+      API_GATEWAY_SERVICE_NAME: "api-gateway-${BRANCH_NAME}-${VERSION}"
+      API_GATEWAY_SERVICE_PORT: "8000"
+  reverse-proxy:
+    env_vars:
+      SERVICE_NAME: "reverse-proxy-${BRANCH_NAME}-${VERSION}"
+      VAULT_ADDR: "https://vault-${BRANCH_NAME}-${VERSION}:8200"
+      VAULT_SERVICE_NAME: "vault-${BRANCH_NAME}-${VERSION}"
+      VAULT_USERNAME: "reverse-proxy"
+      VAULT_PASSWORD: "reverse-proxy"
+      FRONTEND_SERVICE_NAME: "frontend-${BRANCH_NAME}-${VERSION}"
+      FRONTEND_SERVICE_PORT: "3000"
+      API_GATEWAY_SERVICE_NAME: "api-gateway-${BRANCH_NAME}-${VERSION}"
+      API_GATEWAY_SERVICE_PORT: "9000"

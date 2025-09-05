@@ -15,7 +15,7 @@ jobs:
   build:
     runs-on: [self-hosted]
     strategy:
-      max-parallel: 10
+      # max-parallel: 10
       matrix:
         service: [vault, consul, mongo, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
     permissions:
@@ -59,13 +59,29 @@ jobs:
         id: get_version
         run: echo "VERSION=$(cat .version)" >> $GITHUB_OUTPUT
 
+      - name: Install yq
+        run: sudo snap install yq
+
       - name: Start containers
         run: |
           VERSION=${{ steps.get_version.outputs.VERSION }}
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
           TAG="${VERSION}-${BRANCH_NAME}"
-          docker run -d --name ${{ matrix.service }} ${{ matrix.service }}:$TAG
+          # Extraire les variables pour le service actuel
+          CONFIG=$(yq eval ".services.${{ matrix.service }}.env_vars" services_config.yaml)
+          ENV_VARS=""
+          # Générer les arguments -e pour docker run
+          echo "$CONFIG" | yq eval '. | to_entries | .[]' | while read -r line; do
+            key=$(echo "$line" | yq eval '.key' -)
+            value=$(echo "$line" | yq eval '.value' -)
 
+            # Remplacer les placeholders par leurs valeurs
+            value=${value//\${BRANCH_NAME}/$BRANCH_NAME}
+            value=${value//\${VERSION}/$VERSION}
+            ENV_VARS+=" -e $key=\"$value\""
+          done
+          # Démarrer le conteneur avec les variables d'environnement
+          docker run -d --name ${{ matrix.service }} $ENV_VARS ${{ matrix.service }}:$TAG
 
 # name: AVR25 Rakuten MLOps - CI
 # run-name: Test AVR25 Rakuten MLOps actions started by ${{ github.actor }}
