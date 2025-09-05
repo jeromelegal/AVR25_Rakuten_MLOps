@@ -44,6 +44,7 @@ jobs:
           docker build -t ${{ matrix.service }}:$TAG .
 
 
+
 # name: AVR25 Rakuten MLOps - CI
 # run-name: Test AVR25 Rakuten MLOps actions started by ${{ github.actor }}
 # on:
