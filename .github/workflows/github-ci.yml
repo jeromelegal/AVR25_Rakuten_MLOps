@@ -102,7 +102,6 @@ jobs:
 
           ENV_VARS=""
           echo "$CONFIG" | /usr/local/bin/yq eval '.env_vars | to_entries | .[]' | while read -r line; do
-            echo "Test"
             key=$(/usr/local/bin/yq eval '.key' <<< "$line")
             value=$(/usr/local/bin/yq eval '.value' <<< "$line")
 
@@ -110,6 +109,7 @@ jobs:
             value=${value//\${BRANCH_NAME}/$BRANCH_NAME}
             value=${value//\${VERSION}/$VERSION}
             ENV_VARS+=" -e $key=\"$value\""
+            echo "Test ENV_VARS  $ENV_VARS"
           done
 
 
