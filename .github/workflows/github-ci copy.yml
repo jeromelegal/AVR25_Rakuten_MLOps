@@ -1,0 +1,44 @@
+name: AVR25 Rakuten MLOps - CI
+run-name: Test AVR25 Rakuten MLOps actions started by ${{ github.actor }}
+on:
+  push:
+    branches:
+      - master
+      - MLFlow
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+env:
+  FORCE_COLOR: "1"
+jobs:
+  build:
+    runs-on: [self-hosted]
+    strategy:
+      max-parallel: 10
+      matrix:
+        service: [vault, consul, mongo, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+
+      - name: Get version from file
+        id: get_version
+        run: echo "VERSION=$(cat VERSION)" >> $GITHUB_OUTPUT
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: |
+            image=moby/buildkit:v0.16.0
+
+      - name: Build services
+        run: |
+          VERSION=${{ steps.get_version.outputs.VERSION }}
+          BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          TAG="${VERSION}-${BRANCH_NAME}"
+          docker build -t ${{ matrix.service }}:$TAG -f src/${{ matrix.service }}/Dockerfile .
