@@ -34,8 +34,6 @@ jobs:
           docker stop ${{ matrix.service }}-${BRANCH_NAME}-${VERSION} || true
           docker rm ${{ matrix.service }}-${BRANCH_NAME}-${VERSION} || true
 
-
-
   build:
     runs-on: [self-hosted]
     needs: clear-containers
@@ -95,6 +93,13 @@ jobs:
           TAG="${VERSION}-${BRANCH_NAME}"
           CONTAINER_NAME="${{ matrix.service }}-${BRANCH_NAME}-${VERSION}"
           CONFIG=$(/usr/local/bin/yq eval ".services.frontend.env_vars" services_config.yaml)
+          RUN_AS_ROOT=$(/usr/local/bin/yq eval ".run_as_root" <<< "$CONFIG")
+
+          # Si RUN_AS_ROOT est vide ou non défini, nous le définissons comme false par défaut
+          if [ -z "$RUN_AS_ROOT" ] || [ "$RUN_AS_ROOT" = "null" ]; then
+            RUN_AS_ROOT=false
+          fi
+
           ENV_VARS=""
           echo "$CONFIG" | /usr/local/bin/yq eval '. | to_entries | .[]' | while read -r line; do
             key=$(/usr/local/bin/yq eval '.key' <<< "$line")
@@ -106,9 +111,13 @@ jobs:
             ENV_VARS+=" -e $key=\"$value\""
           done
           # Démarrer le conteneur avec le nom incluant la branche et la version
-          docker run -d --name ${{ matrix.service }}-${BRANCH_NAME}-${VERSION} $ENV_VARS ${{ matrix.service }}:$TAG
-
-
+          # docker run -d --name ${{ matrix.service }}-${BRANCH_NAME}-${VERSION} $ENV_VARS ${{ matrix.service }}:$TAG
+          # Démarrer le conteneur avec les privilèges root si nécessaire
+          if [ "$RUN_AS_ROOT" = true ]; then
+            docker run -d --user root --name $CONTAINER_NAME $ENV_VARS ${{ matrix.service }}:$TAG
+          else
+            docker run -d --name $CONTAINER_NAME $ENV_VARS ${{ matrix.service }}:$TAG
+          fi
 
   health-check-containers:
     runs-on: [self-hosted]
@@ -142,17 +151,10 @@ jobs:
             echo "$URL is healthy."
           done
 
-
-
-
-
-
-
   stop-containers:
     runs-on: [self-hosted]
     needs: health-check-containers  # Ce job dépend de la réussite du job "start-containers"
     strategy:
-      # max-parallel: 10
       matrix:
         service: [vault, consul, mongo, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
     steps:
