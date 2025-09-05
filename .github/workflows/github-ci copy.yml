@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - master
-      - MLFlow
+      - mlflow
   pull_request:
     types:
       - opened
