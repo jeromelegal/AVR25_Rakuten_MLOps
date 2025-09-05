@@ -61,9 +61,10 @@ jobs:
 
       - name: Install yq
         run: |
-          sudo rm -f /usr/bin/yq
-          sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq
-          sudo chmod +x /usr/bin/yq
+          # Télécharger yq dans le répertoire courant
+          wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O ./yq
+          chmod +x ./yq
+          sudo mv ./yq /usr/local/bin/yq
 
       - name: Start containers
         run: |
