@@ -141,9 +141,8 @@ jobs:
 
   health-check-containers:
     runs-on: [self-hosted]
-    needs: start-containers  # Ce job dépend de la réussite du job "start-containers"
+    needs: start-containers
     strategy:
-      max-parallel: 10
       matrix:
         service: [vault, consul, mongo, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
     steps:
@@ -162,25 +161,15 @@ jobs:
           VERSION=${{ steps.get_version.outputs.VERSION }}
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
           HEALTH_CHECK=$(/usr/local/bin/yq eval ".services.${{ matrix.service }}.health_check.urls" health_check_config.yaml)
-
-          sleep 10
-
           echo "$HEALTH_CHECK" | /usr/local/bin/yq eval '.[]' | while read -r check; do
             URL=$(/usr/local/bin/yq eval '.url' <<< "$check")
             EXPECTED_CODE=$(/usr/local/bin/yq eval '.expected_code' <<< "$check")
-
-            # Effectuer la requête curl et vérifier le code de retour
-            RESPONSE_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$URL")
-
-            if [ "$RESPONSE_CODE" -ne "$EXPECTED_CODE" ]; then
-              echo "Health check failed for $URL. Expected code $EXPECTED_CODE but got $RESPONSE_CODE"
-              exit 1
-            else
-              echo "Health check passed for $URL"
-            fi
+            until [ "$(curl -s -o /dev/null -w "%{http_code}" "$URL")" -eq "$EXPECTED_CODE" ]; do
+              echo "Waiting for $URL to be healthy."
+              sleep 1
+            done
+            echo "$URL is healthy."
           done
-
-
 
 
 
