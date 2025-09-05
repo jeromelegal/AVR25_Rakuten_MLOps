@@ -110,14 +110,21 @@ jobs:
             value=${value//\${VERSION}/$VERSION}
             ENV_VARS+=" -e $key=\"$value\""
           done
-          # Démarrer le conteneur avec le nom incluant la branche et la version
-          # docker run -d --name ${{ matrix.service }}-${BRANCH_NAME}-${VERSION} $ENV_VARS ${{ matrix.service }}:$TAG
+
+          # Préparation des capacités à ajouter
+          CAP_OPTIONS=""
+          if [ "$CAP_ADD" != "null" ] && [ -n "$CAP_ADD" ]; then
+            echo "$CAP_ADD" | /usr/local/bin/yq eval '.[]' | while read -r cap; do
+              CAP_OPTIONS+=" --cap-add=$cap"
+            done
+          fi
+
           # Démarrer le conteneur avec les privilèges root si nécessaire
           if [ "$RUN_AS_ROOT" = true ]; then
             echo "Started as root"
-            docker run -d --user root --name $CONTAINER_NAME $ENV_VARS ${{ matrix.service }}:$TAG
+            docker run -d --user root $CAP_OPTIONS --name $CONTAINER_NAME $ENV_VARS ${{ matrix.service }}:$TAG
           else
-            docker run -d --name $CONTAINER_NAME $ENV_VARS ${{ matrix.service }}:$TAG
+            docker run -d $CAP_OPTIONS --name $CONTAINER_NAME $ENV_VARS ${{ matrix.service }}:$TAG
           fi
 
   health-check-containers:
