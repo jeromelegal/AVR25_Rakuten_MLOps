@@ -118,7 +118,7 @@ jobs:
               CAP_OPTIONS+=" --cap-add=$cap"
             done
           fi
-          echo "TEST AFFICHAGE RUN_AS_ROOT $RUN_AS_ROOT"
+          echo "TEST AFFICHAGE RUN_AS_ROOT $RUN_AS_ROOT   CAP_OPTIONS  $CAP_OPTIONS"
           # Démarrer le conteneur avec les privilèges root si nécessaire
           if [ "$RUN_AS_ROOT" = true ]; then
             echo "Started as root"
