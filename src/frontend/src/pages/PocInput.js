@@ -6,6 +6,7 @@ import ProductTitleInput from '../components/ProductTitleInput';
 import ProductCategoryButton from '../components/ProductCategoryButton';
 import ProductCategoryModal from '../components/ProductCategoryModal';
 import ValidateButton from '../components/ValidateButton';
+import { handleValidateAll } from './handlers/handleValidateAll';
 
 const PocInput = () => {
   const [description, setDescription] = useState('');
@@ -36,16 +37,13 @@ const PocInput = () => {
   };
 
    // Example save handler
-  const handleValidateAll = () => {
-    // Save logic here (e.g., send to backend)
-    const productData = {
-      title,
-      description,
-      category: selectedCategory,
-      picture
-    };
-    console.log('Saving product:', productData);
-    // Add your save-to-database logic here
+  const onValidateClick = async () => {
+    try {
+      await handleValidateAll({ title, description, picture });
+      // Show success message or redirect
+    } catch (error) {
+      // Show error message
+    }
   };
 
   return (
@@ -61,7 +59,7 @@ const PocInput = () => {
         <ProductCategoryButton onClick={handleCategoryButtonClick} />
         <div style={{ height: '1rem' }}></div> 
         <ValidateButton
-          onClick={handleValidateAll}
+          onClick={onValidateClick}
           disabled={!title || !description || !selectedCategory || !picture}
         >
           Validate Product
