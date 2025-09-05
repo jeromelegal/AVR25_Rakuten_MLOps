@@ -100,24 +100,50 @@ jobs:
             RUN_AS_ROOT=false
           fi
 
-          ENV_VARS=""
-          echo "$CONFIG" | /usr/local/bin/yq eval 'env_vars | to_entries | .[]' | while read -r line; do
-            key=$(/usr/local/bin/yq eval '.key' <<< "$line")
-            value=$(/usr/local/bin/yq eval '.value' <<< "$line")
+          # ENV_VARS=""
+          # echo "$CONFIG" | /usr/local/bin/yq eval '.env_vars | to_entries | .[]' | while read -r line; do
+          #   key=$(/usr/local/bin/yq eval '.key' <<< "$line")
+          #   value=$(/usr/local/bin/yq eval '.value' <<< "$line")
 
-            # Remplacer les placeholders par leurs valeurs
+          #   # Remplacer les placeholders par leurs valeurs
+          #   value=${value//\${BRANCH_NAME}/$BRANCH_NAME}
+          #   value=${value//\${VERSION}/$VERSION}
+          #   ENV_VARS+=" -e $key=\"$value\""
+          # done
+
+          ENV_VARS=""
+          echo "$CONFIG" | /usr/local/bin/yq eval '.env_vars | to_entries | .[]' - | while read -r line; do
+            key=$(echo "$line" | /usr/local/bin/yq eval '.key' -)
+            value=$(echo "$line" | /usr/local/bin/yq eval '.value' -)
             value=${value//\${BRANCH_NAME}/$BRANCH_NAME}
             value=${value//\${VERSION}/$VERSION}
             ENV_VARS+=" -e $key=\"$value\""
           done
 
-          # Préparation des capacités à ajouter
+
+
+          # # Préparation des capacités à ajouter
+          # CAP_OPTIONS=""
+          # if [ "$CAP_ADD" != "null" ] && [ -n "$CAP_ADD" ]; then
+          #   echo "$CAP_ADD" | /usr/local/bin/yq eval '.cap-add | to_entries | .[]' | while read -r cap; do
+          #     CAP_OPTIONS+=" --cap-add=$cap"
+          #   done
+          # fi
+
+
+          CAP_ADD=$(/usr/local/bin/yq eval ".cap_add | join(\",\")" <<< "$CONFIG")
           CAP_OPTIONS=""
           if [ "$CAP_ADD" != "null" ] && [ -n "$CAP_ADD" ]; then
-            echo "$CAP_ADD" | /usr/local/bin/yq eval '.[]' | while read -r cap; do
+            for cap in $(echo $CAP_ADD | tr ',' '\n'); do
               CAP_OPTIONS+=" --cap-add=$cap"
             done
           fi
+
+
+
+
+
+
           echo "TEST AFFICHAGE RUN_AS_ROOT $RUN_AS_ROOT   CAP_OPTIONS  $CAP_OPTIONS   ENV_VARS   $ENV_VARS"
           # Démarrer le conteneur avec les privilèges root si nécessaire
           if [ "$RUN_AS_ROOT" = true ]; then
