@@ -115,7 +115,7 @@ jobs:
           CONTAINER_NAME="${{ matrix.service }}-${BRANCH_NAME}-${VERSION}"
           # Vérifie si le conteneur est en cours d'exécution et l'arrête
           if [ "$(docker ps -q -f name=$CONTAINER_NAME)" ]; then
-            docker stop $CONTAINER_NAME
+            docker rm $CONTAINER_NAME -f
           fi
           CONFIG=$(/usr/local/bin/yq eval ".services.frontend.env_vars" services_config.yaml)
           ENV_VARS=""
