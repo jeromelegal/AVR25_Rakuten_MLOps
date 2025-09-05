@@ -1,0 +1,56 @@
+services:
+  vault:
+    health_check:
+      urls:
+        - url: "http://vault-${BRANCH_NAME}-${VERSION}/health"
+          expected_code: 200
+  consul:
+    health_check:
+      urls:
+        - url: "http://consul-${BRANCH_NAME}-${VERSION}/health"
+          expected_code: 200
+  mongo:
+    health_check:
+      urls:
+        - url: "http://mongo-${BRANCH_NAME}-${VERSION}/health"
+          expected_code: 200
+  api-mongodb:
+    health_check:
+      urls:
+        - url: "http://api-mongodb-${BRANCH_NAME}-${VERSION}/health"
+          expected_code: 200
+  postgresql:
+    health_check:
+      urls:
+        - url: "http://postgresql-${BRANCH_NAME}-${VERSION}/health"
+          expected_code: 200
+  api-postgresql:
+    health_check:
+      urls:
+        - url: "http://api-postgresql-${BRANCH_NAME}-${VERSION}/health"
+          expected_code: 200
+  api-gateway:
+    health_check:
+      urls:
+        - url: "http://api-gateway-${BRANCH_NAME}-${VERSION}/health"
+          expected_code: 200
+  frontend:
+    health_check:
+      urls:
+        - url: "http://frontend-${BRANCH_NAME}-${VERSION}/health"
+          expected_code: 200
+  reverse-proxy:
+    health_check:
+      urls:
+        - url: "http://reverse-proxy-${BRANCH_NAME}-${VERSION}/health"
+          expected_code: 200
+  minio:
+    health_check:
+      urls:
+        - url: "http://minio-${BRANCH_NAME}-${VERSION}/health"
+          expected_code: 200
+  api-minio:
+    health_check:
+      urls:
+        - url: "http://api-minio-${BRANCH_NAME}-${VERSION}/health"
+          expected_code: 200
