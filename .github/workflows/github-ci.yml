@@ -185,7 +185,7 @@ jobs:
 
   stop-containers:
     runs-on: [self-hosted]
-    needs: start-containers  # Ce job dépend de la réussite du job "start-containers"
+    needs: health-check-containers  # Ce job dépend de la réussite du job "start-containers"
     strategy:
       # max-parallel: 10
       matrix:
