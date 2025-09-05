@@ -15,6 +15,7 @@ jobs:
 
   clear-containers:
     runs-on: [self-hosted]
+    needs: health-check-containers  # Ce job dépend de la réussite du job "start-containers"
     strategy:
       # max-parallel: 10
       matrix:
