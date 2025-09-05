@@ -1,9 +1,10 @@
 name: AVR25 Rakuten MLOps - CI
 run-name: Test AVR25 Rakuten MLOps actions started by ${{ github.actor }}
 on:
-  push:
-    branches:
-      - master
+  # push:
+  #   branches:
+  #     - master
+  #     - mlflow
   pull_request:
     types:
       - opened
