@@ -13,9 +13,10 @@ env:
   FORCE_COLOR: "1"
 jobs:
 
-  stop-containers:
+  clear-containers:
     runs-on: [self-hosted]
     strategy:
+      # max-parallel: 10
       matrix:
         service: [vault, consul, mongo, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
     steps:
@@ -24,20 +25,20 @@ jobs:
       - name: Get version from file
         id: get_version
         run: echo "VERSION=$(cat .version)" >> $GITHUB_OUTPUT
-      - name: Stop containers
+      - name: Stop and remove containers
         run: |
           VERSION=${{ steps.get_version.outputs.VERSION }}
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
-          CONTAINER_NAME="${{ matrix.service }}-${BRANCH_NAME}-${VERSION}"
-          # Vérifie si le conteneur est en cours d'exécution et l'arrête
-          if [ "$(docker ps -q -f name=$CONTAINER_NAME)" ]; then
-            docker rm $CONTAINER_NAME -f
-          fi
+          TAG="${VERSION}-${BRANCH_NAME}"
+          # Arrêter et retirer le conteneur
+          docker stop ${{ matrix.service }}-${BRANCH_NAME}-${VERSION} || true
+          docker rm ${{ matrix.service }}-${BRANCH_NAME}-${VERSION} || true
+
 
 
   build:
     runs-on: [self-hosted]
-    needs: stop-containers
+    needs: clear-containers
     strategy:
       matrix:
         service: [vault, consul, mongo, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
