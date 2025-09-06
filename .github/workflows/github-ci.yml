@@ -88,6 +88,7 @@ jobs:
 
       - name: Start containers
         run: |
+          echo "DEBUG 0"
           VERSION=${{ steps.get_version.outputs.VERSION }}
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
           TAG="${VERSION}-${BRANCH_NAME}"
@@ -95,11 +96,13 @@ jobs:
           CONFIG=$(/usr/local/bin/yq eval ".services.${{ matrix.service }}" services_config.yaml)
           RUN_AS_ROOT=$(/usr/local/bin/yq eval ".run_as_root" <<< "$CONFIG")
 
+          echo "DEBUG 1"
           # Si RUN_AS_ROOT est vide ou non défini, nous le définissons comme false par défaut
           if [ -z "$RUN_AS_ROOT" ] || [ "$RUN_AS_ROOT" = "null" ]; then
             RUN_AS_ROOT=false
           fi
 
+          echo "DEBUG 2"
           ENV_VARS=""
           while IFS= read -r line; do
             key=$(echo "$line" | /usr/local/bin/yq eval '.key' -)
@@ -108,7 +111,8 @@ jobs:
             value=${value//\${VERSION}/$VERSION}
             ENV_VARS+=" -e $key=\"$value\""
           done < <(/usr/local/bin/yq eval '.env_vars | to_entries | .[]' - <<< "$CONFIG")
-
+          
+          echo "DEBUG 3"
           CAP_ADD=$(/usr/local/bin/yq eval ".cap_add | join(\",\")" <<< "$CONFIG")
           CAP_OPTIONS=""
           if [ "$CAP_ADD" != "null" ] && [ -n "$CAP_ADD" ]; then
@@ -116,8 +120,11 @@ jobs:
               CAP_OPTIONS+=" --cap-add=$cap"
             done
           fi
-
+          echo "DEBUG 4"
+          
           echo "TEST AFFICHAGE RUN_AS_ROOT $RUN_AS_ROOT   CAP_OPTIONS  $CAP_OPTIONS   ENV_VARS   $ENV_VARS"
+
+
           # Démarrer le conteneur avec les privilèges root si nécessaire
           if [ "$RUN_AS_ROOT" = true ]; then
             echo "Started as root"
