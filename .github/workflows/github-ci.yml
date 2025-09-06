@@ -113,13 +113,26 @@ jobs:
           done < <(/usr/local/bin/yq eval '.env_vars | to_entries | .[]' - <<< "$CONFIG")
           
           echo "DEBUG 3"
-          CAP_ADD=$(/usr/local/bin/yq eval ".cap_add | join(\",\")" <<< "$CONFIG")
+          # CAP_ADD=$(/usr/local/bin/yq eval ".cap_add | join(\",\")" <<< "$CONFIG")
+          # CAP_OPTIONS=""
+          # if [ "$CAP_ADD" != "null" ] && [ -n "$CAP_ADD" ]; then
+          #   for cap in $(echo $CAP_ADD | tr ',' '\n'); do
+          #     CAP_OPTIONS+=" --cap-add=$cap"
+          #   done
+          # fi
+
+          
+          # Récupérer CAP_ADD à partir de la configuration
+          CAP_ADD=$(/usr/local/bin/yq eval ".cap_add | join(\",\")" <<< "$CONFIG" || true)
+          echo "CAP_ADD value: '$CAP_ADD'"
           CAP_OPTIONS=""
           if [ "$CAP_ADD" != "null" ] && [ -n "$CAP_ADD" ]; then
-            for cap in $(echo $CAP_ADD | tr ',' '\n'); do
-              CAP_OPTIONS+=" --cap-add=$cap"
-            done
+              for cap in $(echo $CAP_ADD | tr ',' '\n'); do
+                  CAP_OPTIONS+=" --cap-add=$cap"
+              done
           fi
+
+
           echo "DEBUG 4"
           
           echo "TEST AFFICHAGE RUN_AS_ROOT $RUN_AS_ROOT   CAP_OPTIONS  $CAP_OPTIONS   ENV_VARS   $ENV_VARS"
