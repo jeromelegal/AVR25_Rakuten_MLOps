@@ -11,7 +11,7 @@ ENV VAULT_ADDR=${VAULT_ADDR:-"https://vault:8200"}
 ENV VAULT_USERNAME=${VAULT_USERNAME:-"postgresql"}
 ENV VAULT_PASSWORD=${VAULT_PASSWORD:-"postgresql"}
 ENV VAULT_ROLE=${VAULT_ROLE:-"your-role"}
-ENV DB_PATH=${DB_PATH:-"/var/lib/postgresql/data"}
+ENV DB_PATH=${DB_PATH:-"/data/postgresql"}
 ENV PORT=${PORT:-"5432"}
 ENV BIND_IP=${BIND_IP:-"0.0.0.0"}
 ENV TLS_MODE=${TLS_MODE:-"require"}
@@ -36,6 +36,10 @@ ENV mTLS=${mTLS:-"false"}
 ENV LOG_PATH=${LOG_PATH:-"/var/log/postgresql/postgresql.log"}
 ENV NGINX_CONFIG_FILE="/etc/nginx/nginx.conf"
 ENV HEALTH_CHECK_FILE="/usr/local/bin/health-check.sh"
+
+RUN mkdir -p $DB_PATH
+RUN chown -R postgresql:postgresql $DB_PATH
+RUN chmod 750 $DB_PATH
 
 # Mettre à jour les paquets et installer les dépendances
 RUN apt-get update && apt-get install -y \
@@ -97,6 +101,8 @@ COPY vault/vault.sh /usr/local/bin/vault.sh
 RUN chmod +x /usr/local/bin/*.sh
 
 #USER postgresql
+# Volume
+VOLUME ["/data/postgresql"]
 
 # Définir le point d'entrée et exposer le port
 ENTRYPOINT ["entrypoint.sh"]

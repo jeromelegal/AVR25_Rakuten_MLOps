@@ -38,19 +38,51 @@ db.getSiblingDB('file_storage').createUser({
   roles: [{ role: 'userManager', db: 'file_storage' }]
 });
 
-// create ads collection
-db.getSiblingDB('file_storage').createCollection('ads', {
+// Create ads collection
+db.getSiblingDB('file_storage').createCollection("ads", {
   validator: {
       $jsonSchema: {
         bsonType: "object",
-        required: ["designation", "description", "image", "created_at", "created_by"],
+        required: ["designation", "description", "image_name", "bucket_name", "created_at", "created_by"],
         properties: {
           designation: { bsonType: "string" },
           description: { bsonType: "string" },
-          image:       { bsonType: "string" },
+          image_name:  { bsonType: "string" },
+          bucket_name: { bsonType: "string" },
           created_at:  { bsonType: "string" },
           created_by:  { bsonType: "string" }
         }
       }
     }
 });
+
+// Create categories collection
+db.getSiblingDB('file_storage').createCollection("categories", {
+  validator: {
+    $jsonSchema: {
+      bsonType: "object",
+      required: ["code", "label"],
+      properties: {
+        code:      { bsonType: "int" },
+        label:     { bsonType: "string" }
+      }
+    }
+  }
+});
+db.categories.createIndex({ code: 1 }, { unique: true });
+
+// Create ad_categories collection
+db.getSiblingDB('file_storage').createCollection("ad_categories", {
+  validator: {
+    $jsonSchema: {
+      bsonType: "object",
+      required: ["ad_id", "category_id"],
+      properties: {
+        ad_id:       { bsonType: "objectId" },
+        category_id: { bsonType: "objectId" }
+      }
+    }
+  }
+});
+db.ad_categories.createIndex({ ad_id: 1 }, { unique: true });
+db.ad_categories.createIndex({ category_id: 1 });
