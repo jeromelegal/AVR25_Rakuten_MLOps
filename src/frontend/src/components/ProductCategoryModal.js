@@ -3,7 +3,7 @@ import { Modal, Button, Form } from 'react-bootstrap';
 import ValidateButton from './ValidateButton';
 import { rakutenCategories } from '../constants/rakutenCategories';
 
-const ProductCategoryModal = ({ show, onHide, categories = [], onSelect }) => {
+const ProductCategoryModal = ({ show, onHide, onSelect }) => {
   const [changingCategory, setChangingCategory] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('');
 
@@ -13,9 +13,17 @@ const ProductCategoryModal = ({ show, onHide, categories = [], onSelect }) => {
 
 
   const handleValidate = () => {
-    onSelect(changingCategory && selectedCategory ? selectedCategory : categoryProposal);
-    setChangingCategory(false);
-    setSelectedCategory('');
+    let selected;
+  if (changingCategory && selectedCategory) {
+    // Find the category object by id
+    selected = categoriesToShow.find(cat => String(cat.id) === String(selectedCategory));
+  } else {
+    // Use the proposal as a fallback (find by name)
+    selected = categoriesToShow.find(cat => cat.name === categoryProposal) || { name: categoryProposal };
+  }
+  onSelect(selected);
+  setChangingCategory(false);
+  setSelectedCategory('');
   };
 
   const handleChangeCategoryClick = () => {
