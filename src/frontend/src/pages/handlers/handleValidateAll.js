@@ -19,7 +19,6 @@ export const handleValidateAll = async ({ title, description, picture }) => {
     designation: title,
     description: description,
     image: imageBase64
-    // Add other fields if needed
   };
 
   try {
@@ -27,7 +26,6 @@ export const handleValidateAll = async ({ title, description, picture }) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
-        // Add authentication headers if your gateway requires them
       },
       body: JSON.stringify(productData)
     });

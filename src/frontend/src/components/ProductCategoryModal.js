@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Modal, Button, Form } from 'react-bootstrap';
 import ValidateButton from './ValidateButton';
+import { rakutenCategories } from '../constants/rakutenCategories';
 
 const ProductCategoryModal = ({ show, onHide, categories = [], onSelect }) => {
   const [changingCategory, setChangingCategory] = useState(false);
@@ -8,14 +9,8 @@ const ProductCategoryModal = ({ show, onHide, categories = [], onSelect }) => {
 
   // Example category proposal
   const categoryProposal = "Electronics";
-  const exampleCategories = categories.length > 0 ? categories : [
-    "Electronics",
-    "Books",
-    "Clothing",
-    "Home & Kitchen",
-    "Toys",
-    "Sports"
-  ];
+  const categoriesToShow = rakutenCategories;
+
 
   const handleValidate = () => {
     onSelect(changingCategory && selectedCategory ? selectedCategory : categoryProposal);
@@ -83,8 +78,8 @@ const ProductCategoryModal = ({ show, onHide, categories = [], onSelect }) => {
               onChange={e => setSelectedCategory(e.target.value)}
             >
               <option value="">-- Choose a category --</option>
-              {exampleCategories.map(cat => (
-                <option key={cat} value={cat}>{cat}</option>
+              {categoriesToShow.map(cat => (
+                <option key={cat.id} value={cat.id}>{cat.name}</option>
               ))}
             </Form.Select>
           </Form.Group>
