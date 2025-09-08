@@ -7,6 +7,12 @@ Rakuten MLOps
 docker-compose up --build
 ```
 
+>**Note:** When the architecture is initialized for the first time, the first version of the image and text classification models must be downloaded and charged as the fisrt versions of tracked models. To do so, we uploaded our models in a publicly available GDrive available [here](https://drive.google.com/drive/folders/1YA1I7YONolKU_lN3beyNBlwSJhqojXTs?usp=drive_link). This GDrive will be available for the evaluation of this project. In order to load, these first version, one should use the following command:
+>```bash
+>docker-compose --profile setup up --build
+>```
+
+
 ### Start services
 ```bash
 docker-compose up --force-recreate
