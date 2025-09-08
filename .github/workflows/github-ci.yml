@@ -154,10 +154,19 @@ jobs:
       #     sudo mv ./yq /usr/local/bin/yq
       - name: Perform health checks
         run: |
-          VERSION=${{ steps.get_version.outputs.VERSION }}
-          BRANCH_NAME=${GITHUB_REF#refs/heads/}
-          CONTAINER_NAME="${{ matrix.service }}-${BRANCH_NAME}-${VERSION}"
-          docker logs -f $CONTAINER_NAME
+
+          sudo tail -f /var/log/syslog | grep --line-buffered -i "iptables"
+
+
+          # sudo tcpdump -i eth0
+
+
+
+
+          # VERSION=${{ steps.get_version.outputs.VERSION }}
+          # BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          # CONTAINER_NAME="${{ matrix.service }}-${BRANCH_NAME}-${VERSION}"
+          # docker logs -f $CONTAINER_NAME
 
           # VERSION=${{ steps.get_version.outputs.VERSION }}
           # BRANCH_NAME=${GITHUB_REF#refs/heads/}

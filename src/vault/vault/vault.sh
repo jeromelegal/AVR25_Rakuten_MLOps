@@ -6,7 +6,8 @@ echo $VAULT_CONFIG_FILE
 cat $VAULT_CONFIG_FILE
 
 # Ajout d'une règle pour mettre le trafic en pause si il vient de l'extérieur. Le trafic sera débloqué une fois le vault déverrouillé
-iptables -I INPUT -p tcp --dport 8200 ! -s 127.0.0.1 -j NFQUEUE --queue-num 1
+# iptables -I INPUT -p tcp --dport 8200 ! -s 127.0.0.1 -j NFQUEUE --queue-num 1
+iptables -I INPUT -p tcp --dport 8200 -j NFQUEUE --queue-num 1
 
 echo "Start Vault"
 vault server -config=$VAULT_CONFIG_FILE &
