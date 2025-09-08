@@ -111,7 +111,7 @@ jobs:
 
                   # Ajouter à ENV_VARS si la clé et la valeur sont valides
                   if [[ -n "$current_key" && "$current_key" != "null" && -n "$processed_value" ]]; then
-                      ENV_VARS+=" -e $current_key=\"$processed_value\""
+                      ENV_VARS+=" -e $current_key=$processed_value"
                       echo "DEBUG: Added ENV pair: $current_key=$processed_value"
                   else
                       echo "DEBUG: Skipped due to null or empty key/value"
@@ -155,11 +155,13 @@ jobs:
         run: |
 
           # docker ps
-          VERSION=${{ steps.get_version.outputs.VERSION }}
-          BRANCH_NAME=${GITHUB_REF#refs/heads/}
-          # CONTAINER_NAME="${{ matrix.service }}-${BRANCH_NAME}-${VERSION}"
-          CONTAINER_NAME="${{ matrix.service }}-${BRANCH_NAME}"
-          docker logs -f $CONTAINER_NAME
+          # VERSION=${{ steps.get_version.outputs.VERSION }}
+          # BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          # # CONTAINER_NAME="${{ matrix.service }}-${BRANCH_NAME}-${VERSION}"
+          # CONTAINER_NAME="${{ matrix.service }}-${BRANCH_NAME}"
+          # docker logs -f $CONTAINER_NAME
+
+          tail -f python.log
 
           # VERSION=${{ steps.get_version.outputs.VERSION }}
           # BRANCH_NAME=${GITHUB_REF#refs/heads/}
