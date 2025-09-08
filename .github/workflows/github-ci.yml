@@ -214,7 +214,7 @@ jobs:
           # echo "DEBUG: Final ENV_VARS: $ENV_VARS"
 
 
-          ENV_VARS=""
+          export ENV_VARS=""
           current_key=""
 
           # Fonction pour traiter la clé et la valeur quand elles sont sur des lignes distinctes
@@ -234,6 +234,7 @@ jobs:
                       if [[ -n "$current_key" && "$current_key" != "null" && -n "$processed_value" ]]; then
                           ENV_VARS+=" -e $current_key=\"$processed_value\""
                           echo "DEBUG: Added ENV pair: $current_key=$processed_value"
+                          export ENV_VARS="$ENV_VARS"
                           echo "ENV_VARS = $ENV_VARS"
                       else
                           echo "DEBUG: Skipped due to null or empty key/value"
