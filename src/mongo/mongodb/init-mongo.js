@@ -72,14 +72,16 @@ db.getSiblingDB('file_storage').createCollection("categories", {
 db.categories.createIndex({ code: 1 }, { unique: true });
 
 // Create ad_categories collection
-db.getSiblingDB('file_storage').createCollection("ad_categories", {
+db.getSiblingDB('file_storage').createCollection("ad_category", {
   validator: {
     $jsonSchema: {
       bsonType: "object",
-      required: ["ad_id", "category_id"],
+      required: ["ad_id", "category_id", "created_at", "created_by"],
       properties: {
-        ad_id:       { bsonType: "objectId" },
-        category_id: { bsonType: "objectId" }
+        ad_id:       { bsonType: "ObjectId" },
+        category_id: { bsonType: "ObjectId" },
+        created_at:  { bsonType: "string" },
+        created_by:  { bsonType: "string" }
       }
     }
   }

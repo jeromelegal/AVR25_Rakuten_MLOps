@@ -96,3 +96,53 @@ class MongoDBClient:
         response = self.session.post(f"{self.base_url}/api/internal/mongodb/entity/ad/{ad_id}", headers=headers)
         response.raise_for_status()
         return response.json()
+    
+    def create_category(self, category_data: Dict[str, str]):
+        headers = self.get_headers()
+        response = self.session.post(f"{self.base_url}/api/internal/mongodb/entity/category", json=category_data, headers=headers)
+        response.raise_for_status()
+        return response.json()
+    
+    def get_category(self, category_id: str):
+        headers = self.get_headers()
+        response = self.session.post(f"{self.base_url}/api/internal/mongodb/entity/category/{category_id}", headers=headers)
+        response.raise_for_status()
+        return response.json()
+    
+    def update_category(self, category_data: Dict[str, str]):
+        headers = self.get_headers()
+        category_id = category_data['ad_id']
+        response = self.session.post(f"{self.base_url}/api/internal/mongodb/entity/category/{category_id}", json=category_data, headers=headers)
+        response.raise_for_status()
+        return response.json()
+    
+    def delete_category(self, category_id: str):
+        headers = self.get_headers()
+        response = self.session.post(f"{self.base_url}/api/internal/mongodb/entity/category/{category_id}", headers=headers)
+        response.raise_for_status()
+        return response.json()
+    
+    def create_ad_category(self, ad_category_data: Dict[str, str]):
+        headers = self.get_headers()
+        response = self.session.post(f"{self.base_url}/api/internal/mongodb/entity/ad_category", json=ad_category_data, headers=headers)
+        response.raise_for_status()
+        return response.json()
+    
+    def get_ad_category(self, relation_id: str):
+        headers = self.get_headers()
+        response = self.session.post(f"{self.base_url}/api/internal/mongodb/entity/ad_category/{relation_id}", headers=headers)
+        response.raise_for_status()
+        return response.json()
+    
+    def update_ad_category(self, ad_category_data: Dict[str, str]):
+        headers = self.get_headers()
+        relation_id = ad_category_data['ad_id']
+        response = self.session.post(f"{self.base_url}/api/internal/mongodb/entity/ad_category/{relation_id}", json=ad_category_data, headers=headers)
+        response.raise_for_status()
+        return response.json()
+    
+    def delete_ad_category(self, relation_id: str):
+        headers = self.get_headers()
+        response = self.session.post(f"{self.base_url}/api/internal/mongodb/entity/ad_category/{relation_id}", headers=headers)
+        response.raise_for_status()
+        return response.json()
