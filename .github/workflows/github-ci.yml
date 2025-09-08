@@ -81,10 +81,19 @@ jobs:
 
       - name: Install yq
         run: |
-          # Télécharger yq dans le répertoire courant
-          wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O ./yq
-          chmod +x ./yq
-          sudo mv ./yq /usr/local/bin/yq
+          # # Télécharger yq dans le répertoire courant
+          # wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O ./yq
+          # chmod +x ./yq
+          # sudo mv ./yq /usr/local/bin/yq
+          if ! command -v yq &> /dev/null; then
+            echo "yq not found. Installing..."
+            wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O ./yq
+            chmod +x ./yq
+            sudo mv ./yq /usr/local/bin/yq
+          else
+            echo "yq is already installed."
+          fi
+
 
       - name: Start containers
         run: |
@@ -144,9 +153,19 @@ jobs:
         run: echo "VERSION=$(cat .version)" >> $GITHUB_OUTPUT
       - name: Install yq
         run: |
-          wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O ./yq
-          chmod +x ./yq
-          sudo mv ./yq /usr/local/bin/yq
+          # wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O ./yq
+          # chmod +x ./yq
+          # sudo mv ./yq /usr/local/bin/yq
+          if ! command -v yq &> /dev/null; then
+            echo "yq not found. Installing..."
+            wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O ./yq
+            chmod +x ./yq
+            sudo mv ./yq /usr/local/bin/yq
+          else
+            echo "yq is already installed."
+          fi
+
+
       - name: Perform health checks
         run: |
           VERSION=${{ steps.get_version.outputs.VERSION }}
