@@ -11,21 +11,6 @@ services:
       - IPC_LOCK
       - NET_ADMIN
       - NET_RAW
-    secured_services:  # Liste simple de services
-      - vault-${BRANCH_NAME}
-      - consul-${BRANCH_NAME}
-      - mongodb-${BRANCH_NAME}
-      - api-mongodb-${BRANCH_NAME}
-      - postgresql-${BRANCH_NAME}
-      - api-postgresql-${BRANCH_NAME}
-      - api-gateway-${BRANCH_NAME}
-      - frontend-${BRANCH_NAME}
-      - reverse-proxy-${BRANCH_NAME}
-      - zookeeper-${BRANCH_NAME}
-      - kafka-${BRANCH_NAME}
-      - minio-${BRANCH_NAME}
-      - api-minio-${BRANCH_NAME}
-      - mlflow-${BRANCH_NAME}
     env_vars:
       SERVICE_NAME: vault-${BRANCH_NAME}
       SERVICE_NAME: vault-${BRANCH_NAME}
