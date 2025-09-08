@@ -96,8 +96,8 @@ listener "tcp" {
   tls_key_file  = "$VAULT_KEY_FILE"
 }
 
-api_addr = "https://vault:8200"
-cluster_addr = "https://vault:8201"
+api_addr = "https://127.0.0.1:8200"
+cluster_addr = "https://127.0.0.1:8201"
 disable_mlock = true
 
 # Configuration des logs

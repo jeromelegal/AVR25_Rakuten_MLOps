@@ -54,7 +54,7 @@ jobs:
 
   build:
     runs-on: [self-hosted, phil-host]
-    needs: [clear-containers, clear-containers]
+    needs: [clear-containers]
     strategy:
       matrix:
         service: [vault, consul, mongo, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]

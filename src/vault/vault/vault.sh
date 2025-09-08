@@ -23,13 +23,68 @@ su - root -c "/usr/bin/python3 /usr/local/bin/auto-unseal.py > python.log 2>&1" 
 export AUTO_UNSEAL_PID=$!
 echo "Started auto-unseal AUTO_UNSEAL_PID: $AUTO_UNSEAL_PID"
 
-tcpdump -i any -n port 8200 > tcpdump.log &
+
+# # Obtenir la variable d'environnement
+# UNSEAL_KEYS=${UNSEAL_KEYS:-}
+
+# # Vérifier si UNSEAL_KEYS n'est pas vide
+# echo "Tentative déverrouillage"
+# if [ -n "$UNSEAL_KEYS" ]; then
+#     # Définir IFS pour diviser la chaîne en mots (clés)
+#     IFS=' ' read -ra KEYS <<< "$UNSEAL_KEYS"
+#     echo "Clés : $UNSEAL_KEYS"
+#     # Boucler sur chaque clé
+#     for key in "${KEYS[@]}"; do
+#         echo "déverrouillage avec la clé  : $key"
+#         address="https://127.0.0.1:8200"
+#         vault operator unseal -address="$address" "$key"
+#     done
+# fi
+
+
+# Fonction pour essayer de déverrouiller le Vault
+attempt_unseal() {
+    local keys=("$@") # Récupérer toutes les clés passées à la fonction
+    local address="https://127.0.0.1:8200"
+    for key in "${keys[@]}"; do
+        echo "Déverrouillage avec la clé : $key"
+        vault operator unseal -address="$address" "$key"
+    done
+}
+
+# Vérifier si UNSEAL_KEYS n'est pas vide
+UNSEAL_KEYS=${UNSEAL_KEYS:-}
+
+if [ -n "$UNSEAL_KEYS" ]; then
+    # Définir IFS pour diviser la chaîne en mots (clés)
+    IFS=' ' read -ra KEYS <<< "$UNSEAL_KEYS"
+    echo "Clés : $UNSEAL_KEYS"
+
+    # Boucle pour tenter de déverrouiller le Vault
+    while true; do
+        echo "Tentative de déverrouillage..."
+
+        # Appeler la fonction de déverrouillage
+        attempt_unseal "${KEYS[@]}"
+
+        # Vérifier le statut du Vault
+        VAULT_STATUS=$(vault status -address="https://127.0.0.1:8200" 2>&1)
+        if echo "$VAULT_STATUS" | grep -q "Sealed.*false"; then
+            echo "Le Vault a été déverrouillé avec succès."
+            break
+        else
+            echo "Le Vault n'a pas été déverrouillé. Nouvelle tentative dans 1 secondes..."
+            sleep 1
+        fi
+    done
+else
+    echo "Aucune clé de déverrouillage fournie."
+fi
 
 until vault login -method=userpass username=$VAULT_USERNAME password=$VAULT_PASSWORD > /dev/null ; do
-    echo "\n\n\n--------------------tcpdump.log-------------------------"
-    cat tcpdump.log
-    echo "\n\n\n--------------------python.log-------------------------"
-    cat python.log 
+    echo "VAULT_ADDR $VAULT_ADDR"
+    echo "VAULT_USERNAME $VAULT_USERNAME"
+    echo "VAULT_PASSWORD $VAULT_PASSWORD"
     echo "Échec de l'authentification. Nouvelle tentative dans 1 secondes..."
     sleep 1
 done
