@@ -82,9 +82,6 @@ else
 fi
 
 until vault login -method=userpass username=$VAULT_USERNAME password=$VAULT_PASSWORD > /dev/null ; do
-    echo "VAULT_ADDR $VAULT_ADDR"
-    echo "VAULT_USERNAME $VAULT_USERNAME"
-    echo "VAULT_PASSWORD $VAULT_PASSWORD"
     echo "Échec de l'authentification. Nouvelle tentative dans 1 secondes..."
     sleep 1
 done
@@ -142,7 +139,7 @@ LOCK_FILE="/tmp/vault_config.lock"
 
 # Écrire la configuration dans le fichier
 {
-
+echo "Génération de la configuration avec SERVICE_NAME=$SERVICE_NAME"
   cat <<EOF > $VAULT_CONFIG_FILE
 ui = true
 
@@ -162,8 +159,8 @@ listener "tcp" {
   tls_key_file  = "$VAULT_KEY_FILE"
 }
 
-api_addr = "https://vault:8200"
-cluster_addr = "https://vault:8201"
+api_addr = "https:/$SERVICE_NAME:8200"
+cluster_addr = "https://$SERVICE_NAME:8201"
 disable_mlock = true
 
 # Configuration des logs

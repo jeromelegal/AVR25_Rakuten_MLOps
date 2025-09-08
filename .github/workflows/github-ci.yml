@@ -155,7 +155,16 @@ jobs:
               done
           fi
 
-          echo "Running with RUN_AS_ROOT=$RUN_AS_ROOT, CAP_OPTIONS=$CAP_OPTIONS, ENV_VARS=$ENV_VARS"
+          # Extraire et traiter les ports exposés
+          EXPOSE_PORTS=$(/usr/local/bin/yq eval ".expose_ports | join(\",\")" <<< "$CONFIG" || true)
+          if [ "$EXPOSE_PORTS" != "null" ] && [ -n "$EXPOSE_PORTS" ]; then
+              for port in $(echo $EXPOSE_PORTS | tr ',' '\n'); do
+                  EXPOSE_OPTIONS+=" --expose=$port"
+              done
+          fi
+          echo "DEBUG: EXPOSE_OPTIONS=$EXPOSE_OPTIONS"
+
+          echo "Running with RUN_AS_ROOT=$RUN_AS_ROOT, CAP_OPTIONS=$CAP_OPTIONS, ENV_VARS=$ENV_VARS, EXPOSE_OPTIONS=$EXPOSE_OPTIONS"
           if [ "$RUN_AS_ROOT" = true ]; then
             docker run -d --user root $CAP_OPTIONS --name $CONTAINER_NAME --network $NETWORK_NAME $ENV_VARS ${{ matrix.service }}:$TAG
           else

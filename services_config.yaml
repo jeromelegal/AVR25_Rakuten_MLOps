@@ -1,13 +1,19 @@
 services:
   vault:
     run_as_root: true
+    expose_ports:
+      - 8200
+      - 8201
+      - 8501
+      - 80
+      - 443
     cap_add:
       - IPC_LOCK
       - NET_ADMIN
       - NET_RAW
     env_vars:
       SERVICE_NAME: vault-${BRANCH_NAME}
-      SERVICE_NAME: vault
+      SERVICE_NAME: vault-${BRANCH_NAME}
       SERVICE_PORT: 8200
       VAULT_ADDR: https://vault-${BRANCH_NAME}:8200
       VAULT_USERNAME: vault
