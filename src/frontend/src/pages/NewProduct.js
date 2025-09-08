@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import {useState} from 'react';
 import ProductDescriptionInput from '../components/ProductDescriptionInput';
 import ProductPictureInput from '../components/ProductPictureInput';
 import ProductTitleInput from '../components/ProductTitleInput';
