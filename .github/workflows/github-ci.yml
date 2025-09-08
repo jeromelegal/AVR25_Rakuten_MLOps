@@ -96,12 +96,12 @@ jobs:
           CONFIG=$(/usr/local/bin/yq eval ".services.${{ matrix.service }}" services_config.yaml)
           RUN_AS_ROOT=$(/usr/local/bin/yq eval ".run_as_root" <<< "$CONFIG")
 
-
           # Si RUN_AS_ROOT est vide ou non défini, nous le définissons comme false par défaut
           if [ -z "$RUN_AS_ROOT" ] || [ "$RUN_AS_ROOT" = "null" ]; then
             RUN_AS_ROOT=false
           fi
 
+          echo "DEBUG 2"
           ENV_VARS=""
           while IFS= read -r line; do
             key=$(echo "$line" | /usr/local/bin/yq eval '.key' -)
@@ -111,7 +111,6 @@ jobs:
             ENV_VARS+=" -e $key=\"$value\""
           done < <(/usr/local/bin/yq eval '.env_vars | to_entries | .[]' - <<< "$CONFIG")
           
-
 
           
           # Récupérer CAP_ADD à partir de la configuration
