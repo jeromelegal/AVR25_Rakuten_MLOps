@@ -88,7 +88,7 @@ class MongoDBClient:
     def update_ad(self, ad_data: Dict[str, str]):
         headers = self.get_headers()
         ad_id = ad_data['ad_id']
-        response = self.session.post(f"{self.base_url}/api/internal/mongodb/entity/ad/{ad_id}", json=ad_data, headers=headers)
+        response = self.session.put(f"{self.base_url}/api/internal/mongodb/entity/ad/{ad_id}", json=ad_data, headers=headers)
         response.raise_for_status()
         return response.json()
     
