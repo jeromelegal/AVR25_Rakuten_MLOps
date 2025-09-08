@@ -79,55 +79,6 @@ jobs:
         id: get_version
         run: echo "VERSION=$(cat .version)" >> $GITHUB_OUTPUT
 
-      # - name: Start containers
-      #   run: |
-      #     echo "DEBUG 0"
-      #     VERSION=${{ steps.get_version.outputs.VERSION }}
-      #     BRANCH_NAME=${GITHUB_REF#refs/heads/}
-      #     TAG="${VERSION}-${BRANCH_NAME}"
-      #     CONTAINER_NAME="${{ matrix.service }}-${BRANCH_NAME}-${VERSION}"
-      #     CONFIG=$(/usr/local/bin/yq eval ".services.${{ matrix.service }}" services_config.yaml)
-      #     RUN_AS_ROOT=$(/usr/local/bin/yq eval ".run_as_root" <<< "$CONFIG")
-
-      #     # Si RUN_AS_ROOT est vide ou non défini, nous le définissons comme false par défaut
-      #     if [ -z "$RUN_AS_ROOT" ] || [ "$RUN_AS_ROOT" = "null" ]; then
-      #       RUN_AS_ROOT=false
-      #     fi
-
-      #     echo "DEBUG 2"
-      #     ENV_VARS=""
-      #     while IFS= read -r line; do
-      #       key=$(echo "$line" | /usr/local/bin/yq eval '.key' -)
-      #       value=$(echo "$line" | /usr/local/bin/yq eval '.value' -)
-      #       value=${value//\${BRANCH_NAME}/$BRANCH_NAME}
-      #       value=${value//\${VERSION}/$VERSION}
-      #       ENV_VARS+=" -e $key=\"$value\""
-      #     done < <(/usr/local/bin/yq eval '.env_vars | to_entries | .[]' - <<< "$CONFIG")
-          
-
-          
-      #     # Récupérer CAP_ADD à partir de la configuration
-      #     CAP_ADD=$(/usr/local/bin/yq eval ".cap_add | join(\",\")" <<< "$CONFIG" || true)
-      #     echo "CAP_ADD value: '$CAP_ADD'"
-      #     CAP_OPTIONS=""
-      #     if [ "$CAP_ADD" != "null" ] && [ -n "$CAP_ADD" ]; then
-      #         for cap in $(echo $CAP_ADD | tr ',' '\n'); do
-      #             CAP_OPTIONS+=" --cap-add=$cap"
-      #         done
-      #     fi
-
-          
-      #     echo "TEST AFFICHAGE RUN_AS_ROOT $RUN_AS_ROOT   CAP_OPTIONS  $CAP_OPTIONS   ENV_VARS   $ENV_VARS"
-
-
-      #     # Démarrer le conteneur avec les privilèges root si nécessaire
-      #     if [ "$RUN_AS_ROOT" = true ]; then
-      #       echo "Started as root"
-      #       docker run -d --user root $CAP_OPTIONS --name $CONTAINER_NAME $ENV_VARS ${{ matrix.service }}:$TAG
-      #     else
-      #       docker run -d $CAP_OPTIONS --name $CONTAINER_NAME $ENV_VARS ${{ matrix.service }}:$TAG
-      #     fi
-
       - name: Start containers
         run: |
           VERSION=${{ steps.get_version.outputs.VERSION }}
@@ -139,115 +90,6 @@ jobs:
           if [ -z "$RUN_AS_ROOT" ] || [ "$RUN_AS_ROOT" = "null" ]; then
             RUN_AS_ROOT=false
           fi
-
-          # ENV_VARS=""
-          # while IFS= read -r line; do
-          #   key=$(echo "$line" | /usr/local/bin/yq eval '.key' -)
-          #   value=$(echo "$line" | /usr/local/bin/yq eval '.value' -)
-          #   # Effectuer la substitution des variables
-          #   value=$(echo "$value" | sed "s/\${BRANCH_NAME}/$BRANCH_NAME/g" | sed "s/\${VERSION}/$VERSION/g")
-          #   ENV_VARS+=" -e $key=\"$value\""
-          # done < <(/usr/local/bin/yq eval '.env_vars | to_entries | .[]' - <<< "$CONFIG")
-
-          # ENV_VARS=""
-          # while IFS= read -r line; do
-          #     key=$(echo "$line" | /usr/local/bin/yq eval '.key' -)
-          #     value=$(echo "$line" | /usr/local/bin/yq eval '.value' -)
-          #     # Vérifiez si key n'est pas null ou vide
-          #     if [[ -n "$key" && "$key" != "null" && -n "$value" ]]; then
-          #         # Effectuer la substitution des variables
-          #         value=$(echo "$value" | sed "s/\${BRANCH_NAME}/$BRANCH_NAME/g" | sed "s/\${VERSION}/$VERSION/g")
-          #         ENV_VARS+=" -e $key=\"$value\""
-          #         echo "DEBUG: Processed ENV pair: $key=$value"
-          #     fi
-          # done < <(/usr/local/bin/yq eval '.env_vars | to_entries | .[]' - <<< "$CONFIG")
-
-          # echo "DEBUG: Final ENV_VARS: $ENV_VARS"
-
-
-          # ENV_VARS=""
-          # while IFS= read -r line; do
-          #     key=$(echo "$line" | /usr/local/bin/yq eval '.key' -)
-          #     value=$(echo "$line" | /usr/local/bin/yq eval '.value' -)
-
-          #     # Debug: afficher les valeurs avant la substitution
-          #     echo "DEBUG: Before substitution - key=$key, value=$value"
-
-          #     # Effectuer la substitution des variables
-          #     value=$(echo "$value" | sed "s/\${BRANCH_NAME}/$BRANCH_NAME/g" | sed "s/\${VERSION}/$VERSION/g")
-
-          #     # Vérifiez que key et value ne sont pas nuls
-          #     if [[ -n "$key" && "$key" != "null" && -n "$value" ]]; then
-          #         ENV_VARS+=" -e $key=\"$value\""
-          #         echo "DEBUG: Processed ENV pair: $key=$value"
-          #     else
-          #         echo "DEBUG: Skipped due to null or empty key/value"
-          #     fi
-          # done < <(/usr/local/bin/yq eval '.env_vars | to_entries | .[]' - <<< "$CONFIG")
-
-          # echo "DEBUG: Final ENV_VARS: $ENV_VARS"
-
-
-          # # Extraire et traiter les env_vars
-          # ENV_VARS=""
-          # while IFS= read -r line; do
-          #    echo "line: $line"
-          #     # Extraire la clé et la valeur
-          #     key=$(echo "$line" | /usr/local/bin/yq eval '.key' -)
-          #     value=$(echo "$line" | /usr/local/bin/yq eval '.value' -)
-
-          #     # Afficher les valeurs pour le débogage
-          #     echo "DEBUG: Extracted key=$key, value=$value"
-
-          #     # Effectuer la substitution des variables
-          #     processed_value=$(echo "$value" | sed "s/\${BRANCH_NAME}/$BRANCH_NAME/g" | sed "s/\${VERSION}/$VERSION/g")
-
-          #     # Ajouter à ENV_VARS si la clé et la valeur sont valides
-          #     if [[ -n "$key" && "$key" != "null" && -n "$processed_value" ]]; then
-          #         ENV_VARS+=" -e $key=\"$processed_value\""
-          #         echo "DEBUG: Added ENV pair: $key=$processed_value"
-          #     else
-          #         echo "DEBUG: Skipped due to null or empty key/value"
-          #     fi
-          # done < <(/usr/local/bin/yq eval '.env_vars | to_entries | .[]' - <<< "$CONFIG")
-
-          # echo "DEBUG: Final ENV_VARS: $ENV_VARS"
-
-
-          # export ENV_VARS=""
-          # current_key=""
-
-          # # Fonction pour traiter la clé et la valeur quand elles sont sur des lignes distinctes
-          # process_lines() {
-          #     while IFS= read -r line; do
-          #         # Extraire la clé quand la ligne commence par "key:"
-          #         if [[ $line == key:* ]]; then
-          #             current_key=$(echo "$line" | sed 's/key: //')
-          #         # Extraire et traiter la valeur quand la ligne commence par "value:"
-          #         elif [[ $line == value:* ]]; then
-          #             # Extraire la valeur et supprimer les guillemets
-          #             value=$(echo "$line" | sed 's/value: //' | tr -d '"')
-          #             # Effectuer la substitution des variables
-          #             processed_value=$(echo "$value" | sed "s/\${BRANCH_NAME}/$BRANCH_NAME/g" | sed "s/\${VERSION}/$VERSION/g")
-
-          #             # Ajouter à ENV_VARS si la clé et la valeur sont valides
-          #             if [[ -n "$current_key" && "$current_key" != "null" && -n "$processed_value" ]]; then
-          #                 ENV_VARS+=" -e $current_key=\"$processed_value\""
-          #                 echo "DEBUG: Added ENV pair: $current_key=$processed_value"
-          #                 export ENV_VARS="$ENV_VARS"
-          #                 echo "ENV_VARS = $ENV_VARS"
-          #             else
-          #                 echo "DEBUG: Skipped due to null or empty key/value"
-          #             fi
-          #         fi
-          #     done
-          # }
-
-          # # Passer la configuration au processus de traitement des lignes
-          # echo "$CONFIG" | /usr/local/bin/yq eval '.env_vars | to_entries | .[]' - | process_lines
-
-          # echo "DEBUG: Final ENV_VARS: $ENV_VARS"
-
 
           # Traiter les lignes sans utiliser de fonction
           while IFS= read -r line; do
@@ -270,9 +112,6 @@ jobs:
                   fi
               fi
           done < <(/usr/local/bin/yq eval '.env_vars | to_entries | .[]' - <<< "$CONFIG")
-
-
-
 
           CAP_ADD=$(/usr/local/bin/yq eval ".cap_add | join(\",\")" <<< "$CONFIG" || true)
           CAP_OPTIONS=""
@@ -309,11 +148,11 @@ jobs:
       - name: Perform health checks
         run: |
 
-          docker ps
-          # VERSION=${{ steps.get_version.outputs.VERSION }}
-          # BRANCH_NAME=${GITHUB_REF#refs/heads/}
-          # CONTAINER_NAME="${{ matrix.service }}-${BRANCH_NAME}-${VERSION}"
-          # docker logs -f $CONTAINER_NAME
+          # docker ps
+          VERSION=${{ steps.get_version.outputs.VERSION }}
+          BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          CONTAINER_NAME="${{ matrix.service }}-${BRANCH_NAME}-${VERSION}"
+          docker logs -f $CONTAINER_NAME
 
           # VERSION=${{ steps.get_version.outputs.VERSION }}
           # BRANCH_NAME=${GITHUB_REF#refs/heads/}
