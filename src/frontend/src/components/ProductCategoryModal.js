@@ -1,26 +1,29 @@
 import React, { useState } from 'react';
 import { Modal, Button, Form } from 'react-bootstrap';
 import ValidateButton from './ValidateButton';
+import { rakutenCategories } from '../constants/rakutenCategories';
 
-const ProductCategoryModal = ({ show, onHide, categories = [], onSelect }) => {
+const ProductCategoryModal = ({ show, onHide, onSelect }) => {
   const [changingCategory, setChangingCategory] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('');
 
   // Example category proposal
   const categoryProposal = "Electronics";
-  const exampleCategories = categories.length > 0 ? categories : [
-    "Electronics",
-    "Books",
-    "Clothing",
-    "Home & Kitchen",
-    "Toys",
-    "Sports"
-  ];
+  const categoriesToShow = rakutenCategories;
+
 
   const handleValidate = () => {
-    onSelect(changingCategory && selectedCategory ? selectedCategory : categoryProposal);
-    setChangingCategory(false);
-    setSelectedCategory('');
+    let selected;
+  if (changingCategory && selectedCategory) {
+    // Find the category object by id
+    selected = categoriesToShow.find(cat => String(cat.id) === String(selectedCategory));
+  } else {
+    // Use the proposal as a fallback (find by name)
+    selected = categoriesToShow.find(cat => cat.name === categoryProposal) || { name: categoryProposal };
+  }
+  onSelect(selected);
+  setChangingCategory(false);
+  setSelectedCategory('');
   };
 
   const handleChangeCategoryClick = () => {
@@ -83,8 +86,8 @@ const ProductCategoryModal = ({ show, onHide, categories = [], onSelect }) => {
               onChange={e => setSelectedCategory(e.target.value)}
             >
               <option value="">-- Choose a category --</option>
-              {exampleCategories.map(cat => (
-                <option key={cat} value={cat}>{cat}</option>
+              {categoriesToShow.map(cat => (
+                <option key={cat.id} value={cat.id}>{cat.name}</option>
               ))}
             </Form.Select>
           </Form.Group>

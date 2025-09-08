@@ -1,4 +1,3 @@
-// frontend/src/pages/PocInput.js
 import React, {useState} from 'react';
 import ProductDescriptionInput from '../components/ProductDescriptionInput';
 import ProductPictureInput from '../components/ProductPictureInput';
@@ -6,8 +5,9 @@ import ProductTitleInput from '../components/ProductTitleInput';
 import ProductCategoryButton from '../components/ProductCategoryButton';
 import ProductCategoryModal from '../components/ProductCategoryModal';
 import ValidateButton from '../components/ValidateButton';
+import { handleValidateAll } from './handlers/handleValidateAll';
 
-const PocInput = () => {
+const NewProduct = () => {
   const [description, setDescription] = useState('');
   const [picture, setPicture] = useState(null);
   const [title, setTitle] = useState('');
@@ -16,10 +16,6 @@ const PocInput = () => {
 
   const handleCategoryButtonClick = () => {
     setCategoryModalShow(true);
-  };
-
-  const handleTitleChange = (e) => {
-    setTitle(e.target.value);
   };
 
   const handleDescriptionChange = (e) => {
@@ -36,21 +32,18 @@ const PocInput = () => {
   };
 
    // Example save handler
-  const handleValidateAll = () => {
-    // Save logic here (e.g., send to backend)
-    const productData = {
-      title,
-      description,
-      category: selectedCategory,
-      picture
-    };
-    console.log('Saving product:', productData);
-    // Add your save-to-database logic here
+  const onValidateClick = async () => {
+    try {
+      await handleValidateAll({ title, description, picture });
+      // Show success message or redirect
+    } catch (error) {
+      // Show error message
+    }
   };
 
   return (
     <div>
-      <h1>PocInput Page</h1>
+      <h1>Add a new product</h1>
       <div style={{ width: '60%', margin: '0 auto' }}>
         <ProductTitleInput value={title} onChange={(e) => setTitle(e.target.value)} />
         <div style={{ height: '2rem' }}></div> 
@@ -59,9 +52,24 @@ const PocInput = () => {
         <ProductDescriptionInput value={description} onChange={handleDescriptionChange} />
         <div style={{ height: '2rem' }}></div> 
         <ProductCategoryButton onClick={handleCategoryButtonClick} />
+        {selectedCategory && (
+        <div
+          style={{
+            background: '#e3eafc',
+            color: '#155a9e',
+            padding: '0.75rem 1rem',
+            borderRadius: '8px',
+            margin: '1rem 0',
+            fontWeight: '500',
+            textAlign: 'center'
+          }}
+        >
+          Selected Category: {selectedCategory.name}
+        </div>
+      )}
         <div style={{ height: '1rem' }}></div> 
         <ValidateButton
-          onClick={handleValidateAll}
+          onClick={onValidateClick}
           disabled={!title || !description || !selectedCategory || !picture}
         >
           Validate Product
@@ -72,9 +80,8 @@ const PocInput = () => {
         onHide={() => setCategoryModalShow(false)}
         onSelect={handleCategorySelect}
       />
-      {selectedCategory && <p>Selected Category: {selectedCategory}</p>}
     </div>
   );
 };
 
-export default PocInput;
+export default NewProduct;
