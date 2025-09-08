@@ -191,6 +191,7 @@ jobs:
           # Extraire et traiter les env_vars
           ENV_VARS=""
           while IFS= read -r line; do
+             echo "line: $line"
               # Extraire la clé et la valeur
               key=$(echo "$line" | /usr/local/bin/yq eval '.key' -)
               value=$(echo "$line" | /usr/local/bin/yq eval '.value' -)
