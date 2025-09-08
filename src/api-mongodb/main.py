@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from api import main, auth
-from api.mongodb.entity import user, space, role, document, page, widget, directory, index, pipeline, datasource, api, stage
+from api.mongodb.entity import user, space, role, document, page, widget, ad, directory, index, pipeline, datasource, api, stage
+from api.mongodb.entity import category
 from api.mongodb.relation import roles_users, role_document, role_space, role_page, role_widget, role_directory, role_index, role_pipeline, role_datasource, role_api, role_stage
 from api.mongodb.relation import space_page, space_directory, space_index, space_datasource, space_pipeline, space_api
 from api.mongodb.relation import directory_directory, directory_document
@@ -9,6 +10,7 @@ from api.mongodb.relation import stage_api
 from api.mongodb.relation import page_widget
 from api.mongodb.relation import widget_datasource
 from api.mongodb.relation import datasource_index
+from api.mongodb.relation import ad_category
 
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -79,6 +81,8 @@ app.add_middleware(LoggingMiddleware)
 
 app.include_router(main.router)
 app.include_router(auth.router)
+app.include_router(ad.router)
+app.include_router(category.router)
 app.include_router(user.router)
 app.include_router(space.router)
 app.include_router(role.router)
@@ -125,3 +129,5 @@ app.include_router(page_widget.router)
 app.include_router(widget_datasource.router)
 
 app.include_router(datasource_index.router)
+
+app.include_router(ad_category.router)
