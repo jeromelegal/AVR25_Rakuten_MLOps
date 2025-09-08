@@ -1,10 +1,6 @@
-const USE_MOCK_API = true; // Set to false to use real API
+const API_URL = 'http://localhost:4000/api/internal/mongodb/entity/ad'
 
-const API_URL = USE_MOCK_API
-  ? 'http://localhost:4000/api/internal/mongodb/entity/ad'
-  : '/api/internal/mongodb/entity/ad';
-
-export const handleValidateAll = async () => {
+export const handleValidateAll = async ({ title, description, picture }) => {
   // Convert image file to base64
   const toBase64 = file =>
     new Promise((resolve, reject) => {

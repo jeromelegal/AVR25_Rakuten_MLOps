@@ -19,10 +19,6 @@ const PocInput = () => {
     setCategoryModalShow(true);
   };
 
-  const handleTitleChange = (e) => {
-    setTitle(e.target.value);
-  };
-
   const handleDescriptionChange = (e) => {
     setDescription(e.target.value);
   };
