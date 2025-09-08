@@ -125,6 +125,46 @@ jobs:
             RUN_AS_ROOT=false
           fi
 
+
+
+
+
+
+
+          # # Extraction des env_vars pour le service, en conservant les quotes si présentes
+          # yq eval ".services.${{ matrix.service }}.env_vars | to_entries | .[] | \"\(.key) \(.value)\"" services_config.yaml | while read -r key value; do
+          #     # Substitution des variables ${BRANCH_NAME} et ${VERSION}
+          #     processed_value=$(echo "$value" | sed "s/\${BRANCH_NAME}/$BRANCH_NAME/g" | sed "s/\${VERSION}/$VERSION/g")
+          #     # Affichage pour debug (ou utilisation directe)
+          #     echo "Clé: $key, Valeur: $processed_value"
+          #     # Pour docker run : ENV_VARS+=" -e $key=$processed_value"
+          # done
+
+
+          # Initialisation de ENV_VARS
+          ENV_VARS=""
+
+          # Utilisation d'un tableau pour éviter les problèmes de quotes et d'espaces
+          mapfile -t env_pairs < <(yq eval ".services.$SERVICE.env_vars | to_entries | .[] | \"\(.key) \(.value)\"" services_config.yaml)
+
+
+          # Boucle sur chaque paire clé/valeur
+          for pair in "${env_pairs[@]}"; do
+              key=$(echo "$pair" | awk '{print $1}')
+              value=$(echo "$pair" | cut -d' ' -f2-)
+              # Substitution des variables ${BRANCH_NAME} et ${VERSION}
+              processed_value=$(echo "$value" | sed "s/\${BRANCH_NAME}/$BRANCH_NAME/g" | sed "s/\${VERSION}/$VERSION/g")
+              # Construction de ENV_VARS
+              ENV_VARS+=" -e $key=$processed_value"
+              echo "DEBUG: Added ENV pair: $key=$processed_value"
+          done
+
+          echo "Premier print ENV_VARS=$ENV_VARS"
+
+
+
+
+
           # Traiter les lignes sans utiliser de fonction
           while IFS= read -r line; do
               # Extraire la clé quand la ligne commence par "key:"

@@ -313,8 +313,11 @@ store_intermediate_certs() {
     vault kv put "secret/${service}/ca" certificate=@${cert_file}
 }
 
+# # Liste des services
+# services=("vault" "consul" "mongodb" "api-mongodb" "postgresql" "api-postgresql"  "api-gateway" "frontend" "reverse-proxy" "zookeeper" "kafka" "minio" "api-minio" "mlflow")
 # Liste des services
-services=("vault" "consul" "mongodb" "api-mongodb" "postgresql" "api-postgresql"  "api-gateway" "frontend" "reverse-proxy" "zookeeper" "kafka" "minio" "api-minio" "mlflow")
+services=$SECURED_SERVICES
+
 
 # Appel des fonctions pour chaque service
 for service in "${services[@]}"; do
