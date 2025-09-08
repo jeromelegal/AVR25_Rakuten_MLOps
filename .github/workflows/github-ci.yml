@@ -1,73 +1,3 @@
-# name: Build, Push, and Test Docker Image
-
-# on: [push]
-
-# jobs:
-#   build-and-push:
-#     runs-on: [self-hosted]
-#     permissions:
-#       contents: read
-#       packages: write
-
-#     steps:
-#       - name: Checkout code
-#         uses: actions/checkout@v4
-
-#       - name: Log in to the Container registry
-#         uses: docker/login-action@v2
-#         with:
-#           registry: ghcr.io
-#           username: ${{ github.repository_owner }}
-#           password: ${{ secrets.GITHUB_TOKEN }}
-
-#       - name: Build and push Docker image
-#         uses: docker/build-push-action@v4
-#         with:
-#           push: true
-#           file: CI-CD.Dockerfile  # Spécifiez le chemin vers votre Dockerfile ici
-#           tags: ghcr.io/${{ github.repository_owner }}/CI-CD:latest
-
-#   test-image:
-#     needs: build-and-push
-#     runs-on: [self-hosted]
-#     steps:
-#       - name: Checkout code
-#         uses: actions/checkout@v4
-
-#       - name: Log in to the Container registry
-#         uses: docker/login-action@v2
-#         with:
-#           registry: ghcr.io
-#           username: ${{ github.repository_owner }}
-#           password: ${{ secrets.GITHUB_TOKEN }}
-
-#       - name: Pull the Docker image
-#         run: docker pull ghcr.io/${{ github.repository_owner }}/CI-CD:latest
-
-#       - name: Run a test command in the container
-#         run: docker run ghcr.io/${{ github.repository_owner }}/CI-CD:latest echo "Hello, World!"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 name: AVR25 Rakuten MLOps - CI
 run-name: Test AVR25 Rakuten MLOps actions started by ${{ github.actor }}
 on:
@@ -92,11 +22,11 @@ jobs:
       matrix:
         service: [vault, consul, mongo, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
     steps:
-      # - name: Check out repository code
-      #   uses: actions/checkout@v4
-      # - name: Get version from file
-      #   id: get_version
-      #   run: echo "VERSION=$(cat .version)" >> $GITHUB_OUTPUT
+      - name: Check out repository code
+        uses: actions/checkout@v4
+      - name: Get version from file
+        id: get_version
+        run: echo "VERSION=$(cat .version)" >> $GITHUB_OUTPUT
       - name: Stop and remove containers
         run: |
           VERSION=${{ steps.get_version.outputs.VERSION }}
@@ -123,11 +53,11 @@ jobs:
         id: get_version
         run: echo "VERSION=$(cat .version)" >> $GITHUB_OUTPUT
 
-      # - name: Set up Docker Buildx
-      #   uses: docker/setup-buildx-action@v4
-      #   with:
-      #     driver-opts: |
-      #       image=moby/buildkit:v0.16.0
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+        with:
+          driver-opts: |
+            image=moby/buildkit:v0.16.0
 
       - name: Build services
         run: |
