@@ -234,6 +234,7 @@ jobs:
                       if [[ -n "$current_key" && "$current_key" != "null" && -n "$processed_value" ]]; then
                           ENV_VARS+=" -e $current_key=\"$processed_value\""
                           echo "DEBUG: Added ENV pair: $current_key=$processed_value"
+                          echo "ENV_VARS = $ENV_VARS"
                       else
                           echo "DEBUG: Skipped due to null or empty key/value"
                       fi
