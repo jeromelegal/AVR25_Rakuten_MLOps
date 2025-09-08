@@ -127,65 +127,26 @@ jobs:
 
 
 
-
-
-
-
-          # # Extraction des env_vars pour le service, en conservant les quotes si présentes
-          # yq eval ".services.${{ matrix.service }}.env_vars | to_entries | .[] | \"\(.key) \(.value)\"" services_config.yaml | while read -r key value; do
-          #     # Substitution des variables ${BRANCH_NAME} et ${VERSION}
-          #     processed_value=$(echo "$value" | sed "s/\${BRANCH_NAME}/$BRANCH_NAME/g" | sed "s/\${VERSION}/$VERSION/g")
-          #     # Affichage pour debug (ou utilisation directe)
-          #     echo "Clé: $key, Valeur: $processed_value"
-          #     # Pour docker run : ENV_VARS+=" -e $key=$processed_value"
-          # done
-
-
-          # Initialisation de ENV_VARS
           ENV_VARS=""
-
-          # Utilisation d'un tableau pour éviter les problèmes de quotes et d'espaces
-          mapfile -t env_pairs < <(yq eval ".services.$SERVICE.env_vars | to_entries | .[] | \"\(.key) \(.value)\"" services_config.yaml)
-
-
-          # Boucle sur chaque paire clé/valeur
-          for pair in "${env_pairs[@]}"; do
-              key=$(echo "$pair" | awk '{print $1}')
-              value=$(echo "$pair" | cut -d' ' -f2-)
+          # Utiliser une substitution de processus pour éviter le sous-shell créé par le pipe
+          while read -r key value; do
               # Substitution des variables ${BRANCH_NAME} et ${VERSION}
               processed_value=$(echo "$value" | sed "s/\${BRANCH_NAME}/$BRANCH_NAME/g" | sed "s/\${VERSION}/$VERSION/g")
-              # Construction de ENV_VARS
+              # Affichage pour debug (ou utilisation directe)
+              echo "Clé: $key, Valeur: $processed_value"
               ENV_VARS+=" -e $key=$processed_value"
-              echo "DEBUG: Added ENV pair: $key=$processed_value"
-          done
+          done < <(yq eval ".services.${{ matrix.service }}.env_vars | to_entries | .[] | \"\(.key) \(.value)\"" services_config.yaml)
+
+
+          # Extraire et traiter secured_services
+          SECURED_SERVICES=$(/usr/local/bin/yq eval ".secured_services | join(\",\")" <<< "$CONFIG" || true)
+          if [ "$SECURED_SERVICES" != "null" ] && [ -n "$SECURED_SERVICES" ]; then
+              # Remplacer ${BRANCH_NAME} dans chaque élément de secured_services
+              SECURED_SERVICES_PROCESSED=$(echo "$SECURED_SERVICES" | sed "s/\${BRANCH_NAME}/$BRANCH_NAME/g")
+              ENV_VARS+=" -e SECURED_SERVICES=\"$SECURED_SERVICES_PROCESSED\""
+          fi
 
           echo "Premier print ENV_VARS=$ENV_VARS"
-
-
-
-
-
-          # Traiter les lignes sans utiliser de fonction
-          while IFS= read -r line; do
-              # Extraire la clé quand la ligne commence par "key:"
-              if [[ $line == key:* ]]; then
-                  current_key=$(echo "$line" | sed 's/key: //')
-              # Extraire et traiter la valeur quand la ligne commence par "value:"
-              elif [[ $line == value:* ]]; then
-                  # Extraire la valeur et supprimer les guillemets
-                  value=$(echo "$line" | sed 's/value: //' | tr -d '"')
-                  # Effectuer la substitution des variables
-                  processed_value=$(echo "$value" | sed "s/\${BRANCH_NAME}/$BRANCH_NAME/g" | sed "s/\${VERSION}/$VERSION/g")
-
-                  # Ajouter à ENV_VARS si la clé et la valeur sont valides
-                  if [[ -n "$current_key" && "$current_key" != "null" && -n "$processed_value" ]]; then
-                      ENV_VARS+=" -e $current_key=$processed_value"
-                      echo "DEBUG: Added ENV pair: $current_key=$processed_value"
-                  else
-                      echo "DEBUG: Skipped due to null or empty key/value"
-                  fi
-              fi
-          done < <(/usr/local/bin/yq eval '.env_vars | to_entries | .[]' - <<< "$CONFIG")
 
           CAP_ADD=$(/usr/local/bin/yq eval ".cap_add | join(\",\")" <<< "$CONFIG" || true)
           CAP_OPTIONS=""
@@ -206,6 +167,7 @@ jobs:
 
           echo "Running with RUN_AS_ROOT=$RUN_AS_ROOT, CAP_OPTIONS=$CAP_OPTIONS, ENV_VARS=$ENV_VARS, EXPOSE_OPTIONS=$EXPOSE_OPTIONS"
           if [ "$RUN_AS_ROOT" = true ]; then
+            echo "docker run -d --user root $CAP_OPTIONS --name $CONTAINER_NAME --network $NETWORK_NAME $ENV_VARS ${{ matrix.service }}:$TAG" 
             docker run -d --user root $CAP_OPTIONS --name $CONTAINER_NAME --network $NETWORK_NAME $ENV_VARS ${{ matrix.service }}:$TAG
           else
             docker run -d $CAP_OPTIONS --name $CONTAINER_NAME --network $NETWORK_NAME $ENV_VARS ${{ matrix.service }}:$TAG
