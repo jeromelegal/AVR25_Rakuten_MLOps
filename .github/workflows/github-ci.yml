@@ -15,8 +15,6 @@ jobs:
 
   clear-containers:
     runs-on: [self-hosted]
-    container:
-      image: my-custom-runner-image:latest
     strategy:
       # max-parallel: 10
       matrix:
@@ -54,7 +52,7 @@ jobs:
         run: echo "VERSION=$(cat .version)" >> $GITHUB_OUTPUT
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@v3
         with:
           driver-opts: |
             image=moby/buildkit:v0.16.0
@@ -66,7 +64,6 @@ jobs:
           TAG="${VERSION}-${BRANCH_NAME}"
           cd src/${{ matrix.service }}
           docker build -t ${{ matrix.service }}:$TAG .
-
 
   start-containers:
     runs-on: [self-hosted]
@@ -82,21 +79,12 @@ jobs:
         id: get_version
         run: echo "VERSION=$(cat .version)" >> $GITHUB_OUTPUT
 
-  #     - name: Install yq
-  #       run: |
-  #         # # Télécharger yq dans le répertoire courant
-  #         # wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O ./yq
-  #         # chmod +x ./yq
-  #         # sudo mv ./yq /usr/local/bin/yq
-  #         if ! command -v yq &> /dev/null; then
-  #           echo "yq not found. Installing..."
-  #           wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O ./yq
-  #           chmod +x ./yq
-  #           sudo mv ./yq /usr/local/bin/yq
-  #         else
-  #           echo "yq is already installed."
-  #         fi
-
+      - name: Install yq
+        run: |
+          # Télécharger yq dans le répertoire courant
+          wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O ./yq
+          chmod +x ./yq
+          sudo mv ./yq /usr/local/bin/yq
 
       - name: Start containers
         run: |
@@ -108,11 +96,13 @@ jobs:
           CONFIG=$(/usr/local/bin/yq eval ".services.${{ matrix.service }}" services_config.yaml)
           RUN_AS_ROOT=$(/usr/local/bin/yq eval ".run_as_root" <<< "$CONFIG")
 
+          echo "DEBUG 1"
           # Si RUN_AS_ROOT est vide ou non défini, nous le définissons comme false par défaut
           if [ -z "$RUN_AS_ROOT" ] || [ "$RUN_AS_ROOT" = "null" ]; then
             RUN_AS_ROOT=false
           fi
 
+          echo "DEBUG 2"
           ENV_VARS=""
           while IFS= read -r line; do
             key=$(echo "$line" | /usr/local/bin/yq eval '.key' -)
@@ -121,7 +111,17 @@ jobs:
             value=${value//\${VERSION}/$VERSION}
             ENV_VARS+=" -e $key=\"$value\""
           done < <(/usr/local/bin/yq eval '.env_vars | to_entries | .[]' - <<< "$CONFIG")
- 
+          
+          echo "DEBUG 3"
+          # CAP_ADD=$(/usr/local/bin/yq eval ".cap_add | join(\",\")" <<< "$CONFIG")
+          # CAP_OPTIONS=""
+          # if [ "$CAP_ADD" != "null" ] && [ -n "$CAP_ADD" ]; then
+          #   for cap in $(echo $CAP_ADD | tr ',' '\n'); do
+          #     CAP_OPTIONS+=" --cap-add=$cap"
+          #   done
+          # fi
+
+          
           # Récupérer CAP_ADD à partir de la configuration
           CAP_ADD=$(/usr/local/bin/yq eval ".cap_add | join(\",\")" <<< "$CONFIG" || true)
           echo "CAP_ADD value: '$CAP_ADD'"
@@ -131,8 +131,12 @@ jobs:
                   CAP_OPTIONS+=" --cap-add=$cap"
               done
           fi
+
+
+          echo "DEBUG 4"
           
           echo "TEST AFFICHAGE RUN_AS_ROOT $RUN_AS_ROOT   CAP_OPTIONS  $CAP_OPTIONS   ENV_VARS   $ENV_VARS"
+
 
           # Démarrer le conteneur avec les privilèges root si nécessaire
           if [ "$RUN_AS_ROOT" = true ]; then
@@ -154,42 +158,25 @@ jobs:
       - name: Get version from file
         id: get_version
         run: echo "VERSION=$(cat .version)" >> $GITHUB_OUTPUT
-
-
-      # - name: Install yq
-      #   run: |
-      #     # wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O ./yq
-      #     # chmod +x ./yq
-      #     # sudo mv ./yq /usr/local/bin/yq
-      #     if ! command -v yq &> /dev/null; then
-      #       echo "yq not found. Installing..."
-      #       wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O ./yq
-      #       chmod +x ./yq
-      #       sudo mv ./yq /usr/local/bin/yq
-      #     else
-      #       echo "yq is already installed."
-      #     fi
-
-
+      - name: Install yq
+        run: |
+          wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O ./yq
+          chmod +x ./yq
+          sudo mv ./yq /usr/local/bin/yq
       - name: Perform health checks
         run: |
           VERSION=${{ steps.get_version.outputs.VERSION }}
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
-
-          CONTAINER_NAME="${{ matrix.service }}-${BRANCH_NAME}-${VERSION}"
-
-          docker logs -f $CONTAINER_NAME
-
-          # HEALTH_CHECK=$(/usr/local/bin/yq eval ".services.${{ matrix.service }}.health_check.urls" health_check_config.yaml)
-          # echo "$HEALTH_CHECK" | /usr/local/bin/yq eval '.[]' | while read -r check; do
-          #   URL=$(/usr/local/bin/yq eval '.url' <<< "$check")
-          #   EXPECTED_CODE=$(/usr/local/bin/yq eval '.expected_code' <<< "$check")
-          #   until [ "$(curl -s -o /dev/null -w "%{http_code}" "$URL")" -eq "$EXPECTED_CODE" ]; do
-          #     echo "Waiting for $URL to be healthy."
-          #     sleep 1
-          #   done
-          #   echo "$URL is healthy."
-          # done
+          HEALTH_CHECK=$(/usr/local/bin/yq eval ".services.${{ matrix.service }}.health_check.urls" health_check_config.yaml)
+          echo "$HEALTH_CHECK" | /usr/local/bin/yq eval '.[]' | while read -r check; do
+            URL=$(/usr/local/bin/yq eval '.url' <<< "$check")
+            EXPECTED_CODE=$(/usr/local/bin/yq eval '.expected_code' <<< "$check")
+            until [ "$(curl -s -o /dev/null -w "%{http_code}" "$URL")" -eq "$EXPECTED_CODE" ]; do
+              echo "Waiting for $URL to be healthy."
+              sleep 1
+            done
+            echo "$URL is healthy."
+          done
 
   stop-containers:
     runs-on: [self-hosted]
@@ -219,341 +206,341 @@ jobs:
 
 
 
-#       # - name: Start containers
+      # - name: Start containers
+      #   run: |
+      #     VERSION=${{ steps.get_version.outputs.VERSION }}
+      #     BRANCH_NAME=${GITHUB_REF#refs/heads/}
+      #     TAG="${VERSION}-${BRANCH_NAME}"
+      #     # Extraire les variables pour le service actuel
+      #     CONFIG=$(yq eval ".services.${{ matrix.service }}.env_vars" services_config.yaml)
+      #     ENV_VARS=""
+      #     # Générer les arguments -e pour docker run
+      #     echo "$CONFIG" | yq eval '. | to_entries | .[]' | while read -r line; do
+      #       key=$(echo "$line" | yq eval '.key' -)
+      #       value=$(echo "$line" | yq eval '.value' -)
+
+      #       # Remplacer les placeholders par leurs valeurs
+      #       value=${value//\${BRANCH_NAME}/$BRANCH_NAME}
+      #       value=${value//\${VERSION}/$VERSION}
+      #       ENV_VARS+=" -e $key=\"$value\""
+      #     done
+      #     # Démarrer le conteneur avec les variables d'environnement
+      #     docker run -d --name ${{ matrix.service }} $ENV_VARS ${{ matrix.service }}:$TAG
+
+# name: AVR25 Rakuten MLOps - CI
+# run-name: Test AVR25 Rakuten MLOps actions started by ${{ github.actor }}
+# on:
+#   push:
+#     branches:
+#       - master
+#   pull_request:
+#     types:
+#       - opened
+#       - reopened
+#       - synchronize
+# env:
+#   FORCE_COLOR: "1"
+
+# jobs:
+#   build:
+#     runs-on: [self-hosted]
+#     strategy:
+#       max-parallel: 10
+#       matrix:
+#         service: [vault consul mongo api-mongodb postgresql api-postgresql api-gateway frontend reverse-proxy minio api-minio]
+#     permissions:
+#       contents: 'read'
+#       id-token: 'write'
+#     steps:
+#       - name: Check out repository code
+#         uses: actions/checkout@v4
+#       - name: Set up Docker Buildx
+#         uses: docker/setup-buildx-action@v3
+#         with:
+#           driver-opts: |
+#             image=moby/buildkit:v0.16.0
+#       - name: Set up Docker Compose
+#         uses: docker/setup-compose-action@v1
+#       - name: Start services
+#         run: |
+#           docker compose up -d --build --force-recreate ${{ matrix.service }}
+
+#   # build-vault:
+#   #   runs-on: [self-hosted]
+#   #   permissions:
+#   #     contents: 'read'
+#   #     id-token: 'write'
+#   #   steps:
+#   #     - name: Check out repository code
+#   #       uses: actions/checkout@v4
+#   #     - name: Set up Docker Buildx
+#   #       uses: docker/setup-buildx-action@v3
+#   #       with:
+#   #         driver-opts: |
+#   #           image=moby/buildkit:v0.16.0
+#   #     - name: Set up Docker Compose
+#   #       uses: docker/setup-compose-action@v1
+#   #     - name: Start services
+#   #       run: |
+#   #         docker compose up -d --build --force-recreate vault
+
+#   # build-consul:
+#   #   runs-on: [self-hosted]
+#   #   permissions:
+#   #     contents: 'read'
+#   #     id-token: 'write'
+#   #   steps:
+#   #     - name: Check out repository code
+#   #       uses: actions/checkout@v4
+#   #     - name: Set up Docker Buildx
+#   #       uses: docker/setup-buildx-action@v3
+#   #       with:
+#   #         driver-opts: |
+#   #           image=moby/buildkit:v0.16.0
+#   #     - name: Set up Docker Compose
+#   #       uses: docker/setup-compose-action@v1
+#   #     - name: Start services
+#   #       run: |
+#   #         docker compose up -d --build --force-recreate consul
+
+#   # build-mongo:
+#   #   runs-on: [self-hosted]
+#   #   permissions:
+#   #     contents: 'read'
+#   #     id-token: 'write'
+#   #   steps:
+#   #     - name: Check out repository code
+#   #       uses: actions/checkout@v4
+#   #     - name: Set up Docker Buildx
+#   #       uses: docker/setup-buildx-action@v3
+#   #       with:
+#   #         driver-opts: |
+#   #           image=moby/buildkit:v0.16.0
+#   #     - name: Set up Docker Compose
+#   #       uses: docker/setup-compose-action@v1
+#   #     - name: Start services
+#   #       run: |
+#   #         docker compose up -d --build --force-recreate mongo
+
+#   # build-postgresql:
+#   #   runs-on: [self-hosted]
+#   #   permissions:
+#   #     contents: 'read'
+#   #     id-token: 'write'
+#   #   steps:
+#   #     - name: Check out repository code
+#   #       uses: actions/checkout@v4
+#   #     - name: Set up Docker Buildx
+#   #       uses: docker/setup-buildx-action@v3
+#   #       with:
+#   #         driver-opts: |
+#   #           image=moby/buildkit:v0.16.0
+#   #     - name: Set up Docker Compose
+#   #       uses: docker/setup-compose-action@v1
+#   #     - name: Start services
+#   #       run: |
+#   #         docker compose up -d --build --force-recreate postgresql
+
+#   # build-minio:
+#   #   runs-on: [self-hosted]
+#   #   permissions:
+#   #     contents: 'read'
+#   #     id-token: 'write'
+#   #   steps:
+#   #     - name: Check out repository code
+#   #       uses: actions/checkout@v4
+#   #     - name: Set up Docker Buildx
+#   #       uses: docker/setup-buildx-action@v3
+#   #       with:
+#   #         driver-opts: |
+#   #           image=moby/buildkit:v0.16.0
+#   #     - name: Set up Docker Compose
+#   #       uses: docker/setup-compose-action@v1
+#   #     - name: Start services
+#   #       run: |
+#   #         docker compose up -d --build --force-recreate minio
+
+#   # build-frontend:
+#   #   runs-on: [self-hosted]
+#   #   permissions:
+#   #     contents: 'read'
+#   #     id-token: 'write'
+#   #   steps:
+#   #     - name: Check out repository code
+#   #       uses: actions/checkout@v4
+#   #     - name: Set up Docker Buildx
+#   #       uses: docker/setup-buildx-action@v3
+#   #       with:
+#   #         driver-opts: |
+#   #           image=moby/buildkit:v0.16.0
+#   #     - name: Set up Docker Compose
+#   #       uses: docker/setup-compose-action@v1
+#   #     - name: Start services
+#   #       run: |
+#   #         docker compose up -d --build --force-recreate frontend
+
+#   # build-reverse-proxy:
+#   #   runs-on: [self-hosted]
+#   #   permissions:
+#   #     contents: 'read'
+#   #     id-token: 'write'
+#   #   steps:
+#   #     - name: Check out repository code
+#   #       uses: actions/checkout@v4
+#   #     - name: Set up Docker Buildx
+#   #       uses: docker/setup-buildx-action@v3
+#   #       with:
+#   #         driver-opts: |
+#   #           image=moby/buildkit:v0.16.0
+#   #     - name: Set up Docker Compose
+#   #       uses: docker/setup-compose-action@v1
+#   #     - name: Start services
+#   #       run: |
+#   #         docker compose up -d --build --force-recreate reverse-proxy
+
+#   # build-api-minio:
+#   #   runs-on: [self-hosted]
+#   #   permissions:
+#   #     contents: 'read'
+#   #     id-token: 'write'
+#   #   steps:
+#   #     - name: Check out repository code
+#   #       uses: actions/checkout@v4
+#   #     - name: Set up Docker Buildx
+#   #       uses: docker/setup-buildx-action@v3
+#   #       with:
+#   #         driver-opts: |
+#   #           image=moby/buildkit:v0.16.0
+#   #     - name: Set up Docker Compose
+#   #       uses: docker/setup-compose-action@v1
+#   #     - name: Start services
+#   #       run: |
+#   #         docker compose up -d --build --force-recreate api-minio
+
+#   # build-api-mongodb:
+#   #   runs-on: [self-hosted]
+#   #   permissions:
+#   #     contents: 'read'
+#   #     id-token: 'write'
+#   #   steps:
+#   #     - name: Check out repository code
+#   #       uses: actions/checkout@v4
+#   #     - name: Set up Docker Buildx
+#   #       uses: docker/setup-buildx-action@v3
+#   #       with:
+#   #         driver-opts: |
+#   #           image=moby/buildkit:v0.16.0
+#   #     - name: Set up Docker Compose
+#   #       uses: docker/setup-compose-action@v1
+#   #     - name: Start services
+#   #       run: |
+#   #         docker compose up -d --build --force-recreate api-mongodb
+
+#   # build-api-postgresql:
+#   #   runs-on: [self-hosted]
+#   #   permissions:
+#   #     contents: 'read'
+#   #     id-token: 'write'
+#   #   steps:
+#   #     - name: Check out repository code
+#   #       uses: actions/checkout@v4
+#   #     - name: Set up Docker Buildx
+#   #       uses: docker/setup-buildx-action@v3
+#   #       with:
+#   #         driver-opts: |
+#   #           image=moby/buildkit:v0.16.0
+#   #     - name: Set up Docker Compose
+#   #       uses: docker/setup-compose-action@v1
+#   #     - name: Start services
+#   #       run: |
+#   #         docker compose up -d --build --force-recreate api-postgresql
+
+
+#   tests:
+#     runs-on: [self-hosted]
+#     # needs: [build-vault, build-consul, build-mongo, build-postgresql, build-minio, build-frontend, build-reverse-proxy, build-api-minio, build-api-mongodb, build-api-postgresql]
+#     needs: [build]
+#     permissions:
+#       contents: 'read'
+#       id-token: 'write'
+#     steps:
+#       - name: Check out repository code
+#         uses: actions/checkout@v4
+#       - name: Set up Docker Buildx
+#         uses: docker/setup-buildx-action@v3
+#         with:
+#           driver-opts: |
+#             image=moby/buildkit:v0.16.0
+#       - name: Set up Docker Compose
+#         uses: docker/setup-compose-action@v1
+#       # - name: Start services
 #       #   run: |
-#       #     VERSION=${{ steps.get_version.outputs.VERSION }}
-#       #     BRANCH_NAME=${GITHUB_REF#refs/heads/}
-#       #     TAG="${VERSION}-${BRANCH_NAME}"
-#       #     # Extraire les variables pour le service actuel
-#       #     CONFIG=$(yq eval ".services.${{ matrix.service }}.env_vars" services_config.yaml)
-#       #     ENV_VARS=""
-#       #     # Générer les arguments -e pour docker run
-#       #     echo "$CONFIG" | yq eval '. | to_entries | .[]' | while read -r line; do
-#       #       key=$(echo "$line" | yq eval '.key' -)
-#       #       value=$(echo "$line" | yq eval '.value' -)
+#       #     docker compose up -d --build --force-recreate
+#       - name: Wait for services to be up
+#         run: |
+#           sleep 120
+#       - name: Launch unit tests
+#         run: |
+#           sh scripts/launch_test.sh
+#       # - name: Set python version
+#       #   uses: actions/setup-python@v5
+#       #   with:
+#       #     python-version: "3.12.3"
+#       # - name: Setting up Python environment
+#       #   run: |
+#       #     mkdir coverage
+#       #     pip install pipenv
+#       #     pipenv install --dev --ignore-pipfile
+#       # - name: Linting API
+#       #   run: |
+#       #     # printing linter configuration
+#       #     echo --------------------------
+#       #     echo "Executing linter with the following error code disabled"
+#       #     echo "  - C0111: Missing docstrings"
+#       #     echo "  - R0902: Too many instance attributes"
+#       #     echo "  - W0511: Fix me"
+#       #     echo "  - W0702: No exception type(s) specified"
+#       #     echo "  - R0913: Too many arguments"
+#       #     echo "  - R0903: Too few public methods"
+#       #     echo "  - R0904: Too many public methods"
+#       #     echo "  - R0912: Too many branches"
+#       #     echo "  - R0801: Similar lines in 2 files"
+#       #     echo "  - W1514: Using open without explicitly specifying an encoding"
+#       #     echo "  - R0916: Too many boolean expressions in if statement"
+#       #     echo "  - R0901: Too many ancestors"
+#       #     echo --------------------------
+#       #     pipenv run pylint --disable=C0111,R0902,W0511,W0702,R0913,R0903,R0904,R0912,R0801,W1514,R0916,R0901 app
+#       # - name: Running API tests
+#       #   run: pipenv run pytest --capture=sys --cov-report term-missing --cov=app tests | tee coverage/coverage.txt
+#       - name: Archive CI test results
+#         uses: actions/upload-artifact@v4
+#         if: always()
+#         with:
+#           name: ci-test_results
+#           path: test_results/*test_result.xml
+#       - name: Archive CI code coverages
+#         uses: actions/upload-artifact@v4
+#         if: always()
+#         with:
+#           name: ci-test_coverages
+#           path: test_results/*test_coverage.xml
 
-#       #       # Remplacer les placeholders par leurs valeurs
-#       #       value=${value//\${BRANCH_NAME}/$BRANCH_NAME}
-#       #       value=${value//\${VERSION}/$VERSION}
-#       #       ENV_VARS+=" -e $key=\"$value\""
-#       #     done
-#       #     # Démarrer le conteneur avec les variables d'environnement
-#       #     docker run -d --name ${{ matrix.service }} $ENV_VARS ${{ matrix.service }}:$TAG
-
-# # name: AVR25 Rakuten MLOps - CI
-# # run-name: Test AVR25 Rakuten MLOps actions started by ${{ github.actor }}
-# # on:
-# #   push:
-# #     branches:
-# #       - master
-# #   pull_request:
-# #     types:
-# #       - opened
-# #       - reopened
-# #       - synchronize
-# # env:
-# #   FORCE_COLOR: "1"
-
-# # jobs:
-# #   build:
-# #     runs-on: [self-hosted]
-# #     strategy:
-# #       max-parallel: 10
-# #       matrix:
-# #         service: [vault consul mongo api-mongodb postgresql api-postgresql api-gateway frontend reverse-proxy minio api-minio]
-# #     permissions:
-# #       contents: 'read'
-# #       id-token: 'write'
-# #     steps:
-# #       - name: Check out repository code
-# #         uses: actions/checkout@v4
-# #       - name: Set up Docker Buildx
-# #         uses: docker/setup-buildx-action@v4
-# #         with:
-# #           driver-opts: |
-# #             image=moby/buildkit:v0.16.0
-# #       - name: Set up Docker Compose
-# #         uses: docker/setup-compose-action@v1
-# #       - name: Start services
-# #         run: |
-# #           docker compose up -d --build --force-recreate ${{ matrix.service }}
-
-# #   # build-vault:
-# #   #   runs-on: [self-hosted]
-# #   #   permissions:
-# #   #     contents: 'read'
-# #   #     id-token: 'write'
-# #   #   steps:
-# #   #     - name: Check out repository code
-# #   #       uses: actions/checkout@v4
-# #   #     - name: Set up Docker Buildx
-# #   #       uses: docker/setup-buildx-action@v4
-# #   #       with:
-# #   #         driver-opts: |
-# #   #           image=moby/buildkit:v0.16.0
-# #   #     - name: Set up Docker Compose
-# #   #       uses: docker/setup-compose-action@v1
-# #   #     - name: Start services
-# #   #       run: |
-# #   #         docker compose up -d --build --force-recreate vault
-
-# #   # build-consul:
-# #   #   runs-on: [self-hosted]
-# #   #   permissions:
-# #   #     contents: 'read'
-# #   #     id-token: 'write'
-# #   #   steps:
-# #   #     - name: Check out repository code
-# #   #       uses: actions/checkout@v4
-# #   #     - name: Set up Docker Buildx
-# #   #       uses: docker/setup-buildx-action@v4
-# #   #       with:
-# #   #         driver-opts: |
-# #   #           image=moby/buildkit:v0.16.0
-# #   #     - name: Set up Docker Compose
-# #   #       uses: docker/setup-compose-action@v1
-# #   #     - name: Start services
-# #   #       run: |
-# #   #         docker compose up -d --build --force-recreate consul
-
-# #   # build-mongo:
-# #   #   runs-on: [self-hosted]
-# #   #   permissions:
-# #   #     contents: 'read'
-# #   #     id-token: 'write'
-# #   #   steps:
-# #   #     - name: Check out repository code
-# #   #       uses: actions/checkout@v4
-# #   #     - name: Set up Docker Buildx
-# #   #       uses: docker/setup-buildx-action@v4
-# #   #       with:
-# #   #         driver-opts: |
-# #   #           image=moby/buildkit:v0.16.0
-# #   #     - name: Set up Docker Compose
-# #   #       uses: docker/setup-compose-action@v1
-# #   #     - name: Start services
-# #   #       run: |
-# #   #         docker compose up -d --build --force-recreate mongo
-
-# #   # build-postgresql:
-# #   #   runs-on: [self-hosted]
-# #   #   permissions:
-# #   #     contents: 'read'
-# #   #     id-token: 'write'
-# #   #   steps:
-# #   #     - name: Check out repository code
-# #   #       uses: actions/checkout@v4
-# #   #     - name: Set up Docker Buildx
-# #   #       uses: docker/setup-buildx-action@v4
-# #   #       with:
-# #   #         driver-opts: |
-# #   #           image=moby/buildkit:v0.16.0
-# #   #     - name: Set up Docker Compose
-# #   #       uses: docker/setup-compose-action@v1
-# #   #     - name: Start services
-# #   #       run: |
-# #   #         docker compose up -d --build --force-recreate postgresql
-
-# #   # build-minio:
-# #   #   runs-on: [self-hosted]
-# #   #   permissions:
-# #   #     contents: 'read'
-# #   #     id-token: 'write'
-# #   #   steps:
-# #   #     - name: Check out repository code
-# #   #       uses: actions/checkout@v4
-# #   #     - name: Set up Docker Buildx
-# #   #       uses: docker/setup-buildx-action@v4
-# #   #       with:
-# #   #         driver-opts: |
-# #   #           image=moby/buildkit:v0.16.0
-# #   #     - name: Set up Docker Compose
-# #   #       uses: docker/setup-compose-action@v1
-# #   #     - name: Start services
-# #   #       run: |
-# #   #         docker compose up -d --build --force-recreate minio
-
-# #   # build-frontend:
-# #   #   runs-on: [self-hosted]
-# #   #   permissions:
-# #   #     contents: 'read'
-# #   #     id-token: 'write'
-# #   #   steps:
-# #   #     - name: Check out repository code
-# #   #       uses: actions/checkout@v4
-# #   #     - name: Set up Docker Buildx
-# #   #       uses: docker/setup-buildx-action@v4
-# #   #       with:
-# #   #         driver-opts: |
-# #   #           image=moby/buildkit:v0.16.0
-# #   #     - name: Set up Docker Compose
-# #   #       uses: docker/setup-compose-action@v1
-# #   #     - name: Start services
-# #   #       run: |
-# #   #         docker compose up -d --build --force-recreate frontend
-
-# #   # build-reverse-proxy:
-# #   #   runs-on: [self-hosted]
-# #   #   permissions:
-# #   #     contents: 'read'
-# #   #     id-token: 'write'
-# #   #   steps:
-# #   #     - name: Check out repository code
-# #   #       uses: actions/checkout@v4
-# #   #     - name: Set up Docker Buildx
-# #   #       uses: docker/setup-buildx-action@v4
-# #   #       with:
-# #   #         driver-opts: |
-# #   #           image=moby/buildkit:v0.16.0
-# #   #     - name: Set up Docker Compose
-# #   #       uses: docker/setup-compose-action@v1
-# #   #     - name: Start services
-# #   #       run: |
-# #   #         docker compose up -d --build --force-recreate reverse-proxy
-
-# #   # build-api-minio:
-# #   #   runs-on: [self-hosted]
-# #   #   permissions:
-# #   #     contents: 'read'
-# #   #     id-token: 'write'
-# #   #   steps:
-# #   #     - name: Check out repository code
-# #   #       uses: actions/checkout@v4
-# #   #     - name: Set up Docker Buildx
-# #   #       uses: docker/setup-buildx-action@v4
-# #   #       with:
-# #   #         driver-opts: |
-# #   #           image=moby/buildkit:v0.16.0
-# #   #     - name: Set up Docker Compose
-# #   #       uses: docker/setup-compose-action@v1
-# #   #     - name: Start services
-# #   #       run: |
-# #   #         docker compose up -d --build --force-recreate api-minio
-
-# #   # build-api-mongodb:
-# #   #   runs-on: [self-hosted]
-# #   #   permissions:
-# #   #     contents: 'read'
-# #   #     id-token: 'write'
-# #   #   steps:
-# #   #     - name: Check out repository code
-# #   #       uses: actions/checkout@v4
-# #   #     - name: Set up Docker Buildx
-# #   #       uses: docker/setup-buildx-action@v4
-# #   #       with:
-# #   #         driver-opts: |
-# #   #           image=moby/buildkit:v0.16.0
-# #   #     - name: Set up Docker Compose
-# #   #       uses: docker/setup-compose-action@v1
-# #   #     - name: Start services
-# #   #       run: |
-# #   #         docker compose up -d --build --force-recreate api-mongodb
-
-# #   # build-api-postgresql:
-# #   #   runs-on: [self-hosted]
-# #   #   permissions:
-# #   #     contents: 'read'
-# #   #     id-token: 'write'
-# #   #   steps:
-# #   #     - name: Check out repository code
-# #   #       uses: actions/checkout@v4
-# #   #     - name: Set up Docker Buildx
-# #   #       uses: docker/setup-buildx-action@v4
-# #   #       with:
-# #   #         driver-opts: |
-# #   #           image=moby/buildkit:v0.16.0
-# #   #     - name: Set up Docker Compose
-# #   #       uses: docker/setup-compose-action@v1
-# #   #     - name: Start services
-# #   #       run: |
-# #   #         docker compose up -d --build --force-recreate api-postgresql
-
-
-# #   tests:
-# #     runs-on: [self-hosted]
-# #     # needs: [build-vault, build-consul, build-mongo, build-postgresql, build-minio, build-frontend, build-reverse-proxy, build-api-minio, build-api-mongodb, build-api-postgresql]
-# #     needs: [build]
-# #     permissions:
-# #       contents: 'read'
-# #       id-token: 'write'
-# #     steps:
-# #       - name: Check out repository code
-# #         uses: actions/checkout@v4
-# #       - name: Set up Docker Buildx
-# #         uses: docker/setup-buildx-action@v4
-# #         with:
-# #           driver-opts: |
-# #             image=moby/buildkit:v0.16.0
-# #       - name: Set up Docker Compose
-# #         uses: docker/setup-compose-action@v1
-# #       # - name: Start services
-# #       #   run: |
-# #       #     docker compose up -d --build --force-recreate
-# #       - name: Wait for services to be up
-# #         run: |
-# #           sleep 120
-# #       - name: Launch unit tests
-# #         run: |
-# #           sh scripts/launch_test.sh
-# #       # - name: Set python version
-# #       #   uses: actions/setup-python@v5
-# #       #   with:
-# #       #     python-version: "3.12.3"
-# #       # - name: Setting up Python environment
-# #       #   run: |
-# #       #     mkdir coverage
-# #       #     pip install pipenv
-# #       #     pipenv install --dev --ignore-pipfile
-# #       # - name: Linting API
-# #       #   run: |
-# #       #     # printing linter configuration
-# #       #     echo --------------------------
-# #       #     echo "Executing linter with the following error code disabled"
-# #       #     echo "  - C0111: Missing docstrings"
-# #       #     echo "  - R0902: Too many instance attributes"
-# #       #     echo "  - W0511: Fix me"
-# #       #     echo "  - W0702: No exception type(s) specified"
-# #       #     echo "  - R0913: Too many arguments"
-# #       #     echo "  - R0903: Too few public methods"
-# #       #     echo "  - R0904: Too many public methods"
-# #       #     echo "  - R0912: Too many branches"
-# #       #     echo "  - R0801: Similar lines in 2 files"
-# #       #     echo "  - W1514: Using open without explicitly specifying an encoding"
-# #       #     echo "  - R0916: Too many boolean expressions in if statement"
-# #       #     echo "  - R0901: Too many ancestors"
-# #       #     echo --------------------------
-# #       #     pipenv run pylint --disable=C0111,R0902,W0511,W0702,R0913,R0903,R0904,R0912,R0801,W1514,R0916,R0901 app
-# #       # - name: Running API tests
-# #       #   run: pipenv run pytest --capture=sys --cov-report term-missing --cov=app tests | tee coverage/coverage.txt
-# #       - name: Archive CI test results
-# #         uses: actions/upload-artifact@v4
-# #         if: always()
-# #         with:
-# #           name: ci-test_results
-# #           path: test_results/*test_result.xml
-# #       - name: Archive CI code coverages
-# #         uses: actions/upload-artifact@v4
-# #         if: always()
-# #         with:
-# #           name: ci-test_coverages
-# #           path: test_results/*test_coverage.xml
-
-# #   stop-services:
-# #     runs-on: [self-hosted]
-# #     needs: [tests]
-# #     permissions:
-# #       contents: 'read'
-# #       id-token: 'write'
-# #     steps:
-# #       - name: Check out repository code
-# #         uses: actions/checkout@v4
-# #       - name: Set up Docker Buildx
-# #         uses: docker/setup-buildx-action@v4
-# #         with:
-# #           driver-opts: |
-# #             image=moby/buildkit:v0.16.0
-# #       - name: Set up Docker Compose
-# #         uses: docker/setup-compose-action@v1
-# #       - name: Stop services
-# #         run: |
-# #           docker compose down
+#   stop-services:
+#     runs-on: [self-hosted]
+#     needs: [tests]
+#     permissions:
+#       contents: 'read'
+#       id-token: 'write'
+#     steps:
+#       - name: Check out repository code
+#         uses: actions/checkout@v4
+#       - name: Set up Docker Buildx
+#         uses: docker/setup-buildx-action@v3
+#         with:
+#           driver-opts: |
+#             image=moby/buildkit:v0.16.0
+#       - name: Set up Docker Compose
+#         uses: docker/setup-compose-action@v1
+#       - name: Stop services
+#         run: |
+#           docker compose down
