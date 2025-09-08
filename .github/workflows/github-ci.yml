@@ -154,9 +154,6 @@ jobs:
       #     sudo mv ./yq /usr/local/bin/yq
       - name: Perform health checks
         run: |
-
-
-
           VERSION=${{ steps.get_version.outputs.VERSION }}
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
           CONTAINER_NAME="${{ matrix.service }}-${BRANCH_NAME}-${VERSION}"
