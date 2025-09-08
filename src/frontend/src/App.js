@@ -23,6 +23,7 @@ const App = () => {
             <PrivateRoute path="/home" component={HomePage} />
             <Route path="/auth" component={AuthPage} />
             <PrivateRoute path="/newproduct" component={NewProduct} />
+            <PrivateRoute path="/findproduct" component={FindProduct} />
             <PrivateRoute path="/datalake" component={DataLake} />
             <PrivateRoute path="/datatransform" component={DataTransform} />
             <PrivateRoute path="/dataload" component={DataLoad} />
