@@ -214,39 +214,62 @@ jobs:
           # echo "DEBUG: Final ENV_VARS: $ENV_VARS"
 
 
-          export ENV_VARS=""
-          current_key=""
+          # export ENV_VARS=""
+          # current_key=""
 
-          # Fonction pour traiter la clé et la valeur quand elles sont sur des lignes distinctes
-          process_lines() {
-              while IFS= read -r line; do
-                  # Extraire la clé quand la ligne commence par "key:"
-                  if [[ $line == key:* ]]; then
-                      current_key=$(echo "$line" | sed 's/key: //')
-                  # Extraire et traiter la valeur quand la ligne commence par "value:"
-                  elif [[ $line == value:* ]]; then
-                      # Extraire la valeur et supprimer les guillemets
-                      value=$(echo "$line" | sed 's/value: //' | tr -d '"')
-                      # Effectuer la substitution des variables
-                      processed_value=$(echo "$value" | sed "s/\${BRANCH_NAME}/$BRANCH_NAME/g" | sed "s/\${VERSION}/$VERSION/g")
+          # # Fonction pour traiter la clé et la valeur quand elles sont sur des lignes distinctes
+          # process_lines() {
+          #     while IFS= read -r line; do
+          #         # Extraire la clé quand la ligne commence par "key:"
+          #         if [[ $line == key:* ]]; then
+          #             current_key=$(echo "$line" | sed 's/key: //')
+          #         # Extraire et traiter la valeur quand la ligne commence par "value:"
+          #         elif [[ $line == value:* ]]; then
+          #             # Extraire la valeur et supprimer les guillemets
+          #             value=$(echo "$line" | sed 's/value: //' | tr -d '"')
+          #             # Effectuer la substitution des variables
+          #             processed_value=$(echo "$value" | sed "s/\${BRANCH_NAME}/$BRANCH_NAME/g" | sed "s/\${VERSION}/$VERSION/g")
 
-                      # Ajouter à ENV_VARS si la clé et la valeur sont valides
-                      if [[ -n "$current_key" && "$current_key" != "null" && -n "$processed_value" ]]; then
-                          ENV_VARS+=" -e $current_key=\"$processed_value\""
-                          echo "DEBUG: Added ENV pair: $current_key=$processed_value"
-                          export ENV_VARS="$ENV_VARS"
-                          echo "ENV_VARS = $ENV_VARS"
-                      else
-                          echo "DEBUG: Skipped due to null or empty key/value"
-                      fi
+          #             # Ajouter à ENV_VARS si la clé et la valeur sont valides
+          #             if [[ -n "$current_key" && "$current_key" != "null" && -n "$processed_value" ]]; then
+          #                 ENV_VARS+=" -e $current_key=\"$processed_value\""
+          #                 echo "DEBUG: Added ENV pair: $current_key=$processed_value"
+          #                 export ENV_VARS="$ENV_VARS"
+          #                 echo "ENV_VARS = $ENV_VARS"
+          #             else
+          #                 echo "DEBUG: Skipped due to null or empty key/value"
+          #             fi
+          #         fi
+          #     done
+          # }
+
+          # # Passer la configuration au processus de traitement des lignes
+          # echo "$CONFIG" | /usr/local/bin/yq eval '.env_vars | to_entries | .[]' - | process_lines
+
+          # echo "DEBUG: Final ENV_VARS: $ENV_VARS"
+
+
+          # Traiter les lignes sans utiliser de fonction
+          while IFS= read -r line; do
+              # Extraire la clé quand la ligne commence par "key:"
+              if [[ $line == key:* ]]; then
+                  current_key=$(echo "$line" | sed 's/key: //')
+              # Extraire et traiter la valeur quand la ligne commence par "value:"
+              elif [[ $line == value:* ]]; then
+                  # Extraire la valeur et supprimer les guillemets
+                  value=$(echo "$line" | sed 's/value: //' | tr -d '"')
+                  # Effectuer la substitution des variables
+                  processed_value=$(echo "$value" | sed "s/\${BRANCH_NAME}/$BRANCH_NAME/g" | sed "s/\${VERSION}/$VERSION/g")
+
+                  # Ajouter à ENV_VARS si la clé et la valeur sont valides
+                  if [[ -n "$current_key" && "$current_key" != "null" && -n "$processed_value" ]]; then
+                      ENV_VARS+=" -e $current_key=\"$processed_value\""
+                      echo "DEBUG: Added ENV pair: $current_key=$processed_value"
+                  else
+                      echo "DEBUG: Skipped due to null or empty key/value"
                   fi
-              done
-          }
-
-          # Passer la configuration au processus de traitement des lignes
-          echo "$CONFIG" | /usr/local/bin/yq eval '.env_vars | to_entries | .[]' - | process_lines
-
-          echo "DEBUG: Final ENV_VARS: $ENV_VARS"
+              fi
+          done < <(/usr/local/bin/yq eval '.env_vars | to_entries | .[]' - <<< "$CONFIG")
 
 
 
