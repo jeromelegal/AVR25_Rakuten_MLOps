@@ -140,14 +140,54 @@ jobs:
             RUN_AS_ROOT=false
           fi
 
+          # ENV_VARS=""
+          # while IFS= read -r line; do
+          #   key=$(echo "$line" | /usr/local/bin/yq eval '.key' -)
+          #   value=$(echo "$line" | /usr/local/bin/yq eval '.value' -)
+          #   # Effectuer la substitution des variables
+          #   value=$(echo "$value" | sed "s/\${BRANCH_NAME}/$BRANCH_NAME/g" | sed "s/\${VERSION}/$VERSION/g")
+          #   ENV_VARS+=" -e $key=\"$value\""
+          # done < <(/usr/local/bin/yq eval '.env_vars | to_entries | .[]' - <<< "$CONFIG")
+
+          # ENV_VARS=""
+          # while IFS= read -r line; do
+          #     key=$(echo "$line" | /usr/local/bin/yq eval '.key' -)
+          #     value=$(echo "$line" | /usr/local/bin/yq eval '.value' -)
+          #     # Vérifiez si key n'est pas null ou vide
+          #     if [[ -n "$key" && "$key" != "null" && -n "$value" ]]; then
+          #         # Effectuer la substitution des variables
+          #         value=$(echo "$value" | sed "s/\${BRANCH_NAME}/$BRANCH_NAME/g" | sed "s/\${VERSION}/$VERSION/g")
+          #         ENV_VARS+=" -e $key=\"$value\""
+          #         echo "DEBUG: Processed ENV pair: $key=$value"
+          #     fi
+          # done < <(/usr/local/bin/yq eval '.env_vars | to_entries | .[]' - <<< "$CONFIG")
+
+          # echo "DEBUG: Final ENV_VARS: $ENV_VARS"
+
+
           ENV_VARS=""
           while IFS= read -r line; do
-            key=$(echo "$line" | /usr/local/bin/yq eval '.key' -)
-            value=$(echo "$line" | /usr/local/bin/yq eval '.value' -)
-            # Effectuer la substitution des variables
-            value=$(echo "$value" | sed "s/\${BRANCH_NAME}/$BRANCH_NAME/g" | sed "s/\${VERSION}/$VERSION/g")
-            ENV_VARS+=" -e $key=\"$value\""
+              key=$(echo "$line" | /usr/local/bin/yq eval '.key' -)
+              value=$(echo "$line" | /usr/local/bin/yq eval '.value' -)
+
+              # Debug: afficher les valeurs avant la substitution
+              echo "DEBUG: Before substitution - key=$key, value=$value"
+
+              # Effectuer la substitution des variables
+              value=$(echo "$value" | sed "s/\${BRANCH_NAME}/$BRANCH_NAME/g" | sed "s/\${VERSION}/$VERSION/g")
+
+              # Vérifiez que key et value ne sont pas nuls
+              if [[ -n "$key" && "$key" != "null" && -n "$value" ]]; then
+                  ENV_VARS+=" -e $key=\"$value\""
+                  echo "DEBUG: Processed ENV pair: $key=$value"
+              else
+                  echo "DEBUG: Skipped due to null or empty key/value"
+              fi
           done < <(/usr/local/bin/yq eval '.env_vars | to_entries | .[]' - <<< "$CONFIG")
+
+          echo "DEBUG: Final ENV_VARS: $ENV_VARS"
+
+
 
           CAP_ADD=$(/usr/local/bin/yq eval ".cap_add | join(\",\")" <<< "$CONFIG" || true)
           CAP_OPTIONS=""
