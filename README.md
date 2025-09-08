@@ -20,6 +20,16 @@ docker-compose up --force-recreate
 The `--force-recreate` option is required for vault to be able to initialize
 
 
+# Architecture
+## Models
+### Image processing
+The image processing API, expect the model defined in the envrionment variable `MLFLOW_IMAGE_CLASSIFIER_MODEL_NAME` to be available in the version defined in the environment variable `MLFLOW_IMAGE_CLASSIFIER_MODEL_VERSION` on the MLFlow server available at the address defined in the environment variable `MLFLOW_ADDR`. The model is loaded when the service started. The deployment of a new version of the image processing model should be done by executing the following steps:
+- Train a new model and track it using MLFlow
+- Add the new model to the MLFlow Model registry and increment the new version
+- Restart the `api-image-processing` service/pod with the `MLFLOW_IMAGE_CLASSIFIER_MODEL_VERSION` updated
+
+**Note** These steps could be triggered using a service such as Airflow
+
 # Data storage
 ## Data Lake
 The images, models and results are stored in S3-like buckets using Minio as the server.
