@@ -29,10 +29,13 @@ jobs:
         run: |
           VERSION=${{ steps.get_version.outputs.VERSION }}
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
-          TAG="${VERSION}-${BRANCH_NAME}"
+          # TAG="${VERSION}-${BRANCH_NAME}"
+          TAG="${BRANCH_NAME}-${VERSION}"
           # Arrêter et retirer le conteneur
-          docker stop ${{ matrix.service }}-${BRANCH_NAME}-${VERSION} || true
-          docker rm ${{ matrix.service }}-${BRANCH_NAME}-${VERSION} || true
+          # docker stop ${{ matrix.service }}-${BRANCH_NAME}-${VERSION} || true
+          # docker rm ${{ matrix.service }}-${BRANCH_NAME}-${VERSION} || true
+          docker stop ${{ matrix.service }}-${BRANCH_NAME}|| true
+          docker rm ${{ matrix.service }}-${BRANCH_NAME} || true
 
   build:
     runs-on: [self-hosted]
@@ -61,7 +64,8 @@ jobs:
         run: |
           VERSION=${{ steps.get_version.outputs.VERSION }}
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
-          TAG="${VERSION}-${BRANCH_NAME}"
+          # TAG="${VERSION}-${BRANCH_NAME}"
+          TAG="${BRANCH_NAME}-${VERSION}"
           cd src/${{ matrix.service }}
           docker build -t ${{ matrix.service }}:$TAG .
 
@@ -83,8 +87,10 @@ jobs:
         run: |
           VERSION=${{ steps.get_version.outputs.VERSION }}
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
-          TAG="${VERSION}-${BRANCH_NAME}"
-          CONTAINER_NAME="${{ matrix.service }}-${BRANCH_NAME}-${VERSION}"
+          # TAG="${VERSION}-${BRANCH_NAME}"
+          TAG="${BRANCH_NAME}-${VERSION}"
+          # CONTAINER_NAME="${{ matrix.service }}-${BRANCH_NAME}-${VERSION}"
+          CONTAINER_NAME="${{ matrix.service }}-${BRANCH_NAME}"
           CONFIG=$(/usr/local/bin/yq eval ".services.${{ matrix.service }}" services_config.yaml)
           RUN_AS_ROOT=$(/usr/local/bin/yq eval ".run_as_root" <<< "$CONFIG")
           if [ -z "$RUN_AS_ROOT" ] || [ "$RUN_AS_ROOT" = "null" ]; then
@@ -151,7 +157,8 @@ jobs:
           # docker ps
           VERSION=${{ steps.get_version.outputs.VERSION }}
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
-          CONTAINER_NAME="${{ matrix.service }}-${BRANCH_NAME}-${VERSION}"
+          # CONTAINER_NAME="${{ matrix.service }}-${BRANCH_NAME}-${VERSION}"
+          CONTAINER_NAME="${{ matrix.service }}-${BRANCH_NAME}"
           docker logs -f $CONTAINER_NAME
 
           # VERSION=${{ steps.get_version.outputs.VERSION }}
@@ -183,7 +190,8 @@ jobs:
         run: |
           VERSION=${{ steps.get_version.outputs.VERSION }}
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
-          TAG="${VERSION}-${BRANCH_NAME}"
+          # TAG="${VERSION}-${BRANCH_NAME}"
+          TAG="${BRANCH_NAME}-${VERSION}"
           # Arrêter et retirer le conteneur
           docker stop ${{ matrix.service }}-${BRANCH_NAME}-${VERSION} || true
           docker rm ${{ matrix.service }}-${BRANCH_NAME}-${VERSION} || true
