@@ -316,8 +316,9 @@ store_intermediate_certs() {
 # # Liste des services
 # services=("vault" "consul" "mongodb" "api-mongodb" "postgresql" "api-postgresql"  "api-gateway" "frontend" "reverse-proxy" "zookeeper" "kafka" "minio" "api-minio" "mlflow")
 # Liste des services
-services=$SECURED_SERVICES
-
+echo -e "\n\nAFFICHAGE DEBUG SECURED_SERVICES=$SECURED_SERVICES \n\n"
+# services=$SECURED_SERVICES
+IFS=',' read -ra services <<< "$SECURED_SERVICES"
 
 # Appel des fonctions pour chaque service
 for service in "${services[@]}"; do

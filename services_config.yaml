@@ -20,6 +20,7 @@ services:
       VAULT_PASSWORD: vault
       CONSUL_SERVER_HOST: consul-${BRANCH_NAME}
       CONSUL_SERVER_PORT: 8501
+      SECURED_SERVICES: vault,consul,mongodb,api-mongodb,postgresql,api-postgresql,api-gateway,frontend,reverse-proxy,zookeeper,kafka,minio,api-minio,mlflow
   consul:
     env_vars:
       SERVICE_NAME: consul-${BRANCH_NAME}
