@@ -10,8 +10,8 @@ echo $VAULT_CONFIG_FILE
 cat $VAULT_CONFIG_FILE
 
 # Ajout d'une règle pour mettre le trafic en pause si il vient de l'extérieur. Le trafic sera débloqué une fois le vault déverrouillé
-iptables -I INPUT -p tcp --dport 8200 ! -s 127.0.0.1 -j NFQUEUE --queue-num 1
-# iptables -I INPUT -p tcp --dport 8200 -j NFQUEUE --queue-num 1
+# iptables -I INPUT -p tcp --dport 8200 ! -s 127.0.0.1 -j NFQUEUE --queue-num 1
+iptables -I INPUT -p tcp --dport 8200 -j NFQUEUE --queue-num 1
 
 echo "Start Vault"
 vault server -config=$VAULT_CONFIG_FILE &
@@ -23,7 +23,13 @@ su - root -c "/usr/bin/python3 /usr/local/bin/auto-unseal.py > python.log 2>&1" 
 export AUTO_UNSEAL_PID=$!
 echo "Started auto-unseal AUTO_UNSEAL_PID: $AUTO_UNSEAL_PID"
 
+tcpdump -i any -n port 8200 > tcpdump.log &
+
 until vault login -method=userpass username=$VAULT_USERNAME password=$VAULT_PASSWORD > /dev/null ; do
+    echo "\n\n\n--------------------tcpdump.log-------------------------"
+    cat tcpdump.log
+    echo "\n\n\n--------------------python.log-------------------------"
+    cat python.log 
     echo "Échec de l'authentification. Nouvelle tentative dans 1 secondes..."
     sleep 1
 done

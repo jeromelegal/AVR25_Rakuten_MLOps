@@ -14,7 +14,7 @@ env:
 jobs:
 
   clear-containers:
-    runs-on: [self-hosted]
+    runs-on: [self-hosted, phil-host]
     strategy:
       # max-parallel: 10
       matrix:
@@ -38,7 +38,7 @@ jobs:
           docker rm ${{ matrix.service }}-${BRANCH_NAME} || true
 
   build:
-    runs-on: [self-hosted]
+    runs-on: [self-hosted, phil-host]
     needs: clear-containers
     strategy:
       matrix:
@@ -70,7 +70,7 @@ jobs:
           docker build -t ${{ matrix.service }}:$TAG .
 
   start-containers:
-    runs-on: [self-hosted]
+    runs-on: [self-hosted, phil-host]
     needs: build  # Ce job dépend de la réussite du job "build"
     strategy:
       matrix:
@@ -139,7 +139,7 @@ jobs:
 
 
   health-check-containers:
-    runs-on: [self-hosted]
+    runs-on: [self-hosted, phil-host]
     needs: start-containers
     strategy:
       matrix:
@@ -155,13 +155,26 @@ jobs:
         run: |
 
           # docker ps
-          # VERSION=${{ steps.get_version.outputs.VERSION }}
-          # BRANCH_NAME=${GITHUB_REF#refs/heads/}
-          # # CONTAINER_NAME="${{ matrix.service }}-${BRANCH_NAME}-${VERSION}"
-          # CONTAINER_NAME="${{ matrix.service }}-${BRANCH_NAME}"
-          # docker logs -f $CONTAINER_NAME
+          VERSION=${{ steps.get_version.outputs.VERSION }}
+          BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          # CONTAINER_NAME="${{ matrix.service }}-${BRANCH_NAME}-${VERSION}"
+          CONTAINER_NAME="${{ matrix.service }}-${BRANCH_NAME}"
+          docker logs -f $CONTAINER_NAME
 
-          tail -f python.log
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
           # VERSION=${{ steps.get_version.outputs.VERSION }}
           # BRANCH_NAME=${GITHUB_REF#refs/heads/}
@@ -177,7 +190,7 @@ jobs:
           # done
 
   stop-containers:
-    runs-on: [self-hosted]
+    runs-on: [self-hosted, phil-host]
     needs: health-check-containers  # Ce job dépend de la réussite du job "start-containers"
     strategy:
       matrix:
