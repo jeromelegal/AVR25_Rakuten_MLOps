@@ -12,8 +12,8 @@ http {
 
         ssl_protocols TLSv1.2 TLSv1.3;
         ssl_ciphers HIGH:!aNULL:!MD5;
-        ssl_certificate $API_MINIO_CERT_PATH;
-        ssl_certificate_key $API_MINIO_KEY_PATH;
+        ssl_certificate $MODEL_DOWNLOADER_CERT_PATH;
+        ssl_certificate_key $MODEL_DOWNLOADER_KEY_PATH;
 
         location /health {
             include fastcgi_params;

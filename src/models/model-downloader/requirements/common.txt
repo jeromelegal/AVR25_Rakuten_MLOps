@@ -1,12 +1,3 @@
-fastapi
-uvicorn
-httpx
-motor
-python-jose
-passlib
-fastapi-jwt-auth
-python-multipart
-anyio
 boto3
-Pillow
 pydantic-settings
+gdown

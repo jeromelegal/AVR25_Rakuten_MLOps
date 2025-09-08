@@ -12,7 +12,7 @@ done
 # Se connecter à Vault et récupérer un token
 export VAULT_SKIP_VERIFY="1"
 
-mkdir -p $(dirname $API_MINIO_PEM_PATH)  $(dirname $API_MINIO_CA_PATH) $(dirname $MINIO_API_MINIO_PEM_PATH) $(dirname $MINIO_API_MINIO_CA_PATH) 
+mkdir -p $(dirname $MODEL_DOWNLOADER_PEM_PATH)  $(dirname $MODEL_DOWNLOADER_CA_PATH) $(dirname $MINIO_MODEL_DOWNLOADER_PEM_PATH) $(dirname $MINIO_MODEL_DOWNLOADER_CA_PATH) 
 
 until vault login -method=userpass username=$VAULT_USERNAME password=$VAULT_PASSWORD > /dev/null; do
     echo "Échec de l'authentification. Nouvelle tentative dans 1 secondes..."
@@ -23,20 +23,20 @@ done
 vault kv get -field=certificate secret/vault/ca > vault_ca.crt
 vault kv get -field=certificate secret/consul/ca > consul_ca.crt
 vault kv get -field=certificate secret/minio/ca > minio_ca.crt
-vault kv get -field=certificate secret/api-minio/ca > api-minio_ca.crt
+vault kv get -field=certificate secret/model-downloader/ca > model-downloader_ca.crt
 
-mkdir -p $(dirname $API_MINIO_PEM_PATH)
-mkdir -p $(dirname $API_MINIO_CA_PATH)
-mkdir -p $(dirname $API_MINIO_KEY_PATH)
-mkdir -p $(dirname $API_MINIO_CERT_PATH)
+mkdir -p $(dirname $MODEL_DOWNLOADER_PEM_PATH)
+mkdir -p $(dirname $MODEL_DOWNLOADER_CA_PATH)
+mkdir -p $(dirname $MODEL_DOWNLOADER_KEY_PATH)
+mkdir -p $(dirname $MODEL_DOWNLOADER_CERT_PATH)
 
-cp api-minio_ca.crt $API_MINIO_CA_PATH
+cp model-downloader_ca.crt $MODEL_DOWNLOADER_CA_PATH
 
 # Ajouter les CA aux magasins de certificats
 cp vault_ca.crt /usr/local/share/ca-certificates/
 cp consul_ca.crt /usr/local/share/ca-certificates/
 cp minio_ca.crt /usr/local/share/ca-certificates/
-cp api-minio_ca.crt /usr/local/share/ca-certificates/
+cp model-downloader_ca.crt /usr/local/share/ca-certificates/
 
 update-ca-certificates
 
@@ -56,124 +56,57 @@ for ip in $ips; do
   fi
 done
 
-vault write -format=json pki_api-minio/issue/api-minio common_name="api-minio" ip_sans="$ip_list" alt_names="$SERVICE_NAME" ttl="72h" > api-minio_cert.json
+vault write -format=json pki_model-downloader/issue/model-downloader common_name="model-downloader" ip_sans="$ip_list" alt_names="$SERVICE_NAME" ttl="72h" > model-downloader_cert.json
 
-cat <<EOF > $API_MINIO_PEM_PATH
-$(jq -r '.data.private_key' api-minio_cert.json)
-$(jq -r '.data.certificate' api-minio_cert.json)
-$(jq -r '.data.issuing_ca' api-minio_cert.json)
+cat <<EOF > $MODEL_DOWNLOADER_PEM_PATH
+$(jq -r '.data.private_key' model-downloader_cert.json)
+$(jq -r '.data.certificate' model-downloader_cert.json)
+$(jq -r '.data.issuing_ca' model-downloader_cert.json)
 EOF
 
 # Extraire le certificat et la clé privée
-echo "API_MINIO_CERT_PATH = $API_MINIO_CERT_PATH"
-cat <<EOF > $API_MINIO_CERT_PATH
-$(jq -r '.data.certificate' api-minio_cert.json)
+echo "MODEL_DOWNLOADER_CERT_PATH = $MODEL_DOWNLOADER_CERT_PATH"
+cat <<EOF > $MODEL_DOWNLOADER_CERT_PATH
+$(jq -r '.data.certificate' model-downloader_cert.json)
 EOF
-echo "API_MINIO_KEY_PATH = $API_MINIO_KEY_PATH"
-cat <<EOF > $API_MINIO_KEY_PATH
-$(jq -r '.data.private_key' api-minio_cert.json)
+echo "MODEL_DOWNLOADER_KEY_PATH = $MODEL_DOWNLOADER_KEY_PATH"
+cat <<EOF > $MODEL_DOWNLOADER_KEY_PATH
+$(jq -r '.data.private_key' model-downloader_cert.json)
 EOF
 
 # Définir les permissions pour les fichiers de certificat et de clé
-chown api-minio:api-minio $API_MINIO_PEM_PATH
-chmod 400 $API_MINIO_PEM_PATH
+chown model-downloader:model-downloader $MODEL_DOWNLOADER_PEM_PATH
+chmod 400 $MODEL_DOWNLOADER_PEM_PATH
 
 # Nettoyage des fichiers temporaires
-rm -f api-minio_cert.json
+rm -f model-downloader_cert.json
 
 # Vérifier si le certificat et la clé Backend existent déjà
-if ! vault kv get -field=value secret/api-minio/keyfile > /dev/null 2>&1; then
+if ! vault kv get -field=value secret/model-downloader/keyfile > /dev/null 2>&1; then
   key_value=$(openssl rand -base64 741 | tr -d '\n' )
-  vault kv put secret/api-minio/keyfile value=$key_value
+  vault kv put secret/model-downloader/keyfile value=$key_value
 fi
 
-API_MINIO_SECRET_KEY=$(vault kv get -field=value secret/api-minio/keyfile)
+MODEL_DOWNLOADER_SECRET_KEY=$(vault kv get -field=value secret/model-downloader/keyfile)
 
 # Vérifier si le certificat et la clé Backend existent déjà
-if ! vault kv get -field=value secret/api-minio/internal_keyfile > /dev/null 2>&1; then
+if ! vault kv get -field=value secret/model-downloader/internal_keyfile > /dev/null 2>&1; then
   key_value=$(openssl rand -base64 741 | tr -d '\n' )
-  vault kv put secret/api-minio/internal_keyfile value=$key_value
+  vault kv put secret/model-downloader/internal_keyfile value=$key_value
 fi
 
-API_MINIO_INTERNAL_SECRET_KEY=$(vault kv get -field=value secret/api-minio/internal_keyfile)
-
-
-
-
-# Vérifier si le certificat et la clé Vault existent déjà
-if vault kv get -field=cert secret/api-minio/api-gateway/certs > /dev/null 2>&1 && vault kv get -field=key secret/api-minio/api-gateway/certs > /dev/null 2>&1; then
-  echo "Le certificat mTLS api-minio pour le service api-gateway existe déjà"
-else
-  # Générer le certificat et la clé
-  echo "Générer le certificat et la clé"
-  vault write -format=json pki_api-minio/issue/api-minio common_name="api-minio"   ttl="72h" > api-minio_api-gateway_cert.json
-
-  # Extraire le certificat et la clé privée
-  API_MINIO_API_GATEWAY_CA=$(jq -r '.data.ca_chain[0]' api-minio_api-gateway_cert.json)
-  API_MINIO_API_GATEWAY_CERT=$(jq -r '.data.certificate' api-minio_api-gateway_cert.json)
-  API_MINIO_API_GATEWAY_KEY=$(jq -r '.data.private_key' api-minio_api-gateway_cert.json)
-
-
-  # Enregistrer le certificat et la clé privée dans Vault
-  vault kv put secret/api-minio/api-gateway/certs cert="$API_MINIO_API_GATEWAY_CERT" key="$API_MINIO_API_GATEWAY_KEY" ca="$API_MINIO_API_GATEWAY_CA"
-
-  # Nettoyage des fichiers temporaires
-  rm -f api-minio_api-gateway_cert.json
-fi
-
-
-
-# Vérifier si le certificat et la clé Vault existent déjà
-if vault kv get -field=cert secret/api-minio/api-minio/certs > /dev/null 2>&1 && vault kv get -field=key secret/api-minio/api-minio/certs > /dev/null 2>&1; then
-  echo "Le certificat mTLS api-minio pour le api-minio existent déjà"
-else
-  # Générer le certificat et la clé
-  echo "Générer le certificat et la clé"
-  vault write -format=json pki_api-minio/issue/api-minio common_name="api-minio"   ttl="72h" > api-minio_api-minio_cert.json
-
-  # Extraire le certificat et la clé privée
-  API_MINIO_API_MINIO_CA=$(jq -r '.data.ca_chain[0]' api-minio_api-minio_cert.json)
-  API_MINIO_API_MINIO_CERT=$(jq -r '.data.certificate' api-minio_api-minio_cert.json)
-  API_MINIO_API_MINIO_KEY=$(jq -r '.data.private_key' api-minio_api-minio_cert.json)
-
-
-  # Enregistrer le certificat et la clé privée dans Vault
-  vault kv put secret/api-minio/api-minio/certs cert="$API_MINIO_API_MINIO_CERT" key="$API_MINIO_API_MINIO_KEY" ca="$API_MINIO_API_MINIO_CA"
-
-  # Nettoyage des fichiers temporaires
-  rm -f api-minio_api-minio_cert.json
-fi
-
-
-cat <<EOF > $API_MINIO_API_MINIO_KEY_PATH
-$(printf "%s" "$API_MINIO_API_MINIO_KEY")
-EOF
-
-cat <<EOF > $API_MINIO_API_MINIO_CERT_PATH
-$(printf "%s" "$API_MINIO_API_MINIO_CERT")
-EOF
-
-cat <<EOF > $API_MINIO_API_MINIO_PEM_PATH
-$(printf "%s" "$API_MINIO_API_MINIO_KEY")
-$(printf "%s" "$API_MINIO_API_MINIO_CERT")
-EOF
-
-cat <<EOF > $API_MINIO_API_MINIO_CA_PATH
-$(printf "%s" "$API_MINIO_API_MINIO_CA")
-EOF
-
-
+MODEL_DOWNLOADER_INTERNAL_SECRET_KEY=$(vault kv get -field=value secret/model-downloader/internal_keyfile)
 
 # Extraire le certificat et la clé privée
-MINIO_API_MINIO_CA=$(vault kv get -field=ca secret/minio/api-minio/certs)
-MINIO_API_MINIO_CERT=$(vault kv get -field=cert secret/minio/api-minio/certs)
-MINIO_API_MINIO_KEY=$(vault kv get -field=key secret/minio/api-minio/certs)
+MINIO_MODEL_DOWNLOADER_CA=$(vault kv get -field=ca secret/minio/model-downloader/certs)
+MINIO_MODEL_DOWNLOADER_CERT=$(vault kv get -field=cert secret/minio/model-downloader/certs)
+MINIO_MODEL_DOWNLOADER_KEY=$(vault kv get -field=key secret/minio/model-downloader/certs)
 
-cat <<EOF > $MINIO_API_MINIO_PEM_PATH
-$(printf "%s" "$MINIO_API_MINIO_KEY")
-$(printf "%s" "$MINIO_API_MINIO_CERT")
+cat <<EOF > $MINIO_MODEL_DOWNLOADER_PEM_PATH
+$(printf "%s" "$MINIO_MODEL_DOWNLOADER_KEY")
+$(printf "%s" "$MINIO_MODEL_DOWNLOADER_CERT")
 EOF
 
-cat <<EOF > $MINIO_API_MINIO_CA_PATH
-$(printf "%s" "$MINIO_API_MINIO_CA")
+cat <<EOF > $MINIO_MODEL_DOWNLOADER_CA_PATH
+$(printf "%s" "$MINIO_MODEL_DOWNLOADER_CA")
 EOF

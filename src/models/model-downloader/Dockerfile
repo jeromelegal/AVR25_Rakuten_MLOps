@@ -6,8 +6,8 @@ ENV SERVICE_NAME=${SERVICE_NAME:-"model-downloader"}
 ENV SERVICE_VERSION=${SERVICE_VERSION:-"v0.0.1"}
 
 ENV VAULT_ADDR ${VAULT_ADDR:-"https://vault:8200"}
-ENV VAULT_USERNAME=${VAULT_USERNAME:-"model-downloader-user"}
-ENV VAULT_PASSWORD=${VAULT_PASSWORD:-"model-downloader-password"}
+ENV VAULT_USERNAME=${VAULT_USERNAME:-"model-downloader"}
+ENV VAULT_PASSWORD=${VAULT_PASSWORD:-"model-downloader"}
 ENV VAULT_SERVICE_NAME ${VAULT_SERVICE_NAME:-"vault"}
 
 ENV MODEL_DOWNLOADER_PEM_PATH ${MODEL_DOWNLOADER_PEM_PATH:-"/etc/ssl/model-downloader/model-downloader.pem"}
@@ -26,6 +26,8 @@ ENV MINIO_MODEL_DOWNLOADER_PEM_PATH ${MINIO_MODEL_DOWNLOADER_PEM_PATH:-"/etc/ssl
 ENV MINIO_MODEL_DOWNLOADER_CA_PATH ${MINIO_MODEL_DOWNLOADER_CA_PATH:-"/etc/ssl/model-downloader/api-minio.ca"}
 ENV MINIO_MODEL_DOWNLOADER_KEY_PATH ${MINIO_MODEL_DOWNLOADER_KEY_PATH:-"/etc/ssl/model-downloader/api-minio.key"}
 ENV MINIO_MODEL_DOWNLOADER_CERT_PATH ${MINIO_MODEL_DOWNLOADER_CERT_PATH:-"/etc/ssl/model-downloader/api-minio.crt"}
+ENV MINIO_MODEL_BUCKET_NAME ${MINIO_MODEL_BUCKET_NAME:-"models"}
+ENV LOCAL_MODEL_DIRECTORY_PATH ${LOCAL_MODEL_DIRECTORY_PATH:-"/app/data"}
 
 ENV API_MINIO_HOST=https://$SERVICE_NAME
 ENV API_MINIO_INTERNAL_ENDPOINT_URL=/api/internal/
@@ -43,11 +45,11 @@ ENV NGINX_STATUS_FILE="/var/log/status"
 ENV NGINX_CONTENT_FILE="/var/log/content"
 ENV HEALTH_CHECK_FILE="/usr/local/bin/health-check.sh"
 
-# Ajouter l'utilisateur et le groupe api-minio
-RUN groupadd --gid 999 --system api-minio && \
-    useradd --uid 999 --system --gid api-minio --home-dir /home/api-minio api-minio && \
-    mkdir -p /home/api-minio && \
-    chown -R api-minio:api-minio /home/api-minio
+# Ajouter l'utilisateur et le groupe model-downloader
+RUN groupadd --gid 999 --system model-downloader && \
+    useradd --uid 999 --system --gid model-downloader --home-dir /home/model-downloader model-downloader && \
+    mkdir -p /home/model-downloader && \
+    chown -R model-downloader:model-downloader /home/model-downloader
 
 # Mettre à jour la liste des paquets et installer wget, gpg et lsb-release
 RUN apt-get update && apt-get install -y wget gpg lsb-release curl iptables jq openssl libcap2-bin iproute2 ca-certificates dnsutils
@@ -80,9 +82,6 @@ RUN chmod +x /usr/local/bin/entrypoint.sh
 
 COPY vault/vault.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/vault.sh
-
-COPY test/test.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/test.sh
 
 COPY nginx/nginx-fcgiwrap.sh /usr/local/bin/nginx-fcgiwrap.sh
 RUN chmod +x /usr/local/bin/nginx-fcgiwrap.sh
