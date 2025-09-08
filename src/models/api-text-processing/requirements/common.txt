@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+httpx
+motor
+python-jose
+passlib
+fastapi-jwt-auth
+python-multipart
+anyio
+pydantic-settings
+mlflow
