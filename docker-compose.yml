@@ -134,6 +134,20 @@ services:
       VAULT_USERNAME: "api-minio"
       VAULT_PASSWORD: "api-minio"
       ENVIRONMENT: "prod"
+  
+  model-downloader:
+    build:
+      context: ./src/models/model-downloader
+      dockerfile: Dockerfile
+    container_name: model-downloader
+    environment:
+      VAULT_ADDR: "https://vault:8200"
+      VAULT_USERNAME: "model-downloader-user"
+      VAULT_PASSWORD: "model-downloader-password"
+    profiles: [setup]
+    depends_on:
+      minio:
+        condition: service_healthy
 
   mlflow:
     build:
