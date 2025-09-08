@@ -37,9 +37,24 @@ jobs:
           docker stop ${{ matrix.service }}-${BRANCH_NAME}|| true
           docker rm ${{ matrix.service }}-${BRANCH_NAME} || true
 
+  clear-network:
+    runs-on: [self-hosted, phil-host]
+    needs: [clear-containers]
+    steps:
+      - name: Remove Docker network
+        run: |
+          BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          NETWORK_NAME="network-${BRANCH_NAME}"
+          # docker network rm $NETWORK_NAME #|| true  # Ignore l'erreur si le réseau n'existe pas ou ne peut pas être supprimé
+          if docker network inspect $NETWORK_NAME &> /dev/null; then
+            docker network rm $NETWORK_NAME
+          else
+            echo "Réseau $NETWORK_NAME n'existe pas, pas besoin de le supprimer."
+          fi
+
   build:
     runs-on: [self-hosted, phil-host]
-    needs: clear-containers
+    needs: [clear-containers, clear-containers]
     strategy:
       matrix:
         service: [vault, consul, mongo, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
@@ -69,9 +84,21 @@ jobs:
           cd src/${{ matrix.service }}
           docker build -t ${{ matrix.service }}:$TAG .
 
+
+  create-network:
+    runs-on: [self-hosted, phil-host]
+    needs: [clear-containers, clear-network]
+    steps:
+      - name: Create Docker network
+        run: |
+          BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          NETWORK_NAME="network-${BRANCH_NAME}"
+          docker network create $NETWORK_NAME || true # Ignore if network exists
+
+
   start-containers:
     runs-on: [self-hosted, phil-host]
-    needs: build  # Ce job dépend de la réussite du job "build"
+    needs: [create-network, build] # Ce job dépend de la réussite du job "build"
     strategy:
       matrix:
         service: [vault, consul, mongo, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
@@ -93,6 +120,7 @@ jobs:
           CONTAINER_NAME="${{ matrix.service }}-${BRANCH_NAME}"
           CONFIG=$(/usr/local/bin/yq eval ".services.${{ matrix.service }}" services_config.yaml)
           RUN_AS_ROOT=$(/usr/local/bin/yq eval ".run_as_root" <<< "$CONFIG")
+          NETWORK_NAME="network-${BRANCH_NAME}"
           if [ -z "$RUN_AS_ROOT" ] || [ "$RUN_AS_ROOT" = "null" ]; then
             RUN_AS_ROOT=false
           fi
@@ -129,13 +157,10 @@ jobs:
 
           echo "Running with RUN_AS_ROOT=$RUN_AS_ROOT, CAP_OPTIONS=$CAP_OPTIONS, ENV_VARS=$ENV_VARS"
           if [ "$RUN_AS_ROOT" = true ]; then
-            docker run -d --user root $CAP_OPTIONS --name $CONTAINER_NAME $ENV_VARS ${{ matrix.service }}:$TAG
+            docker run -d --user root $CAP_OPTIONS --name $CONTAINER_NAME --network $NETWORK_NAME $ENV_VARS ${{ matrix.service }}:$TAG
           else
-            docker run -d $CAP_OPTIONS --name $CONTAINER_NAME $ENV_VARS ${{ matrix.service }}:$TAG
+            docker run -d $CAP_OPTIONS --name $CONTAINER_NAME --network $NETWORK_NAME $ENV_VARS ${{ matrix.service }}:$TAG
           fi
-
-
-
 
 
   health-check-containers:
@@ -160,21 +185,6 @@ jobs:
           # CONTAINER_NAME="${{ matrix.service }}-${BRANCH_NAME}-${VERSION}"
           CONTAINER_NAME="${{ matrix.service }}-${BRANCH_NAME}"
           docker logs -f $CONTAINER_NAME
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
           # VERSION=${{ steps.get_version.outputs.VERSION }}
           # BRANCH_NAME=${GITHUB_REF#refs/heads/}
@@ -214,6 +224,20 @@ jobs:
 
 
 
+  remove-network:
+    runs-on: [self-hosted, phil-host]
+    needs: stop-containers  # Assure que tous les conteneurs sont arrêtés et retirés avant de supprimer le réseau
+    steps:
+      - name: Remove Docker network
+        run: |
+          BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          NETWORK_NAME="network-${BRANCH_NAME}"
+          # docker network rm $NETWORK_NAME #|| true  # Ignore l'erreur si le réseau n'existe pas ou ne peut pas être supprimé
+          if docker network inspect $NETWORK_NAME &> /dev/null; then
+            docker network rm $NETWORK_NAME
+          else
+            echo "Réseau $NETWORK_NAME n'existe pas, pas besoin de le supprimer."
+          fi
 
 
 
