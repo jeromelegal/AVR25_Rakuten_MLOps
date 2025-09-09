@@ -16,8 +16,8 @@ services:
       SERVICE_NAME: vault-${BRANCH_NAME}
       SERVICE_PORT: 8200
       VAULT_ADDR: https://vault-${BRANCH_NAME}:8200
-      VAULT_USERNAME: vault
-      VAULT_PASSWORD: vault
+      VAULT_USERNAME: vault-${BRANCH_NAME}
+      VAULT_PASSWORD: vault-${BRANCH_NAME}
       CONSUL_SERVER_HOST: consul-${BRANCH_NAME}
       CONSUL_SERVER_PORT: 8501
       SECURED_SERVICES: vault-${BRANCH_NAME},consul-${BRANCH_NAME},mongodb-${BRANCH_NAME},api-mongodb-${BRANCH_NAME},postgresql-${BRANCH_NAME},api-postgresql-${BRANCH_NAME},api-gateway-${BRANCH_NAME},frontend-${BRANCH_NAME},reverse-proxy-${BRANCH_NAME},zookeeper-${BRANCH_NAME},kafka-${BRANCH_NAME},minio-${BRANCH_NAME},api-minio-${BRANCH_NAME},mlflow-${BRANCH_NAME}
@@ -36,8 +36,8 @@ services:
       SERVICE_NAME: postgresql-${BRANCH_NAME}
       SERVICE_PORT: 5432
       VAULT_ADDR: https://vault-${BRANCH_NAME}:8200
-      VAULT_USERNAME: postgresql
-      VAULT_PASSWORD: postgresql
+      VAULT_USERNAME: postgresql-${BRANCH_NAME}
+      VAULT_PASSWORD: postgresql-${BRANCH_NAME}
       PORT: 5432
       VAULT_SERVICE_NAME: vault-${BRANCH_NAME}
   api-postgresql:
@@ -47,16 +47,16 @@ services:
       POSTGRESQL_SERVICE_NAME: postgresql-${BRANCH_NAME}
       POSTGRESQL_SERVICE_PORT: 5432
       VAULT_ADDR: https://vault-${BRANCH_NAME}:8200
-      VAULT_USERNAME: api-postgresql
-      VAULT_PASSWORD: api-postgresql
+      VAULT_USERNAME: api-postgresql-${BRANCH_NAME}
+      VAULT_PASSWORD: api-postgresql-${BRANCH_NAME}
       VAULT_SERVICE_NAME: vault-${BRANCH_NAME}
       API_GATEWAY_SERVICE_NAME: api-gateway-${BRANCH_NAME}
   mongodb:
     env_vars:
       VAULT_SERVICE_NAME: vault-${BRANCH_NAME}
       VAULT_ADDR: https://vault-${BRANCH_NAME}:8200
-      VAULT_USERNAME: mongodb
-      VAULT_PASSWORD: mongodb
+      VAULT_USERNAME: mongodb-${BRANCH_NAME}
+      VAULT_PASSWORD: mongodb-${BRANCH_NAME}
       PORT: 27017
       SERVICE_NAME: mongodb-${BRANCH_NAME}
   api-mongodb:
@@ -64,8 +64,8 @@ services:
       SERVICE_NAME: api-mongodb-${BRANCH_NAME}
       SERVICE_PORT: 8000
       VAULT_ADDR: https://vault-${BRANCH_NAME}:8200
-      VAULT_USERNAME: api-mongodb
-      VAULT_PASSWORD: api-mongodb
+      VAULT_USERNAME: api-mongodb-${BRANCH_NAME}
+      VAULT_PASSWORD: api-mongodb-${BRANCH_NAME}
       VAULT_SERVICE_NAME: vault-${BRANCH_NAME}
       MONGODB_SERVICE_NAME: mongodb-${BRANCH_NAME}
       MONGODB_SERVICE_PORT: 27017
@@ -73,8 +73,8 @@ services:
   minio:
     env_vars:
       VAULT_ADDR: https://vault-${BRANCH_NAME}:8200
-      VAULT_USERNAME: minio
-      VAULT_PASSWORD: minio
+      VAULT_USERNAME: minio-${BRANCH_NAME}
+      VAULT_PASSWORD: minio-${BRANCH_NAME}
       PORT: 9010
       GUI_PORT: 9011
       SERVICE_NAME: minio-${BRANCH_NAME}
@@ -85,8 +85,8 @@ services:
       SERVICE_PORT: 8020
       SERVICE_VERSION: v0.0.1
       VAULT_ADDR: https://vault-${BRANCH_NAME}:8200
-      VAULT_USERNAME: api-minio
-      VAULT_PASSWORD: api-password
+      VAULT_USERNAME: api-minio-${BRANCH_NAME}
+      VAULT_PASSWORD: api-minio-${BRANCH_NAME}
       VAULT_SERVICE_NAME: vault-${BRANCH_NAME}
       MINIO_SERVICE_NAME: minio-${BRANCH_NAME}
       MINIO_SERVICE_PORT: 9010
@@ -97,8 +97,8 @@ services:
       SERVICE_PORT: 9000
       VAULT_ADDR: https://vault-${BRANCH_NAME}:8200
       VAULT_SERVICE_NAME: vault-${BRANCH_NAME}
-      VAULT_USERNAME: api-gateway
-      VAULT_PASSWORD: api-gateway
+      VAULT_USERNAME: api-gateway-${BRANCH_NAME}
+      VAULT_PASSWORD: api-gateway-${BRANCH_NAME}
       API_MONGODB_SERVICE_NAME: api-mongodb-${BRANCH_NAME}
       API_MONGODB_SERVICE_PORT: 8000
       API_POSTGRESQL_SERVICE_NAME: api-postgresql-${BRANCH_NAME}
@@ -108,8 +108,8 @@ services:
       SERVICE_NAME: mlflow-${BRANCH_NAME}
       SERVICE_PORT: 8000
       VAULT_ADDR: https://vault-${BRANCH_NAME}:8200
-      VAULT_USERNAME: mlflow
-      VAULT_PASSWORD: mlflow
+      VAULT_USERNAME: mlflow-${BRANCH_NAME}
+      VAULT_PASSWORD: mlflow-${BRANCH_NAME}
       VAULT_SERVICE_NAME: vault-${BRANCH_NAME}
       MONGODB_SERVICE_NAME: mongodb-${BRANCH_NAME}
       MONGODB_SERVICE_PORT: 27017
@@ -120,8 +120,8 @@ services:
       SERVICE_NAME: frontend-${BRANCH_NAME}
       VAULT_ADDR: https://vault-${BRANCH_NAME}:8200
       VAULT_SERVICE_NAME: vault-${BRANCH_NAME}
-      VAULT_USERNAME: frontend
-      VAULT_PASSWORD: frontend
+      VAULT_USERNAME: frontend-${BRANCH_NAME}
+      VAULT_PASSWORD: frontend-${BRANCH_NAME}
       API_GATEWAY_SERVICE_NAME: api-gateway-${BRANCH_NAME}
       API_GATEWAY_SERVICE_PORT: 8000
   reverse-proxy:
@@ -129,8 +129,8 @@ services:
       SERVICE_NAME: reverse-proxy-${BRANCH_NAME}
       VAULT_ADDR: https://vault-${BRANCH_NAME}:8200
       VAULT_SERVICE_NAME: vault-${BRANCH_NAME}
-      VAULT_USERNAME: reverse-proxy
-      VAULT_PASSWORD: reverse-proxy
+      VAULT_USERNAME: reverse-proxy-${BRANCH_NAME}
+      VAULT_PASSWORD: reverse-proxy-${BRANCH_NAME}
       FRONTEND_SERVICE_NAME: frontend-${BRANCH_NAME}
       FRONTEND_SERVICE_PORT: 3000
       API_GATEWAY_SERVICE_NAME: api-gateway-${BRANCH_NAME}
