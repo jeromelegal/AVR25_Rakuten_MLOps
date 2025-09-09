@@ -187,25 +187,98 @@ jobs:
       - name: Perform health checks
         run: |
 
-          # docker ps
           VERSION=${{ steps.get_version.outputs.VERSION }}
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
-          # CONTAINER_NAME="${{ matrix.service }}-${BRANCH_NAME}-${VERSION}"
-          CONTAINER_NAME="${{ matrix.service }}-${BRANCH_NAME}"
-          docker logs -f $CONTAINER_NAME
+          echo "Version: $VERSION"
+          echo "Branch Name: $BRANCH_NAME"
 
-          # VERSION=${{ steps.get_version.outputs.VERSION }}
-          # BRANCH_NAME=${GITHUB_REF#refs/heads/}
-          # HEALTH_CHECK=$(/usr/local/bin/yq eval ".services.${{ matrix.service }}.health_check.urls" health_check_config.yaml)
+          # HEALTH_CHECK=$(/usr/local/bin/yq eval ".services.${{ matrix.service }}.health_check.urls" services_config.yaml)
+          # echo "Health Check Config: $HEALTH_CHECK"
+
           # echo "$HEALTH_CHECK" | /usr/local/bin/yq eval '.[]' | while read -r check; do
+          #   echo "check= $check"
           #   URL=$(/usr/local/bin/yq eval '.url' <<< "$check")
           #   EXPECTED_CODE=$(/usr/local/bin/yq eval '.expected_code' <<< "$check")
-          #   until [ "$(curl -s -o /dev/null -w "%{http_code}" "$URL")" -eq "$EXPECTED_CODE" ]; do
-          #     echo "Waiting for $URL to be healthy."
-          #     sleep 1
-          #   done
-          #   echo "$URL is healthy."
+          #   # Ajouter URL au tableau si elle n'est pas nulle
+          #   if [ -n "$URL" ]; then
+          #     URLS+=("$URL")
+          #   fi
+
+          #   # Ajouter expected_code au tableau s'il n'est pas nul
+          #   if [ -n "$EXPECTED_CODE" ]; then
+          #     EXPECTED_CODES+=("$EXPECTED_CODE")
+          #   fi
           # done
+          # echo "EXPECTED_CODES = $EXPECTED_CODES"
+          # echo "URL = $URL"
+
+
+          # Initialiser des tableaux pour stocker les URLs et les codes attendus
+          URLS=()
+          EXPECTED_CODES=()
+
+          # Récupérer tous les couples URL et code attendu
+          while IFS= read -r check; do
+            echo "check -> $check"
+            # Extraire les valeurs pour url et expected_code
+            URL=$(/usr/local/bin/yq eval '.url' <<< "$check")
+            EXPECTED_CODE=$(/usr/local/bin/yq eval '.expected_code' <<< "$check")
+
+            # Ajouter URL au tableau si elle n'est pas nulle
+            if [ -n "$URL" ] && [ "$URL" != "null" ]; then
+              URLS+=("$URL")
+            fi
+
+            # Ajouter expected_code au tableau s'il n'est pas nul
+            if [ -n "$EXPECTED_CODE" ] && [ "$EXPECTED_CODE" != "null" ]; then
+              EXPECTED_CODES+=("$EXPECTED_CODE")
+            fi
+          done < <(/usr/local/bin/yq eval ".services.${{ matrix.service }}.health_check.urls | .[]" services_config.yaml)
+
+          # Affichage des URLs et des codes pour vérification
+          echo "URLs:"
+          for url in "${URLS[@]}"; do
+            echo "$url"
+          done
+
+          echo "Expected Codes:"
+          for code in "${EXPECTED_CODES[@]}"; do
+            echo "$code"
+          done
+
+          # Boucle infinie pour vérifier la santé des URLs
+          while true; do
+            all_healthy=true
+            for i in "${!URLS[@]}"; do
+              # S'assurer que l'index existe pour les deux tableaux avant de procéder
+              if [ "$i" -lt "${#EXPECTED_CODES[@]}" ]; then
+                URL="${URLS[i]}"
+                EXPECTED_CODE="${EXPECTED_CODES[i]}"
+                echo "Checking URL: $URL with expected code: $EXPECTED_CODE"
+                echo "curl -s -o /dev/null -w "%{http_code}" $URL"
+                curl -s -o /dev/null -w "%{http_code}" "$URL"
+                echo "curl -s -o /dev/null -w "%{http_code}" $URL"
+                HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$URL" 2>/dev/null)
+                if [ "$HTTP_CODE" -ne "$EXPECTED_CODE" ]; then
+                  echo "Waiting for $URL to be healthy. Current HTTP code: $HTTP_CODE"
+                  all_healthy=false
+                else
+                  echo "$URL is healthy."
+                fi
+              else
+                echo "Skipping check for URL ${URLS[i]} as there is no corresponding expected code."
+                all_healthy=false
+              fi
+            done
+            if [ "$all_healthy" = true ]; then
+              echo "All URLs are healthy!"
+              break
+            fi
+            sleep 1
+          done
+
+
+
 
   stop-containers:
     runs-on: [self-hosted, phil-host]
