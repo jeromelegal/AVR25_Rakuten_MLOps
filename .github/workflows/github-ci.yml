@@ -193,7 +193,7 @@ jobs:
           echo "Branch Name: $BRANCH_NAME"
           NETWORK_NAME="network-${BRANCH_NAME}"
 
-          
+
           # HEALTH_CHECK=$(/usr/local/bin/yq eval ".services.${{ matrix.service }}.health_check.urls" services_config.yaml)
           # echo "Health Check Config: $HEALTH_CHECK"
 
@@ -259,6 +259,7 @@ jobs:
                 echo "Checking URL: $URL with expected code: $EXPECTED_CODE"
 
                 # Exécuter curl depuis un conteneur sur le réseau spécifié
+                echo "docker run --rm --network $NETWORK_NAME curlimages/curl curl -s -k -o /dev/null -w %{http_code} $URL"
                 HTTP_CODE=$(docker run --rm --network "$NETWORK_NAME" curlimages/curl curl -s -k -o /dev/null -w "%{http_code}" "$URL")
 
                 if [ "$?" -ne 0 ]; then
