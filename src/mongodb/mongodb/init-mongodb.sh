@@ -18,12 +18,12 @@ done
 
 
 echo "Init du replicat set DEBUT"
-cat /usr/local/bin/init-mongo-replicatset.js
-mongosh --host 127.0.0.1 --port 27017 --tls --tlsCAFile $MONGODB_MONGODB_CA_PATH  --tlsCertificateKeyFile $MONGODB_MONGODB_PEM_PATH < /usr/local/bin/init-mongo-replicatset.js 
+cat /usr/local/bin/init-mongodb-replicatset.js
+mongosh --host 127.0.0.1 --port 27017 --tls --tlsCAFile $MONGODB_MONGODB_CA_PATH  --tlsCertificateKeyFile $MONGODB_MONGODB_PEM_PATH < /usr/local/bin/init-mongodb-replicatset.js 
 mongosh --host 127.0.0.1 --port 27017 --tls --tlsCAFile $MONGODB_MONGODB_CA_PATH  --tlsCertificateKeyFile $MONGODB_MONGODB_PEM_PATH  --eval "rs.status()"
 echo "Init du replicat set FIN"
 echo "Init du base DEBUT"
-mongosh --host 127.0.0.1 --port 27017 --tls --tlsCAFile $MONGODB_MONGODB_CA_PATH  --tlsCertificateKeyFile $MONGODB_MONGODB_PEM_PATH <  /usr/local/bin/init-mongo.js 
+mongosh --host 127.0.0.1 --port 27017 --tls --tlsCAFile $MONGODB_MONGODB_CA_PATH  --tlsCertificateKeyFile $MONGODB_MONGODB_PEM_PATH <  /usr/local/bin/init-mongodb.js 
 echo "Init du base FIN"
 
 

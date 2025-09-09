@@ -18,7 +18,7 @@ jobs:
     strategy:
       # max-parallel: 10
       matrix:
-        service: [vault, consul, mongo, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
+        service: [vault, consul, mongodb, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
@@ -57,7 +57,7 @@ jobs:
     needs: [clear-containers]
     strategy:
       matrix:
-        service: [vault, consul, mongo, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
+        service: [vault, consul, mongodb, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
     permissions:
       contents: 'read'
       id-token: 'write'
@@ -101,7 +101,7 @@ jobs:
     needs: [create-network, build] # Ce job dépend de la réussite du job "build"
     strategy:
       matrix:
-        service: [vault, consul, mongo, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
+        service: [vault, consul, mongodb, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
@@ -197,7 +197,7 @@ jobs:
     needs: start-containers
     strategy:
       matrix:
-        service: [vault, consul, mongo, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
+        service: [vault, consul, mongodb, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4

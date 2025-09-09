@@ -5,7 +5,7 @@ vault.sh
 
 
 # Appeler le script d'initialisation
-init-mongo.sh
+init-mongodb.sh
 
 # Ajouter la tâche cron pour vérifier les nouveaux nœuds
 #/usr/local/bin/add-cron-job.sh

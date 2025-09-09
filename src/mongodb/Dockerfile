@@ -35,8 +35,8 @@ ENV MONGODB_MONGODB_CA_PATH=${MONGODB_MONGODB_CA_PATH:-"/etc/ssl/mongodb/mongodb
 ENV AUTHORIZATION=${AUTHORIZATION:-"enabled"}
 ENV SERVICE_NAME=${SERVICE_NAME:-"mongodb"}
 ENV VAULT_SERVICE_NAME=${VAULT_SERVICE_NAME:-"vault"}
-ENV VAULT_CERT_FILE=${VAULT_CERT_FILE:-"mongo-cert.crt"}
-ENV VAULT_KEY_FILE=${VAULT_KEY_FILE:-"mongo.key"}
+ENV VAULT_CERT_FILE=${VAULT_CERT_FILE:-"mongodb-cert.crt"}
+ENV VAULT_KEY_FILE=${VAULT_KEY_FILE:-"mongodb.key"}
 ENV mTLS=${mTLS:-"false"}
 ENV LOG_PATH=${LOG_PATH:-"/var/log/mongodb/mongod.log"}
 ENV NGINX_CONFIG_FILE="/etc/nginx/nginx.conf"
@@ -93,9 +93,9 @@ RUN ls -lah
 
 # Copier les scripts et les fichiers de configuration
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
-COPY mongodb/init-mongo.sh /usr/local/bin/init-mongo.sh
+COPY mongodb/init-mongodb.sh /usr/local/bin/init-mongodb.sh
 #COPY mongodb/init-mongo-replicatset.js /usr/local/bin/init-mongo-replicatset.js
-COPY mongodb/init-mongo.js /usr/local/bin/init-mongo.js
+COPY mongodb/init-mongodb.js /usr/local/bin/init-mongodb.js
 COPY mongodb/generate-config.sh /usr/local/bin/generate-config.sh
 COPY nginx/health-check.sh /usr/local/bin/health-check.sh
 COPY nginx/nginx-conf.sh /usr/local/bin/nginx-conf.sh

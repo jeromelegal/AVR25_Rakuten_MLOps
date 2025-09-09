@@ -21,9 +21,9 @@ services:
     container_name: api-gateway
     ports:
       - "9000:9000"
-  mongo:
+  mongodb:
     build:
-      context: ./src/mongo
+      context: ./src/mongodb
       dockerfile: Dockerfile
     container_name: mongodb
     ports:
