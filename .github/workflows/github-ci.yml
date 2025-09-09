@@ -191,7 +191,9 @@ jobs:
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
           echo "Version: $VERSION"
           echo "Branch Name: $BRANCH_NAME"
+          NETWORK_NAME="network-${BRANCH_NAME}"
 
+          
           # HEALTH_CHECK=$(/usr/local/bin/yq eval ".services.${{ matrix.service }}.health_check.urls" services_config.yaml)
           # echo "Health Check Config: $HEALTH_CHECK"
 
