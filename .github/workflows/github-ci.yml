@@ -255,10 +255,15 @@ jobs:
                 URL="${URLS[i]}"
                 EXPECTED_CODE="${EXPECTED_CODES[i]}"
                 echo "Checking URL: $URL with expected code: $EXPECTED_CODE"
-                echo "curl -s -o /dev/null -w "%{http_code}" $URL"
-                curl -s -o /dev/null -w "%{http_code}" "$URL"
-                echo "curl -s -o /dev/null -w "%{http_code}" $URL"
-                HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$URL" 2>/dev/null)
+
+                # Exécuter curl depuis un conteneur sur le réseau spécifié
+                HTTP_CODE=$(docker run --rm --network "$NETWORK_NAME" curlimages/curl curl -s -k -o /dev/null -w "%{http_code}" "$URL")
+
+                if [ "$?" -ne 0 ]; then
+                  echo "Error occurred while accessing $URL"
+                  all_healthy=false
+                  continue
+                fi
                 if [ "$HTTP_CODE" -ne "$EXPECTED_CODE" ]; then
                   echo "Waiting for $URL to be healthy. Current HTTP code: $HTTP_CODE"
                   all_healthy=false
@@ -276,7 +281,6 @@ jobs:
             fi
             sleep 1
           done
-
 
 
 

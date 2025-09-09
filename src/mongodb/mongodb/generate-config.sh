@@ -104,7 +104,7 @@ cat /etc/mongod.conf
 
 
 
-cat <<EOF > /usr/local/bin/init-mongo-replicatset.js
+cat <<EOF > /usr/local/bin/init-mongodb-replicatset.js
 rs.initiate({
    _id: "rs0",
    members: [
@@ -114,5 +114,5 @@ rs.initiate({
 EOF
 
 
-echo "affichage fichier /usr/local/bin/init-mongo-replicatset.js de mongoDB"
-cat init-mongo-replicatset.js
+echo "affichage fichier /usr/local/bin/init-mongodb-replicatset.js de mongoDB"
+cat init-mongodb-replicatset.js
