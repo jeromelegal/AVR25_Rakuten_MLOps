@@ -53,6 +53,7 @@ const Sidebar = () => {
         <Nav className={`flex-column w-100 ${collapsed ? 'd-none' : ''}`}>
           <Nav.Link as={Link} to="/home" className={styles.navLink}>Home</Nav.Link>
           <Nav.Link as={Link} to="/newproduct" className={styles.navLink}>New Product</Nav.Link>
+          <Nav.Link as={Link} to="/findproduct" className={styles.navLink}>Find a Product</Nav.Link>
           <Nav.Link as={Link} to="/datalake" className={styles.navLink}>DataLake</Nav.Link>
           <Nav.Link as={Link} to="/datatransform" className={styles.navLink}>DataTransform</Nav.Link>
           <Nav.Link as={Link} to="/dataload" className={styles.navLink}>DataLoad</Nav.Link>

@@ -12,6 +12,7 @@ import DataLoad from './pages/DataLoad';
 import DataAnalyse from './pages/DataAnalyse';
 import DataLearn from './pages/DataLearn';
 import NewProduct from './pages/NewProduct';
+import FindProduct from './pages/FindProduct';
 import './App.css'; // Importer le fichier CSS global
 
 const App = () => {
@@ -23,6 +24,7 @@ const App = () => {
             <PrivateRoute path="/home" component={HomePage} />
             <Route path="/auth" component={AuthPage} />
             <PrivateRoute path="/newproduct" component={NewProduct} />
+            <PrivateRoute path="/findproduct" component={FindProduct} />
             <PrivateRoute path="/datalake" component={DataLake} />
             <PrivateRoute path="/datatransform" component={DataTransform} />
             <PrivateRoute path="/dataload" component={DataLoad} />

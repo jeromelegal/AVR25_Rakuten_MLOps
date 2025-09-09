@@ -103,6 +103,7 @@ RUN npm install
 COPY . .
 
 RUN npm install --save-dev @babel/core
+RUN npm install papaparse
 
 RUN npm run build
 
