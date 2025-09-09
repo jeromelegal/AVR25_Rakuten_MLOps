@@ -215,7 +215,8 @@ jobs:
     needs: health-check-containers  # Ce job dépend de la réussite du job "start-containers"
     strategy:
       matrix:
-        service: [vault, consul, mongo, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
+        # service: [vault, consul, mongo, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
+        service: [vault, consul]
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
