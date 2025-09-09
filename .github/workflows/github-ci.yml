@@ -128,12 +128,12 @@ jobs:
             RUN_AS_ROOT=false
           fi
 
-          # Extraire et traiter network-alias
-          NETWORK_ALIASES=$(/usr/local/bin/yq eval ".network-alias | join(\",\")" <<< "$CONFIG" || true)
-          NETWORK_ALIAS_OPTIONS=""
+          # Extraire et traiter hostnames
+          NETWORK_ALIASES=$(/usr/local/bin/yq eval ".hostnames | join(\",\")" <<< "$CONFIG" || true)
+          HOSTNAME_OPTIONS=""
           if [ "$NETWORK_ALIASES" != "null" ] && [ -n "$NETWORK_ALIASES" ]; then
               for alias in $(echo $NETWORK_ALIASES | tr ',' '\n'); do
-                  NETWORK_ALIAS_OPTIONS+=" --network-alias=$alias"
+                  HOSTNAME_OPTIONS+=" --hostname=$alias"
               done
           fi
 
@@ -165,9 +165,9 @@ jobs:
           echo "DEBUG: EXPOSE_OPTIONS=$EXPOSE_OPTIONS"
 
           echo "Running with:"
-          echo "docker run -d --user root $CAP_OPTIONS --name $CONTAINER_NAME --network $NETWORK_NAME $NETWORK_ALIAS_OPTIONS $EXPOSE_OPTIONS $ENV_VARS ${{ matrix.service }}:$TAG"
+          echo "docker run -d --user root $CAP_OPTIONS --name $CONTAINER_NAME --network $NETWORK_NAME $HOSTNAME_OPTIONS $EXPOSE_OPTIONS $ENV_VARS ${{ matrix.service }}:$TAG"
           if [ "$RUN_AS_ROOT" = true ]; then
-            docker run -d --user root $CAP_OPTIONS --name $CONTAINER_NAME --network $NETWORK_NAME $NETWORK_ALIAS_OPTIONS $EXPOSE_OPTIONS $ENV_VARS ${{ matrix.service }}:$TAG
+            docker run -d --user root $CAP_OPTIONS --name $CONTAINER_NAME --network $NETWORK_NAME $HOSTNAME_OPTIONS $EXPOSE_OPTIONS $ENV_VARS ${{ matrix.service }}:$TAG
           else
             docker run -d $CAP_OPTIONS --name $CONTAINER_NAME --network $NETWORK_NAME $ENV_VARS ${{ matrix.service }}:$TAG
           fi
