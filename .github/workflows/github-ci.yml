@@ -125,27 +125,46 @@ jobs:
             RUN_AS_ROOT=false
           fi
 
-          # Traiter les lignes sans utiliser de fonction
-          while IFS= read -r line; do
-              # Extraire la clé quand la ligne commence par "key:"
-              if [[ $line == key:* ]]; then
-                  current_key=$(echo "$line" | sed 's/key: //')
-              # Extraire et traiter la valeur quand la ligne commence par "value:"
-              elif [[ $line == value:* ]]; then
-                  # Extraire la valeur et supprimer les guillemets
-                  value=$(echo "$line" | sed 's/value: //' | tr -d '"')
-                  # Effectuer la substitution des variables
-                  processed_value=$(echo "$value" | sed "s/\${BRANCH_NAME}/$BRANCH_NAME/g" | sed "s/\${VERSION}/$VERSION/g")
+          # # Traiter les lignes sans utiliser de fonction
+          # while IFS= read -r line; do
+          #     # Extraire la clé quand la ligne commence par "key:"
+          #     if [[ $line == key:* ]]; then
+          #         current_key=$(echo "$line" | sed 's/key: //')
+          #     # Extraire et traiter la valeur quand la ligne commence par "value:"
+          #     elif [[ $line == value:* ]]; then
+          #         # Extraire la valeur et supprimer les guillemets
+          #         value=$(echo "$line" | sed 's/value: //' | tr -d '"')
+          #         # Effectuer la substitution des variables
+          #         processed_value=$(echo "$value" | sed "s/\${BRANCH_NAME}/$BRANCH_NAME/g" | sed "s/\${VERSION}/$VERSION/g")
 
-                  # Ajouter à ENV_VARS si la clé et la valeur sont valides
-                  if [[ -n "$current_key" && "$current_key" != "null" && -n "$processed_value" ]]; then
-                      ENV_VARS+=" -e $current_key=$processed_value"
-                      echo "DEBUG: Added ENV pair: $current_key=$processed_value"
-                  else
-                      echo "DEBUG: Skipped due to null or empty key/value"
-                  fi
-              fi
-          done < <(/usr/local/bin/yq eval '.env_vars | to_entries | .[]' - <<< "$CONFIG")
+          #         # Ajouter à ENV_VARS si la clé et la valeur sont valides
+          #         if [[ -n "$current_key" && "$current_key" != "null" && -n "$processed_value" ]]; then
+          #             ENV_VARS+=" -e $current_key=$processed_value"
+          #             echo "DEBUG: Added ENV pair: $current_key=$processed_value"
+          #         else
+          #             echo "DEBUG: Skipped due to null or empty key/value"
+          #         fi
+          #     fi
+          # done < <(/usr/local/bin/yq eval '.env_vars | to_entries | .[]' - <<< "$CONFIG")
+
+          # Extraire et traiter network-alias
+          NETWORK_ALIASES=$(/usr/local/bin/yq eval ".network-alias | join(\",\")" <<< "$CONFIG" || true)
+          NETWORK_ALIAS_OPTIONS=""
+          if [ "$NETWORK_ALIASES" != "null" ] && [ -n "$NETWORK_ALIASES" ]; then
+              for alias in $(echo $NETWORK_ALIASES | tr ',' '\n'); do
+                  NETWORK_ALIAS_OPTIONS+=" --network-alias=$alias"
+              done
+          fi
+
+
+          ENV_VARS=""
+          # Traiter les env_vars existantes
+          while read -r key value; do
+              processed_value=$(echo "$value" | sed "s/\${BRANCH_NAME}/$BRANCH_NAME/g" | sed "s/\${VERSION}/$VERSION/g")
+              echo "Clé: $key, Valeur: $processed_value"
+              ENV_VARS+=" -e $key=$processed_value"
+          done < <(yq eval ".services.${{ matrix.service }}.env_vars | to_entries | .[] | \"\(.key) \(.value)\"" services_config.yaml)
+
 
           CAP_ADD=$(/usr/local/bin/yq eval ".cap_add | join(\",\")" <<< "$CONFIG" || true)
           CAP_OPTIONS=""
@@ -164,9 +183,10 @@ jobs:
           fi
           echo "DEBUG: EXPOSE_OPTIONS=$EXPOSE_OPTIONS"
 
-          echo "Running with RUN_AS_ROOT=$RUN_AS_ROOT, CAP_OPTIONS=$CAP_OPTIONS, ENV_VARS=$ENV_VARS, EXPOSE_OPTIONS=$EXPOSE_OPTIONS"
+          echo "Running with:"
+          echo "docker run -d --user root $CAP_OPTIONS --name $CONTAINER_NAME --network $NETWORK_NAME $NETWORK_ALIAS_OPTIONS $EXPOSE_OPTIONS $ENV_VARS ${{ matrix.service }}:$TAG"
           if [ "$RUN_AS_ROOT" = true ]; then
-            docker run -d --user root $CAP_OPTIONS --name $CONTAINER_NAME --network $NETWORK_NAME $ENV_VARS ${{ matrix.service }}:$TAG
+            docker run -d --user root $CAP_OPTIONS --name $CONTAINER_NAME --network $NETWORK_NAME $NETWORK_ALIAS_OPTIONS $EXPOSE_OPTIONS $ENV_VARS ${{ matrix.service }}:$TAG
           else
             docker run -d $CAP_OPTIONS --name $CONTAINER_NAME --network $NETWORK_NAME $ENV_VARS ${{ matrix.service }}:$TAG
           fi
