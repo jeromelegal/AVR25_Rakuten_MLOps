@@ -322,11 +322,9 @@ jobs:
         run: |
           VERSION=${{ steps.get_version.outputs.VERSION }}
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
-          # TAG="${VERSION}-${BRANCH_NAME}"
-          TAG="${BRANCH_NAME}-${VERSION}"
           # Arrêter et retirer le conteneur
-          docker stop ${{ matrix.service }}-${BRANCH_NAME}-${VERSION} || true
-          docker rm ${{ matrix.service }}-${BRANCH_NAME}-${VERSION} || true
+          docker stop ${{ matrix.service }}-${BRANCH_NAME} || true
+          docker rm ${{ matrix.service }}-${BRANCH_NAME} || true
 
 
 
