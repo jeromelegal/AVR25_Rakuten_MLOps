@@ -37,6 +37,8 @@ jobs:
           docker stop ${{ matrix.service }}-${BRANCH_NAME}|| true
           docker rm ${{ matrix.service }}-${BRANCH_NAME} || true
 
+
+
   clear-network:
     runs-on: [self-hosted, phil-host]
     needs: [clear-containers]
@@ -51,6 +53,20 @@ jobs:
           else
             echo "Réseau $NETWORK_NAME n'existe pas, pas besoin de le supprimer."
           fi
+
+
+  create-network:
+    runs-on: [self-hosted, phil-host]
+    needs: [clear-containers, clear-network]
+    steps:
+      - name: Create Docker network
+        run: |
+          BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          NETWORK_NAME="network-${BRANCH_NAME}"
+          docker network create $NETWORK_NAME || true # Ignore if network exists
+
+
+
 
   build:
     runs-on: [self-hosted, phil-host]
@@ -85,15 +101,6 @@ jobs:
           docker build -t ${{ matrix.service }}:$TAG .
 
 
-  create-network:
-    runs-on: [self-hosted, phil-host]
-    needs: [clear-containers, clear-network]
-    steps:
-      - name: Create Docker network
-        run: |
-          BRANCH_NAME=${GITHUB_REF#refs/heads/}
-          NETWORK_NAME="network-${BRANCH_NAME}"
-          docker network create $NETWORK_NAME || true # Ignore if network exists
 
 
   start-containers:
@@ -311,7 +318,7 @@ jobs:
     needs: health-check-containers  # Ce job dépend de la réussite du job "start-containers"
     strategy:
       matrix:
-        service: [vault, consul, mongo, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
+        service: [vault, consul, mongodb, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
