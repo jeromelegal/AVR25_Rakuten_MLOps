@@ -46,7 +46,7 @@ services:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: example
     volumes:
-      - mongodb-volume/:/data/db
+      - mongodb-volume:/data/db
 
   api-mongodb:
     build:
@@ -73,7 +73,7 @@ services:
       POSTGRESQL_PASSWORD: example
       POSTGRESQL_DB: mydb
     volumes:
-      - postgresql-volume/:/data/postgresql
+      - postgresql-volume:/data/postgresql
 
   api-postgresql:
     build:
