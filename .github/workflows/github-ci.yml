@@ -18,7 +18,8 @@ jobs:
     strategy:
       # max-parallel: 10
       matrix:
-        service: [vault, consul, mongodb, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
+        # service: [vault, consul, mongodb, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
+        service: [vault, consul]
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
@@ -57,7 +58,8 @@ jobs:
     needs: [clear-containers]
     strategy:
       matrix:
-        service: [vault, consul, mongodb, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
+        # service: [vault, consul, mongodb, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
+        service: [vault, consul]
     permissions:
       contents: 'read'
       id-token: 'write'
@@ -101,7 +103,8 @@ jobs:
     needs: [create-network, build] # Ce job dépend de la réussite du job "build"
     strategy:
       matrix:
-        service: [vault, consul, mongodb, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
+        # service: [vault, consul, mongodb, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
+        service: [vault, consul]
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
@@ -124,28 +127,6 @@ jobs:
           if [ -z "$RUN_AS_ROOT" ] || [ "$RUN_AS_ROOT" = "null" ]; then
             RUN_AS_ROOT=false
           fi
-
-          # # Traiter les lignes sans utiliser de fonction
-          # while IFS= read -r line; do
-          #     # Extraire la clé quand la ligne commence par "key:"
-          #     if [[ $line == key:* ]]; then
-          #         current_key=$(echo "$line" | sed 's/key: //')
-          #     # Extraire et traiter la valeur quand la ligne commence par "value:"
-          #     elif [[ $line == value:* ]]; then
-          #         # Extraire la valeur et supprimer les guillemets
-          #         value=$(echo "$line" | sed 's/value: //' | tr -d '"')
-          #         # Effectuer la substitution des variables
-          #         processed_value=$(echo "$value" | sed "s/\${BRANCH_NAME}/$BRANCH_NAME/g" | sed "s/\${VERSION}/$VERSION/g")
-
-          #         # Ajouter à ENV_VARS si la clé et la valeur sont valides
-          #         if [[ -n "$current_key" && "$current_key" != "null" && -n "$processed_value" ]]; then
-          #             ENV_VARS+=" -e $current_key=$processed_value"
-          #             echo "DEBUG: Added ENV pair: $current_key=$processed_value"
-          #         else
-          #             echo "DEBUG: Skipped due to null or empty key/value"
-          #         fi
-          #     fi
-          # done < <(/usr/local/bin/yq eval '.env_vars | to_entries | .[]' - <<< "$CONFIG")
 
           # Extraire et traiter network-alias
           NETWORK_ALIASES=$(/usr/local/bin/yq eval ".network-alias | join(\",\")" <<< "$CONFIG" || true)
@@ -197,7 +178,8 @@ jobs:
     needs: start-containers
     strategy:
       matrix:
-        service: [vault, consul, mongodb, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
+        # service: [vault, consul, mongodb, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
+        service: [vault, consul]
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
