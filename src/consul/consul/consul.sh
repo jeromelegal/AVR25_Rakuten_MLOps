@@ -123,7 +123,8 @@ initialize_cluster_with_acl_no_tokens() {
   consul agent -config-file=$CONSUL_CONFIG_FILE  &
   export CONSUL_PID=$!
   CONSUL_ADDR="https://$CONSUL_SERVER_HOST:$CONSUL_SERVER_PORT" 
-  until curl -s --cert $CONSUL_CERT_FILE --key $CONSUL_KEY_FILE  $CONSUL_ADDR/v1/status/leader > /dev/null; do
+  # until curl -s --cert $CONSUL_CERT_FILE --key $CONSUL_KEY_FILE  $CONSUL_ADDR/v1/status/leader > /dev/null; do
+  until curl -s --cert $CONSUL_CERT_FILE --key $CONSUL_KEY_FILE  $CONSUL_ADDR/v1/status/leader; do
     echo "Waiting for Consul to be ready... "
     sleep 1
   done

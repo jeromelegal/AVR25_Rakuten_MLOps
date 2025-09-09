@@ -24,6 +24,12 @@ services:
       CONSUL_SERVER_PORT: 8501
       SECURED_SERVICES: vault,consul,mongodb,api-mongodb,postgresql,api-postgresql,api-gateway,frontend,reverse-proxy,zookeeper,kafka,minio,api-minio,mlflow
   consul:
+    expose_ports:
+      - 8600/udp
+      - 8500
+      - 8501
+      - 80
+      - 443
     network-alias:
       - consul
     env_vars:

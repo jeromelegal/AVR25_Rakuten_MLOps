@@ -99,7 +99,7 @@ RUN chmod +x /usr/local/bin/nginx-conf.sh
 
 
 
-EXPOSE 8600/udp 8501 80 443
+EXPOSE 8600/udp 8500 8501 80 443
 
 ENTRYPOINT ["entrypoint.sh"]
 
