@@ -128,14 +128,16 @@ jobs:
             RUN_AS_ROOT=false
           fi
 
-          # Extraire et traiter hostnames
-          NETWORK_ALIASES=$(/usr/local/bin/yq eval ".hostnames | join(\",\")" <<< "$CONFIG" || true)
-          HOSTNAME_OPTIONS=""
-          if [ "$NETWORK_ALIASES" != "null" ] && [ -n "$NETWORK_ALIASES" ]; then
-              for alias in $(echo $NETWORK_ALIASES | tr ',' '\n'); do
-                  HOSTNAME_OPTIONS+=" --hostname=$alias"
-              done
-          fi
+          # # Extraire et traiter network-alias
+          # NETWORK_ALIASES=$(/usr/local/bin/yq eval ".network-alias | join(\",\")" <<< "$CONFIG" || true)
+          # NETWORK_ALIAS_OPTIONS=""
+          # if [ "$NETWORK_ALIASES" != "null" ] && [ -n "$NETWORK_ALIASES" ]; then
+          #     for alias in $(echo $NETWORK_ALIASES | tr ',' '\n'); do
+          #         NETWORK_ALIAS_OPTIONS+=" --network-alias=$alias"
+          #     done
+          # fi
+
+          NETWORK_ALIASES=$(/usr/local/bin/yq eval ".network-alias // []" <<< "$CONFIG" || echo "")
 
 
           ENV_VARS=""
@@ -165,11 +167,19 @@ jobs:
           echo "DEBUG: EXPOSE_OPTIONS=$EXPOSE_OPTIONS"
 
           echo "Running with:"
-          echo "docker run -d --user root $CAP_OPTIONS --name $CONTAINER_NAME --network $NETWORK_NAME $HOSTNAME_OPTIONS $EXPOSE_OPTIONS $ENV_VARS ${{ matrix.service }}:$TAG"
+          echo "docker run -d --user root $CAP_OPTIONS --name $CONTAINER_NAME $EXPOSE_OPTIONS $ENV_VARS ${{ matrix.service }}:$TAG"
           if [ "$RUN_AS_ROOT" = true ]; then
-            docker run -d --user root $CAP_OPTIONS --name $CONTAINER_NAME --network $NETWORK_NAME $HOSTNAME_OPTIONS $EXPOSE_OPTIONS $ENV_VARS ${{ matrix.service }}:$TAG
+            docker run -d --user root $CAP_OPTIONS --name $CONTAINER_NAME  $EXPOSE_OPTIONS $ENV_VARS ${{ matrix.service }}:$TAG
           else
-            docker run -d $CAP_OPTIONS --name $CONTAINER_NAME --network $NETWORK_NAME $ENV_VARS ${{ matrix.service }}:$TAG
+            docker run -d $CAP_OPTIONS --name $CONTAINER_NAME $ENV_VARS ${{ matrix.service }}:$TAG
+          fi
+
+          # Ajout des alias réseau après le démarrage du conteneur
+          if [ -n "$NETWORK_ALIASES" ] && [ "$NETWORK_ALIASES" != "null" ]; then
+              for alias in $(echo "$NETWORK_ALIASES" | /usr/local/bin/yq eval '.[]' - 2>/dev/null); do
+                  echo "Ajout de l'alias $alias pour $CONTAINER_NAME sur $NETWORK_NAME"
+                  docker network connect --alias "$alias" "$NETWORK_NAME" "$CONTAINER_NAME" || echo "Erreur lors de l'ajout de l'alias $alias"
+              done
           fi
 
 
