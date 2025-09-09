@@ -78,7 +78,7 @@ class MongoDBClient:
         response.raise_for_status()
         return response.json()
     
-    def get_ad(self, ad_data: Dict[str]):
+    def get_ad(self, ad_data: Dict[str, str]):
         headers = self.get_headers()
         ad_id = ad_data['ad_id']
         response = self.session.post(f"{self.base_url}/api/internal/mongodb/entity/ad/{ad_id}", json=ad_data, headers=headers)
@@ -92,7 +92,7 @@ class MongoDBClient:
         response.raise_for_status()
         return response.json()
     
-    def delete_ad(self, ad_data: Dict[str]):
+    def delete_ad(self, ad_data: Dict[str, str]):
         headers = self.get_headers()
         ad_id = ad_data['ad_id']
         response = self.session.post(f"{self.base_url}/api/internal/mongodb/entity/ad/{ad_id}", json=ad_data, headers=headers)
