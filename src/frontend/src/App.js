@@ -12,6 +12,7 @@ import DataLoad from './pages/DataLoad';
 import DataAnalyse from './pages/DataAnalyse';
 import DataLearn from './pages/DataLearn';
 import NewProduct from './pages/NewProduct';
+import FindProduct from './pages/FindProduct';
 import './App.css'; // Importer le fichier CSS global
 
 const App = () => {
