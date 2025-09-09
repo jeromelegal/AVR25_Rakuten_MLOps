@@ -18,8 +18,7 @@ jobs:
     strategy:
       # max-parallel: 10
       matrix:
-        # service: [vault, consul, mongodb, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
-        service: [vault, consul]
+        service: [vault, consul, mongodb, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
@@ -58,8 +57,7 @@ jobs:
     needs: [clear-containers]
     strategy:
       matrix:
-        # service: [vault, consul, mongodb, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
-        service: [vault, consul]
+        service: [vault, consul, mongodb, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
     permissions:
       contents: 'read'
       id-token: 'write'
@@ -103,8 +101,7 @@ jobs:
     needs: [create-network, build] # Ce job dépend de la réussite du job "build"
     strategy:
       matrix:
-        # service: [vault, consul, mongodb, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
-        service: [vault, consul]
+        service: [vault, consul, mongodb, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
@@ -127,15 +124,6 @@ jobs:
           if [ -z "$RUN_AS_ROOT" ] || [ "$RUN_AS_ROOT" = "null" ]; then
             RUN_AS_ROOT=false
           fi
-
-          # # Extraire et traiter network-alias
-          # NETWORK_ALIASES=$(/usr/local/bin/yq eval ".network-alias | join(\",\")" <<< "$CONFIG" || true)
-          # NETWORK_ALIAS_OPTIONS=""
-          # if [ "$NETWORK_ALIASES" != "null" ] && [ -n "$NETWORK_ALIASES" ]; then
-          #     for alias in $(echo $NETWORK_ALIASES | tr ',' '\n'); do
-          #         NETWORK_ALIAS_OPTIONS+=" --network-alias=$alias"
-          #     done
-          # fi
 
           NETWORK_ALIASES=$(/usr/local/bin/yq eval ".network-alias // []" <<< "$CONFIG" || echo "")
 
@@ -188,8 +176,7 @@ jobs:
     needs: start-containers
     strategy:
       matrix:
-        # service: [vault, consul, mongodb, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
-        service: [vault, consul]
+        service: [vault, consul, mongodb, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
@@ -225,8 +212,7 @@ jobs:
     needs: health-check-containers  # Ce job dépend de la réussite du job "start-containers"
     strategy:
       matrix:
-        # service: [vault, consul, mongo, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
-        service: [vault, consul]
+        service: [vault, consul, mongo, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
