@@ -186,7 +186,7 @@ jobs:
 
       - name: Perform health checks
         run: |
-
+          set +e
           VERSION=${{ steps.get_version.outputs.VERSION }}
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
           echo "Version: $VERSION"
@@ -259,9 +259,27 @@ jobs:
                 echo "Checking URL: $URL with expected code: $EXPECTED_CODE"
 
                 # Exécuter curl depuis un conteneur sur le réseau spécifié
-                echo "docker run --rm --network $NETWORK_NAME --name ${{ matrix.service }}-$BRANCH_NAME-curl curlimages/curl curl -s -k -o /dev/null -w %{http_code} $URL"
-                docker run --rm --network "$NETWORK_NAME"  --name "${{ matrix.service }}-$BRANCH_NAME-curl" curlimages/curl curl -s -k -o /dev/null -w "%{http_code}" "$URL"
-                HTTP_CODE=$(docker run --rm --network "$NETWORK_NAME"  --name "${{ matrix.service }}-$BRANCH_NAME-curl" curlimages/curl curl -s -k -o /dev/null -w "%{http_code}" "$URL")
+                # echo "docker run --rm --network $NETWORK_NAME --name ${{ matrix.service }}-$BRANCH_NAME-curl curlimages/curl curl -s -k -o /dev/null -w %{http_code} $URL"
+                # docker run --rm --network "$NETWORK_NAME"  --name "${{ matrix.service }}-$BRANCH_NAME-curl" curlimages/curl curl -s -k -o /dev/null -w "%{http_code}" "$URL"
+                # HTTP_CODE=$(docker run --rm --network "$NETWORK_NAME"  --name "${{ matrix.service }}-$BRANCH_NAME-curl" curlimages/curl curl -s -k -o /dev/null -w "%{http_code}" "$URL")
+
+                # Essayer d'obtenir le code HTTP
+                if HTTP_CODE=$(docker run --rm --network "$NETWORK_NAME" --name "${{ matrix.service }}-$BRANCH_NAME-curl" curlimages/curl curl -s -k -o /dev/null -w "%{http_code}" "$URL"); then
+                  # La commande a réussi
+                  echo "HTTP Code: $HTTP_CODE"
+                else
+                  # La commande a échoué, définir HTTP_CODE à une valeur par défaut ou gérer l'erreur
+                  HTTP_CODE=000
+                  echo "Error occurred while accessing $URL"
+                fi
+
+                # Continuer avec la logique basée sur HTTP_CODE
+                if [ "$HTTP_CODE" -ne "$EXPECTED_CODE" ]; then
+                  echo "Waiting for $URL to be healthy. Current HTTP code: $HTTP_CODE"
+                  all_healthy=false
+                else
+                  echo "$URL is healthy."
+                fi
 
                 if [ "$?" -ne 0 ]; then
                   echo "Error occurred while accessing $URL"
