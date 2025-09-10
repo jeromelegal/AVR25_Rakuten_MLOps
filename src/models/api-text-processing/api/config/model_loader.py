@@ -1,3 +1,4 @@
+import json
 from functools import lru_cache
 from typing import Annotated
 from api.config.config import Settings, get_settings
@@ -12,7 +13,13 @@ def get_classifier_model(settings: Annotated[Settings, Depends(get_settings)]):
     model_version = settings.MLFLOW_TEXT_CLASSIFIER_MODEL_VERSION
 
     mlflow.set_tracking_uri(settings.MLFLOW_ADDR)
-    return mlflow.pyfunc.load_model(model_uri=f"models:/{model_name}/{model_version}")
+    classifier_components = mlflow.transformers.load_model(
+        model_uri=f"models:/{model_name}/{model_version}",
+        return_type="components",
+    )
+    classifier_tokenizer = classifier_components["tokenizer"]
+    text_classifier = classifier_components["model"]
+    return text_classifier, classifier_tokenizer
 
 
 @lru_cache
@@ -28,8 +35,14 @@ def get_translator_model(settings: Annotated[Settings, Depends(get_settings)]):
         artifact_path=settings.MLFLOW_TEXT_TRANSLATOR_CACHE_ARTIFACT_PATH,
         dst_path=settings.MLFLOW_LOCAL_ARTIFACT_DIRECTORY_PATH,
     )
+    translator_components = mlflow.transformers.load_model(
+        model_uri=f"models:/{model_name}/{model_version}",
+        return_type="components",
+    )
+    translator_tokenizer = translator_components["tokenizer"]
+    translator = translator_components["model"]
 
-    return mlflow.pyfunc.load_model(model_uri=f"models:/{model_name}/{model_version}")
+    return translator, translator_tokenizer
 
 
 @lru_cache
@@ -47,3 +60,15 @@ def get_language_detector_model(settings: Annotated[Settings, Depends(get_settin
     )
 
     return mlflow.pyfunc.load_model(model_uri=f"models:/{model_name}/{model_version}")
+
+
+# load french dictionary
+@lru_cache
+def get_french_words(settings: Annotated[Settings, Depends(get_settings)]):
+    artifact_dir = settings.MLFLOW_LOCAL_ARTIFACT_DIRECTORY_PATH
+    filename = settings.MLFLOW_TEXT_LANGUAGE_DETECTOR_INDEX_ARTIFACT_PATH.rstrip("/")[
+        -1
+    ]
+    with open(f"{artifact_dir}/{filename}", "r", encoding="utf-8") as file:
+        french_words = set(json.load(file))
+    return french_words

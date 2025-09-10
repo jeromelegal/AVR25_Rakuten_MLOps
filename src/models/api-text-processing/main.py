@@ -6,6 +6,12 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 import logging
 from api.config.config import settings
+from api.config.model_loader import (
+    get_classifier_model,
+    get_french_words,
+    get_language_detector_model,
+    get_translator_model,
+)
 
 from jose import JWTError, jwt
 
@@ -60,8 +66,19 @@ class LoggingMiddleware(BaseHTTPMiddleware):
         return response
 
 
+def load_models_and_artifacts_in_cache():
+    logging.info("Loading models and artifacts in cache...")
+    get_classifier_model(settings=settings)
+    get_french_words(settings=settings)
+    get_language_detector_model(settings=settings)
+    get_translator_model(settings=settings)
+    logging.info("Models and artifacts loaded successfully.")
+
+
 app = FastAPI()
 
+# Pre-load models and artifacts
+load_models_and_artifacts_in_cache()
 
 app.add_middleware(
     CORSMiddleware,
