@@ -6,6 +6,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 import logging
 from api.config.config import settings
+from api.config.model_loader import get_image_classifier_model
 
 from jose import JWTError, jwt
 
@@ -59,8 +60,15 @@ class LoggingMiddleware(BaseHTTPMiddleware):
         return response
 
 
+def load_models_and_artifacts_in_cache():
+    logging.info("Loading models and artifacts in cache...")
+    get_image_classifier_model(settings=settings)
+    logging.info("Models and artifacts loaded successfully.")
+
+
 app = FastAPI()
 
+load_models_and_artifacts_in_cache()
 
 app.add_middleware(
     CORSMiddleware,
