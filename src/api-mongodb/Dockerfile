@@ -114,7 +114,7 @@ RUN mv nginx/nginx-conf.sh /usr/local/bin/nginx-conf.sh
 RUN chmod +x /usr/local/bin/nginx-conf.sh
 
 
-EXPOSE 8000
+EXPOSE 8000 443 80 
 
 # CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 ENTRYPOINT ["entrypoint.sh"]

@@ -1,0 +1,249 @@
+services:
+  vault:
+    expose_ports:
+      - 8200
+      - 8201
+      - 8501
+      - 80
+      - 443
+    cap_add:
+      - IPC_LOCK
+      - NET_ADMIN
+      - NET_RAW
+    network-alias:
+      - vault
+    health_check:
+      urls:
+        - url: https://vault/health
+          expected_code: 200
+    env_vars:
+      SERVICE_NAME: vault
+      SERVICE_NAME: vault
+      SERVICE_PORT: 8200
+      VAULT_ADDR: https://vault:8200
+      VAULT_USERNAME: vault
+      VAULT_PASSWORD: vault
+      CONSUL_SERVER_HOST: consul
+      CONSUL_SERVER_PORT: 8501
+      SECURED_SERVICES: vault,consul,mongodb,api-mongodb,postgresql,api-postgresql,api-gateway,frontend,reverse-proxy,zookeeper,kafka,minio,api-minio,mlflow
+  consul:
+    expose_ports:
+      - 8600/udp
+      - 8500
+      - 8501
+      - 80
+      - 443
+    network-alias:
+      - consul
+    health_check:
+      urls:
+        - url: https://consul/health
+          expected_code: 200
+    env_vars:
+      SERVICE_NAME: consul
+      SERVICE_PORT: 8500
+      VAULT_ADDR: https://vault:8200
+      VAULT_USERNAME: consul
+      VAULT_PASSWORD: consul
+      CONSUL_SERVER_HOST: consul
+      CONSUL_SERVER_PORT: 8501
+      INITIALIZED: false
+  postgresql:
+    expose_ports:
+      - 5432
+      - 80
+      - 443
+    network-alias:
+      - postgresql
+    health_check:
+      urls:
+        - url: https://postgresql/health
+          expected_code: 200
+    env_vars:
+      SERVICE_NAME: postgresql
+      SERVICE_PORT: 5432
+      VAULT_ADDR: https://vault:8200
+      VAULT_USERNAME: postgresql
+      VAULT_PASSWORD: postgresql
+      PORT: 5432
+      VAULT_SERVICE_NAME: vault
+  api-postgresql:
+    expose_ports:
+      - 8020
+      - 80
+      - 443
+    network-alias:
+      - api-postgresql
+    health_check:
+      urls:
+        - url: https://api-postgresql/health
+          expected_code: 200
+    env_vars:
+      SERVICE_NAME: api-postgresql
+      SERVICE_PORT: 8080
+      POSTGRESQL_SERVICE_NAME: postgresql
+      POSTGRESQL_SERVICE_PORT: 5432
+      VAULT_ADDR: https://vault:8200
+      VAULT_USERNAME: api-postgresql
+      VAULT_PASSWORD: api-postgresql
+      VAULT_SERVICE_NAME: vault
+      API_GATEWAY_SERVICE_NAME: api-gateway
+  mongodb:
+    expose_ports:
+      - 27017
+      - 80
+      - 443
+    network-alias:
+      - mongodb
+    health_check:
+      urls:
+        - url: https://mongodb/health
+          expected_code: 200
+    env_vars:
+      VAULT_SERVICE_NAME: vault
+      VAULT_ADDR: https://vault:8200
+      VAULT_USERNAME: mongodb
+      VAULT_PASSWORD: mongodb
+      PORT: 27017
+      SERVICE_NAME: mongodb
+  api-mongodb:
+    expose_ports:
+      - 8000
+      - 80
+      - 443
+    network-alias:
+      - api-mongodb
+    health_check:
+      urls:
+        - url: https://api-mongodb/health
+          expected_code: 200
+    env_vars:
+      SERVICE_NAME: api-mongodb
+      SERVICE_PORT: 8000
+      VAULT_ADDR: https://vault:8200
+      VAULT_USERNAME: api-mongodb
+      VAULT_PASSWORD: api-mongodb
+      VAULT_SERVICE_NAME: vault
+      MONGODB_SERVICE_NAME: mongodb
+      MONGODB_SERVICE_PORT: 27017
+      API_GATEWAY_SERVICE_NAME: api-gateway
+  minio:
+    expose_ports:
+      - 9010
+      - 9011
+      - 80
+      - 443
+    network-alias:
+      - minio
+    health_check:
+      urls:
+        - url: https://minio/health
+          expected_code: 200
+    env_vars:
+      VAULT_ADDR: https://vault:8200
+      VAULT_USERNAME: minio
+      VAULT_PASSWORD: minio
+      PORT: 9010
+      GUI_PORT: 9011
+      SERVICE_NAME: minio
+      VAULT_SERVICE_NAME: vault
+  api-minio:
+    expose_ports:
+      - 8020
+      - 80
+      - 443
+    network-alias:
+      - api-minio
+    health_check:
+      urls:
+        - url: https://api-minio/health
+          expected_code: 200
+    env_vars:
+      SERVICE_NAME: api-minio
+      SERVICE_PORT: 8020
+      SERVICE_VERSION: v0.0.1
+      VAULT_ADDR: https://vault:8200
+      VAULT_USERNAME: api-minio
+      VAULT_PASSWORD: api-minio
+      VAULT_SERVICE_NAME: vault
+      MINIO_SERVICE_NAME: minio
+      MINIO_SERVICE_PORT: 9010
+      API_GATEWAY_SERVICE_NAME: api-gateway
+  api-gateway:
+    expose_ports:
+      - 9000
+      - 80
+      - 443
+    network-alias:
+      - api-gateway
+    health_check:
+      urls:
+        - url: https://api-gateway/health
+          expected_code: 200
+    env_vars:
+      SERVICE_NAME: api-gateway
+      SERVICE_PORT: 9000
+      VAULT_ADDR: https://vault:8200
+      VAULT_SERVICE_NAME: vault
+      VAULT_USERNAME: api-gateway
+      VAULT_PASSWORD: api-gateway
+      API_MONGODB_SERVICE_NAME: api-mongodb
+      API_MONGODB_SERVICE_PORT: 8000
+      API_POSTGRESQL_SERVICE_NAME: api-postgresql
+      API_POSTGRESQL_SERVICE_PORT: 8010
+  # mlflow:
+  #   expose_ports:
+  #     - 80
+  #     - 443
+  #   network-alias:
+  #     - mlflow
+  #   env_vars:
+  #     SERVICE_NAME: mlflow
+  #     SERVICE_PORT: 8000
+  #     VAULT_ADDR: https://vault:8200
+  #     VAULT_USERNAME: mlflow
+  #     VAULT_PASSWORD: mlflow
+  #     VAULT_SERVICE_NAME: vault
+  #     MONGODB_SERVICE_NAME: mongodb
+  #     MONGODB_SERVICE_PORT: 27017
+  #     MINIO_SERVICE_NAME: minio
+  #     MINIO_SERVICE_PORT: 9010
+  frontend:
+    expose_ports:
+      - 3000
+      - 80
+      - 443
+    network-alias:
+      - frontend
+    health_check:
+      urls:
+        - url: https://frontend/health
+          expected_code: 200
+    env_vars:
+      SERVICE_NAME: frontend
+      VAULT_ADDR: https://vault:8200
+      VAULT_SERVICE_NAME: vault
+      VAULT_USERNAME: frontend
+      VAULT_PASSWORD: frontend
+      API_GATEWAY_SERVICE_NAME: api-gateway
+      API_GATEWAY_SERVICE_PORT: 8000
+  reverse-proxy:
+    expose_ports:
+      - 80
+      - 443
+    network-alias:
+      - reverse-proxy
+    health_check:
+      urls:
+        - url: https://vault/health
+          expected_code: 200
+    env_vars:
+      SERVICE_NAME: reverse-proxy
+      VAULT_ADDR: https://reverse-proxy:8200
+      VAULT_SERVICE_NAME: vault
+      VAULT_USERNAME: reverse-proxy
+      VAULT_PASSWORD: reverse-proxy
+      FRONTEND_SERVICE_NAME: frontend
+      FRONTEND_SERVICE_PORT: 3000
+      API_GATEWAY_SERVICE_NAME: api-gateway
+      API_GATEWAY_SERVICE_PORT: 9000

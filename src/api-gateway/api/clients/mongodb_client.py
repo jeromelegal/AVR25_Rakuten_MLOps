@@ -80,7 +80,6 @@ class MongoDBClient:
         )
         response.raise_for_status()
         return response.json()
-
     def create_ad(self, ad_data: Dict[str, str]):
         headers = self.get_headers()
         response = self.session.post(
@@ -98,7 +97,6 @@ class MongoDBClient:
         )
         response.raise_for_status()
         return response.json()
-
     def update_ad(self, ad_data: Dict[str, str]):
         headers = self.get_headers()
         ad_id = ad_data["ad_id"]

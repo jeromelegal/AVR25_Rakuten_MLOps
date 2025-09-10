@@ -34,8 +34,8 @@ ENV VAULT_USERNAME=${VAULT_USERNAME:-"minio"}
 ENV VAULT_PASSWORD=${VAULT_PASSWORD:-"minio"}
 ENV VAULT_ROLE=${VAULT_ROLE:-"your-role"}
 ENV REPLSET_NAME=${REPLSET_NAME:-"rs0"}
-ENV PORT=${PORT:-"9000"}
-ENV GUI_PORT=${GUI_PORT:-"9001"}
+ENV PORT=${PORT:-"9010"}
+ENV GUI_PORT=${GUI_PORT:-"9011"}
 ENV BIND_IP=${BIND_IP:-"0.0.0.0"}
 ENV TLS_MODE=${TLS_MODE:-"requireTLS"}
 ENV MINIO_ROOT_USER=${MINIO_ROOT_USER:-"minio-user"}
@@ -100,5 +100,5 @@ COPY vault/vault.sh /usr/local/bin/vault.sh
 RUN chmod +x /usr/local/bin/*.sh
 
 # # Définir le point d'entrée et exposer le port
-EXPOSE 9000 9001
+EXPOSE 9010 9011
 ENTRYPOINT ["entrypoint.sh"]

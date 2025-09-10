@@ -2,8 +2,16 @@
 
 echo "vault.sh"
 
+
+# Mettre à jour la configuration du service Vault avec les nouveaux certificats
+# export VAULT_ADDR=$SAVE_VAULT_ADDR
+
+echo $VAULT_CONFIG_FILE
+cat $VAULT_CONFIG_FILE
+
 # Ajout d'une règle pour mettre le trafic en pause si il vient de l'extérieur. Le trafic sera débloqué une fois le vault déverrouillé
 iptables -I INPUT -p tcp --dport 8200 ! -s 127.0.0.1 -j NFQUEUE --queue-num 1
+# iptables -I INPUT -p tcp --dport 8200 -j NFQUEUE --queue-num 1
 
 echo "Start Vault"
 vault server -config=$VAULT_CONFIG_FILE &
@@ -11,9 +19,67 @@ SERVER_VAULT_PID=$!
 echo "Vault server started with PID $SERVER_VAULT_PID"
 
 echo "Start auto-unseal"
-/usr/bin/python3 /usr/local/bin/auto-unseal.py > python.log 2>&1 &
+su - root -c "/usr/bin/python3 /usr/local/bin/auto-unseal.py > python.log 2>&1" &
 export AUTO_UNSEAL_PID=$!
 echo "Started auto-unseal AUTO_UNSEAL_PID: $AUTO_UNSEAL_PID"
+
+
+# # Obtenir la variable d'environnement
+# UNSEAL_KEYS=${UNSEAL_KEYS:-}
+
+# # Vérifier si UNSEAL_KEYS n'est pas vide
+# echo "Tentative déverrouillage"
+# if [ -n "$UNSEAL_KEYS" ]; then
+#     # Définir IFS pour diviser la chaîne en mots (clés)
+#     IFS=' ' read -ra KEYS <<< "$UNSEAL_KEYS"
+#     echo "Clés : $UNSEAL_KEYS"
+#     # Boucler sur chaque clé
+#     for key in "${KEYS[@]}"; do
+#         echo "déverrouillage avec la clé  : $key"
+#         address="https://127.0.0.1:8200"
+#         vault operator unseal -address="$address" "$key"
+#     done
+# fi
+
+
+# Fonction pour essayer de déverrouiller le Vault
+attempt_unseal() {
+    local keys=("$@") # Récupérer toutes les clés passées à la fonction
+    local address="https://127.0.0.1:8200"
+    for key in "${keys[@]}"; do
+        echo "Déverrouillage avec la clé : $key"
+        vault operator unseal -address="$address" "$key"
+    done
+}
+
+# Vérifier si UNSEAL_KEYS n'est pas vide
+UNSEAL_KEYS=${UNSEAL_KEYS:-}
+
+if [ -n "$UNSEAL_KEYS" ]; then
+    # Définir IFS pour diviser la chaîne en mots (clés)
+    IFS=' ' read -ra KEYS <<< "$UNSEAL_KEYS"
+    echo "Clés : $UNSEAL_KEYS"
+
+    # Boucle pour tenter de déverrouiller le Vault
+    while true; do
+        echo "Tentative de déverrouillage..."
+
+        # Appeler la fonction de déverrouillage
+        attempt_unseal "${KEYS[@]}"
+
+        # Vérifier le statut du Vault
+        VAULT_STATUS=$(vault status -address="https://127.0.0.1:8200" 2>&1)
+        if echo "$VAULT_STATUS" | grep -q "Sealed.*false"; then
+            echo "Le Vault a été déverrouillé avec succès."
+            break
+        else
+            echo "Le Vault n'a pas été déverrouillé. Nouvelle tentative dans 1 secondes..."
+            sleep 1
+        fi
+    done
+else
+    echo "Aucune clé de déverrouillage fournie."
+fi
 
 until vault login -method=userpass username=$VAULT_USERNAME password=$VAULT_PASSWORD > /dev/null ; do
     echo "Échec de l'authentification. Nouvelle tentative dans 1 secondes..."
@@ -64,7 +130,7 @@ chmod 400 $VAULT_CERT_FILE $VAULT_KEY_FILE
 rm -f vault_ca.crt consul_ca.crt mongodb_ca.crt vault_service_cert.json
 
 
-# Mettre à jour la configuration du service Vault avec les nouveaux certificats
+# # Mettre à jour la configuration du service Vault avec les nouveaux certificats
 export VAULT_ADDR=$SAVE_VAULT_ADDR
 
 
@@ -73,7 +139,7 @@ LOCK_FILE="/tmp/vault_config.lock"
 
 # Écrire la configuration dans le fichier
 {
-
+echo "Génération de la configuration avec SERVICE_NAME=$SERVICE_NAME"
   cat <<EOF > $VAULT_CONFIG_FILE
 ui = true
 
@@ -93,8 +159,8 @@ listener "tcp" {
   tls_key_file  = "$VAULT_KEY_FILE"
 }
 
-api_addr = "https://vault:8200"
-cluster_addr = "https://vault:8201"
+api_addr = "https:/$SERVICE_NAME:8200"
+cluster_addr = "https://$SERVICE_NAME:8201"
 disable_mlock = true
 
 # Configuration des logs

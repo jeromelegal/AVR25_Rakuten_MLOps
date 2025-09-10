@@ -135,3 +135,28 @@ else
   # Nettoyage des fichiers temporaires
   rm -f vault_service_cert.json
 fi
+
+
+
+
+
+# Vérifier si le certificat et la clé Vault existent déjà
+if vault kv get -field=cert secret/minio/mlflow/certs > /dev/null 2>&1 && vault kv get -field=key secret/minio/mlflow/certs > /dev/null 2>&1; then
+  echo "Le certificat mTLS minio pour le service mlflow existe déjà"
+else
+  # Générer le certificat et la clé pour Vault
+  echo "Générer le certificat et la clé pour Vault"
+  vault write -format=json pki_minio/issue/minio common_name="minio"   ttl="72h" > minio_mlflow_cert.json
+  # TODO: Define certificate duration as an env variable
+
+  # Extraire le certificat et la clé privée
+  MINIO_MLFLOW_CA=$(jq -r '.data.ca_chain[0]' minio_mlflow_cert.json)
+  MINIO_MLFLOW_CERT=$(jq -r '.data.certificate' minio_mlflow_cert.json)
+  MINIO_MLFLOW_KEY=$(jq -r '.data.private_key' minio_mlflow_cert.json)
+
+  # Enregistrer le certificat et la clé privée dans Vault
+  vault kv put secret/minio/mlflow/certs cert="$MINIO_MLFLOW_CERT" key="$MINIO_MLFLOW_KEY" ca="$MINIO_MLFLOW_CA"
+
+  # Nettoyage des fichiers temporaires
+  rm -f vault_service_cert.json
+fi

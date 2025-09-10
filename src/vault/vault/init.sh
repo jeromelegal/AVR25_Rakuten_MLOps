@@ -96,8 +96,8 @@ listener "tcp" {
   tls_key_file  = "$VAULT_KEY_FILE"
 }
 
-api_addr = "https://vault:8200"
-cluster_addr = "https://vault:8201"
+api_addr = "https://127.0.0.1:8200"
+cluster_addr = "https://127.0.0.1:8201"
 disable_mlock = true
 
 # Configuration des logs
@@ -313,8 +313,12 @@ store_intermediate_certs() {
     vault kv put "secret/${service}/ca" certificate=@${cert_file}
 }
 
+# # Liste des services
+# services=("vault" "consul" "mongodb" "api-mongodb" "postgresql" "api-postgresql"  "api-gateway" "frontend" "reverse-proxy" "zookeeper" "kafka" "minio" "api-minio" "mlflow")
 # Liste des services
-services=("vault" "consul" "mongodb" "api-mongodb" "postgresql" "api-postgresql"  "api-gateway" "frontend" "reverse-proxy" "zookeeper" "kafka" "minio" "api-minio")
+echo -e "\n\nAFFICHAGE DEBUG SECURED_SERVICES=$SECURED_SERVICES \n\n"
+# services=$SECURED_SERVICES
+IFS=',' read -ra services <<< "$SECURED_SERVICES"
 
 # Appel des fonctions pour chaque service
 for service in "${services[@]}"; do

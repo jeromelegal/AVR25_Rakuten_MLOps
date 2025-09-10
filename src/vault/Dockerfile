@@ -79,6 +79,8 @@ COPY . .
 RUN mv auto-unseal/auto-unseal.py /usr/local/bin/auto-unseal.py
 
 
+RUN apt-get install -y tcpdump
+
 
 RUN mv entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
