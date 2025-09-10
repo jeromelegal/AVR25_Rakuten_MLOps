@@ -22,6 +22,7 @@ ENV VAULT_KEY_FILE ${VAULT_KEY_FILE:-"$VAULT_TLS_DIR/server.key"}
 ENV VAULT_SKIP_VERIFY ${VAULT_SKIP_VERIFY:-"0"}
 ENV VAULT_CONFIG_DIR ${VAULT_CONFIG_DIR:-"/config/vault/server"}
 ENV VAULT_CONFIG_FILE ${VAULT_CONFIG_FILE:-"$VAULT_CONFIG_DIR/vault.hcl"}
+ENV SECURED_SERVICES ${SECURED_SERVICES:-"vault,consul,mongodb,api-mongodb,postgresql,api-postgresql,api-gateway,frontend,reverse-proxy,zookeeper,kafka,minio,api-minio,mlflow,model-downloader,api-text-processing,api-image-processing,api-processing"}
 
 ENV VAULT_LOCAL_DATA ${VAULT_LOCAL_DATA:-"/vault/data"} 
 
