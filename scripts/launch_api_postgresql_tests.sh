@@ -1,10 +1,12 @@
 #!/bin/bash
 
-RESLUT_FOLDER=test_results
+SUFFIX=$1
+RESULT_FOLDER=test_results
+CONTAINER_NAME="api-gateway$SUFFIX"
 
 # Create folder to store test results
-echo "Create test resutl folder"
-mkdir -p $RESLUT_FOLDER
+echo "Create test result folder"
+mkdir -p $RESULT_FOLDER
 
 # Execute api-postgresql tests
 echo "Executing api-postgresql tests"

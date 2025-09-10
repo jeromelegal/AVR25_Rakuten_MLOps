@@ -1,17 +1,19 @@
 #!/bin/bash
 
-RESLUT_FOLDER=test_results
+SUFFIX=$1
+RESULT_FOLDER=test_results
+CONTAINER_NAME="api-minio$SUFFIX"
 
 # Create folder to store test results
-echo "Create test resutl folder"
-mkdir -p $RESLUT_FOLDER
+echo "Create test result folder"
+mkdir -p $RESULT_FOLDER
 
 # Execute api-minio tests
 echo "Executing api-minio tests"
-docker exec api-minio pip install --break-system-packages -r requirements/dev.txt && \
+docker exec $CONTAINER_NAME pip install --break-system-packages -r requirements/dev.txt && \
 docker cp src/api-minio/test/test.sh api-minio:/usr/local/bin/test.sh  && \
-docker exec api-minio chown root:root /usr/local/bin/test.sh  && \
-docker exec api-minio chmod +x /usr/local/bin/test.sh  && \
-docker exec api-minio test.sh  && \
-docker cp api-minio:/app/test_result.xml $RESULT_FOLDER/api-minio_test_result.xml  && \
-docker cp api-minio:/app/test_coverage.xml $RESULT_FOLDER/api-minio_test_coverage.xml
+docker exec $CONTAINER_NAME chown root:root /usr/local/bin/test.sh  && \
+docker exec $CONTAINER_NAME +x /usr/local/bin/test.sh  && \
+docker exec $CONTAINER_NAME test.sh  && \
+docker cp $CONTAINER_NAME:/app/test_result.xml $RESULT_FOLDER/api-minio_test_result.xml  && \
+docker cp $CONTAINER_NAME:/app/test_coverage.xml $RESULT_FOLDER/api-minio_test_coverage.xml
