@@ -3,7 +3,7 @@ run-name: Test AVR25 Rakuten MLOps actions started by ${{ github.actor }}
 on:
   push:
     branches:
-      - 'master'
+      - '*'
   pull_request:
     types:
       - opened
@@ -13,7 +13,7 @@ env:
   FORCE_COLOR: "1"
 jobs:
   clear-containers:
-    runs-on: [self-hosted]
+    runs-on: [self-hosted, phil-host]
     strategy:
       matrix:
         service: [vault, consul, mongodb, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
@@ -32,7 +32,7 @@ jobs:
           docker rm ${{ matrix.service }}-${BRANCH_NAME} || true
 
   clear-network:
-    runs-on: [self-hosted]
+    runs-on: [self-hosted, phil-host]
     needs: [clear-containers]
     steps:
       - name: Remove Docker network
@@ -47,7 +47,7 @@ jobs:
           fi
 
   create-network:
-    runs-on: [self-hosted]
+    runs-on: [self-hosted, phil-host]
     needs: [clear-containers, clear-network]
     steps:
       - name: Create Docker network
@@ -57,7 +57,7 @@ jobs:
           docker network create $NETWORK_NAME || true # Ignore if network exists
 
   build:
-    runs-on: [self-hosted]
+    runs-on: [self-hosted, phil-host]
     needs: [clear-containers]
     strategy:
       matrix:
@@ -88,7 +88,7 @@ jobs:
           docker build -t ${{ matrix.service }}:$TAG .
 
   start-containers:
-    runs-on: [self-hosted]
+    runs-on: [self-hosted, phil-host]
     needs: [create-network, build]
     strategy:
       matrix:
@@ -154,7 +154,7 @@ jobs:
           fi
 
   health-check-containers:
-    runs-on: [self-hosted]
+    runs-on: [self-hosted, phil-host]
     needs: start-containers
     strategy:
       matrix:
@@ -234,7 +234,7 @@ jobs:
           done
 
   stop-containers:
-    runs-on: [self-hosted]
+    runs-on: [self-hosted, phil-host]
     needs: health-check-containers
     strategy:
       matrix:
@@ -254,7 +254,7 @@ jobs:
           docker rm ${{ matrix.service }}-${BRANCH_NAME} || true
 
   remove-network:
-    runs-on: [self-hosted]
+    runs-on: [self-hosted, phil-host]
     needs: stop-containers  
     steps:
       - name: Remove Docker network
