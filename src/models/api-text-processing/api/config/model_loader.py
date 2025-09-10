@@ -66,9 +66,9 @@ def get_language_detector_model(settings: Annotated[Settings, Depends(get_settin
 @lru_cache
 def get_french_words(settings: Annotated[Settings, Depends(get_settings)]):
     artifact_dir = settings.MLFLOW_LOCAL_ARTIFACT_DIRECTORY_PATH
-    filename = settings.MLFLOW_TEXT_LANGUAGE_DETECTOR_INDEX_ARTIFACT_PATH.rstrip("/")[
-        -1
-    ]
+    filename = settings.MLFLOW_TEXT_LANGUAGE_DETECTOR_INDEX_ARTIFACT_PATH.rsplit(
+        "/", maxsplit=1
+    )[-1]
     with open(f"{artifact_dir}/{filename}", "r", encoding="utf-8") as file:
         french_words = set(json.load(file))
     return french_words

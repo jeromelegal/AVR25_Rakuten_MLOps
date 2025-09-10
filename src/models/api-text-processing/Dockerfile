@@ -88,16 +88,8 @@ RUN vault --version
 # Installer les dépendances nécessaires
 RUN apt-get update && apt-get install -y curl jq unzip
 
-# miniconda
-ENV CONDA_DIR=/opt/conda
-RUN apt-get update && apt-get install -y wget bzip2 && \
-    wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/miniconda.sh && \
-    bash /tmp/miniconda.sh -b -p $CONDA_DIR && \
-    rm /tmp/miniconda.sh && \
-    $CONDA_DIR/bin/conda clean -afy
-
-# conda in PATH
-ENV PATH=$CONDA_DIR/bin:$PATH
+# Installer Python et pip
+RUN apt update && apt install -y python3-full python3-pip
 
 # Script d'entrée pour obtenir les certificats depuis Vault et démarrer Uvicorn
 COPY entrypoint.sh /usr/local/bin/
@@ -105,9 +97,6 @@ RUN chmod +x /usr/local/bin/entrypoint.sh
 
 COPY vault/vault.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/vault.sh
-
-COPY test/test.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/test.sh
 
 COPY nginx/nginx-fcgiwrap.sh /usr/local/bin/nginx-fcgiwrap.sh
 RUN chmod +x /usr/local/bin/nginx-fcgiwrap.sh
@@ -120,25 +109,12 @@ RUN chmod +x /usr/local/bin/health-check.sh
 COPY nginx/nginx-conf.sh /usr/local/bin/nginx-conf.sh
 RUN chmod +x /usr/local/bin/nginx-conf.sh
 
-# Copier le fichier d'environnement conda dans le conteneur
-COPY environment.yml .
+# Copier le fichier requirements.txt dans le conteneur
+COPY requirements.txt requirements.txt
+COPY requirements/ requirements/
 
-# create env conda
-RUN conda config --set channel_priority strict && \
-    conda config --add channels defaults && \
-    conda config --add channels conda-forge && \
-    conda config --set always_yes yes && \
-    conda tos accept --channel https://repo.anaconda.com/pkgs/main && \
-    conda tos accept --channel https://repo.anaconda.com/pkgs/r
-RUN apt-get update && apt-get install -y build-essential g++ cmake && apt-get clean
-RUN conda env create -f environment.yml && conda clean -afy
-
-# activate env
-SHELL ["/bin/bash", "--login", "-c"]
-RUN echo "conda activate distilbert_docker" >> ~/.bashrc
-
-ENV PATH=/opt/conda/envs/distilbert_docker/bin:$PATH
-ENV PYTHONPATH=/app
+# Installer les dépendances en contournant la restriction
+RUN pip install --break-system-packages -r requirements.txt
 
 COPY . .
 
