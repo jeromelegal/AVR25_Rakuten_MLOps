@@ -1,15 +1,15 @@
 #!/bin/bash
-# Check if API Minio service is up
-echo "Checking if API Minio service is up..."
-HEALTH_URL=http://$API_TEXT_PROCESSING_API_IMAGE_PROCESSING_SERVICE_NAME:$API_TEXT_PROCESSING_API_IMAGE_PROCESSING_SERVICE_PORT/
+# Check if MLFlow service is up
+echo "Checking if MLFlow service is up..."
+HEALTH_URL=$MLFLOW_ADDR/health
 echo "HEALTH_URL: $HEALTH_URL"
 HTTP_CODE=$(curl -k -o /dev/null -s -w "%{http_code}\n" $HEALTH_URL)
 until [ $HTTP_CODE -eq 200 ]; do
     HTTP_CODE=$(curl -k -o /dev/null -s -w "%{http_code}\n" $HEALTH_URL)
-    echo "Waiting for Minio service to be healthy."
+    echo "Waiting for MLFlow service to be healthy."
     sleep 1
 done
-echo "API Minio service is up"
+echo "MLFlow service is up"
 
 echo "ENVIRONMENT: $ENVIRONMENT"
 if [[ "$ENVIRONMENT" == "test" ]]; then
