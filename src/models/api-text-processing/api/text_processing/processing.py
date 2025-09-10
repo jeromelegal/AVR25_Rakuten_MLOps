@@ -1,23 +1,33 @@
-from typing import Annotated, Any
+from typing import Annotated
 
-from .models.image_processing import get_images_predictions, Results
-from fastapi import APIRouter, Depends, File, HTTPException
-from api.config.model_loader import get_classifier_model, get_translator_model
+from fastapi import APIRouter, Depends, HTTPException
+from api.config.config import Settings, get_settings
+from api.text_processing.models.text_processing import (
+    InputsRequest,
+    Results,
+    get_text_categories,
+)
 
 VERSION = "0.0.1"
 
 router = APIRouter()
 
 
-@router.post("/api/internal/api-text-processing/predict")
+@router.get("/api/internal/api-text-processing")
+def get_version():
+    return {
+        "message": "Text prediction API - Rakuten Project AVR25",
+        "version": VERSION,
+    }
+
+
+@router.post("/api/internal/api-text-processing/predict", response_model=Results)
 def get_categories(
-    files: Annotated[list[bytes], File(description="Multiple files as bytes")],
-    translator_model: Annotated[Any, Depends(get_translator_model)],
-    classifier_model: Annotated[Any, Depends(get_classifier_model)],
+    inputs: InputsRequest,
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> Results:
     try:
-        return get_images_predictions(files=files, model=model)
+        return get_text_categories(request=inputs, settings=settings)
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Impossible to process images. {e}"
-        )
+        error_message = f"Impossible to process images. {e}"
+        raise HTTPException(status_code=500, detail=error_message) from e

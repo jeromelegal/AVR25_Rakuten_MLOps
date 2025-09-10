@@ -1,16 +1,21 @@
-import base64
-from typing import Annotated, List
-from PIL import Image
-import io
-
-from fastapi import Depends
-import numpy as np
+from fastapi import Depends, FastAPI, HTTPException
+import pandas as pd
+from api.config.config import get_settings, Settings
+from api.config.model_loader import (
+    get_text_classifier_model,
+    get_language_detector_model,
+    get_translator_model,
+)
+from api.text_processing.models.pipeline import inference
 from pydantic import BaseModel
+from typing import Annotated, List, Optional
 
-IMAGE_DIMENSION = (500, 500)
-
+VERSION = "0.0.1"
 CATEGORIES = [
     "10",
+    "40",
+    "50",
+    "60",
     "1140",
     "1160",
     "1180",
@@ -34,18 +39,27 @@ CATEGORIES = [
     "2585",
     "2705",
     "2905",
-    "40",
-    "50",
-    "60",
 ]
 
+app = FastAPI()
 
-class Input(BaseModel):
-    image_name: str
+
+class InputItem(BaseModel):
+    designation: str
+    description: str
+
+
+class InputsRequest(BaseModel):
+    inputs: List[InputItem]
+
+
+### answer text
+class Output(BaseModel):
+    text: str
 
 
 class Result(BaseModel):
-    input: Input
+    output: Output
     predicted_category: int
     categories_probabilities: List[float]
 
@@ -55,31 +69,41 @@ class Results(BaseModel):
     results: List[Result]
 
 
-def _get_image_from_bytes(file: bytes) -> np.ndarray:
-    stream = io.BytesIO(file)
-    img = Image.open(stream)
-    filename = img.filename
-    img = img.resize(IMAGE_DIMENSION)
-    return filename, np.array(img)
-
-
-def _get_predictions(
-    name: str,
-    img: np.ndarray,
-    model,
-) -> Result:
-    predictions = model.predict(np.array([img]))[0]
-    return Result(
-        input=Input(image_name=name),
-        categories_probabilities=predictions,
-        predicted_category=np.argmax(predictions),
+def get_text_categories(
+    request: InputsRequest, settings: Annotated[Settings, Depends(get_settings)]
+):
+    if not request.inputs:
+        raise HTTPException(status_code=400, detail="'inputs' is empty")
+    df = pd.DataFrame([item.model_dump() for item in request.inputs])
+    # verify df
+    required = {"designation", "description"}
+    missing = required - set(df.columns)
+    if missing:
+        raise HTTPException(
+            status_code=422, detail=f"Missing required fields in payload: {missing}"
+        )
+    text_classifier, classifier_tokenizer = get_text_classifier_model(settings=settings)
+    language_detector = get_language_detector_model(settings=settings)
+    translator, translator_tokenizer = get_translator_model(settings=settings)
+    result = inference(
+        df=df,
+        language_detector=language_detector,
+        text_classifier=text_classifier,
+        text_tokenizer=classifier_tokenizer,
+        translator_model=translator,
+        translator_tokenizer=translator_tokenizer,
     )
+    return get_texts_predictions(result)
 
 
-def get_images_predictions(files: list[bytes], model):
+def get_texts_predictions(result) -> Results:
     results = []
-    for file in files:
-        name, img = _get_image_from_bytes(file=file)
-        result = _get_predictions(name=name, img=img, model=model)
-        results.append(result)
+    for _, row in result.iterrows():
+        output = Output(text=row["text"])
+        item = Result(
+            output=output,
+            predicted_category=int(row["predicted_category"]),
+            categories_probabilities=row["categories_probabilities"],
+        )
+        results.append(item)
     return Results(category_codes=CATEGORIES, results=results)

@@ -6,7 +6,7 @@ from starlette.responses import JSONResponse
 import logging
 from api.config.config import settings
 from api.config.model_loader import (
-    get_classifier_model,
+    get_text_classifier_model,
     get_french_words,
     get_language_detector_model,
     get_translator_model,
@@ -68,7 +68,7 @@ class LoggingMiddleware(BaseHTTPMiddleware):
 
 def load_models_and_artifacts_in_cache():
     logging.info("Loading models and artifacts in cache...")
-    get_classifier_model(settings=settings)
+    get_text_classifier_model(settings=settings)
     get_french_words(settings=settings)
     get_language_detector_model(settings=settings)
     get_translator_model(settings=settings)

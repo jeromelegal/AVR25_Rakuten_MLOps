@@ -7,7 +7,7 @@ import mlflow
 
 
 @lru_cache
-def get_classifier_model(settings: Annotated[Settings, Depends(get_settings)]):
+def get_text_classifier_model(settings: Annotated[Settings, Depends(get_settings)]):
 
     model_name = settings.MLFLOW_TEXT_CLASSIFIER_MODEL_NAME
     model_version = settings.MLFLOW_TEXT_CLASSIFIER_MODEL_VERSION
