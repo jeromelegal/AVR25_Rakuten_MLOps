@@ -3,7 +3,7 @@ run-name: Test AVR25 Rakuten MLOps actions started by ${{ github.actor }}
 on:
   push:
     branches:
-      - '*'
+      - 'master'
   pull_request:
     types:
       - opened
