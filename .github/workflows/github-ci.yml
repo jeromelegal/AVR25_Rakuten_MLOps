@@ -13,7 +13,7 @@ env:
   FORCE_COLOR: "1"
 jobs:
   clear-containers:
-    runs-on: [self-hosted]
+    runs-on: [self-hosted, phil-host]
     strategy:
       matrix:
         service: [vault, consul, mongodb, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
@@ -27,17 +27,19 @@ jobs:
         run: |
           VERSION=${{ steps.get_version.outputs.VERSION }}
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          BRANCH_NAME=${BRANCH_NAME//\//-}
           TAG="${BRANCH_NAME}-${VERSION}"
           docker stop ${{ matrix.service }}-${BRANCH_NAME}|| true
           docker rm ${{ matrix.service }}-${BRANCH_NAME} || true
 
   clear-network:
-    runs-on: [self-hosted]
+    runs-on: [self-hosted, phil-host]
     needs: [clear-containers]
     steps:
       - name: Remove Docker network
         run: |
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          BRANCH_NAME=${BRANCH_NAME//\//-}
           NETWORK_NAME="network-${BRANCH_NAME}"
           # docker network rm $NETWORK_NAME #|| true  # Ignore l'erreur si le réseau n'existe pas ou ne peut pas être supprimé
           if docker network inspect $NETWORK_NAME &> /dev/null; then
@@ -47,17 +49,18 @@ jobs:
           fi
 
   create-network:
-    runs-on: [self-hosted]
+    runs-on: [self-hosted, phil-host]
     needs: [clear-containers, clear-network]
     steps:
       - name: Create Docker network
         run: |
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          BRANCH_NAME=${BRANCH_NAME//\//-}
           NETWORK_NAME="network-${BRANCH_NAME}"
           docker network create $NETWORK_NAME || true # Ignore if network exists
 
   build:
-    runs-on: [self-hosted]
+    runs-on: [self-hosted, phil-host]
     needs: [clear-containers]
     strategy:
       matrix:
@@ -83,12 +86,13 @@ jobs:
         run: |
           VERSION=${{ steps.get_version.outputs.VERSION }}
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          BRANCH_NAME=${BRANCH_NAME//\//-}
           TAG="${BRANCH_NAME}-${VERSION}"
           cd src/${{ matrix.service }}
           docker build -t ${{ matrix.service }}:$TAG .
 
   start-containers:
-    runs-on: [self-hosted]
+    runs-on: [self-hosted, phil-host]
     needs: [create-network, build]
     strategy:
       matrix:
@@ -105,6 +109,7 @@ jobs:
         run: |
           VERSION=${{ steps.get_version.outputs.VERSION }}
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          BRANCH_NAME=${BRANCH_NAME//\//-}
           TAG="${BRANCH_NAME}-${VERSION}"
           NETWORK_NAME="network-${BRANCH_NAME}"
           CONTAINER_NAME="${{ matrix.service }}-${BRANCH_NAME}"
@@ -154,7 +159,7 @@ jobs:
           fi
 
   health-check-containers:
-    runs-on: [self-hosted]
+    runs-on: [self-hosted, phil-host]
     needs: start-containers
     strategy:
       matrix:
@@ -171,6 +176,7 @@ jobs:
           set +e
           VERSION=${{ steps.get_version.outputs.VERSION }}
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          BRANCH_NAME=${BRANCH_NAME//\//-}
           NETWORK_NAME="network-${BRANCH_NAME}"
 
           # Initialiser des tableaux pour stocker les URLs et les codes attendus
@@ -234,7 +240,7 @@ jobs:
           done
 
   stop-containers:
-    runs-on: [self-hosted]
+    runs-on: [self-hosted, phil-host]
     needs: health-check-containers
     strategy:
       matrix:
@@ -249,17 +255,19 @@ jobs:
         run: |
           VERSION=${{ steps.get_version.outputs.VERSION }}
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          BRANCH_NAME=${BRANCH_NAME//\//-}
           # Arrêter et retirer le conteneur
           docker stop ${{ matrix.service }}-${BRANCH_NAME} || true
           docker rm ${{ matrix.service }}-${BRANCH_NAME} || true
 
   remove-network:
-    runs-on: [self-hosted]
+    runs-on: [self-hosted, phil-host]
     needs: stop-containers  
     steps:
       - name: Remove Docker network
         run: |
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          BRANCH_NAME=${BRANCH_NAME//\//-}
           NETWORK_NAME="network-${BRANCH_NAME}"
           if docker network inspect $NETWORK_NAME &> /dev/null; then
             docker network rm $NETWORK_NAME
