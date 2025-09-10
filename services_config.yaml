@@ -1,6 +1,5 @@
 services:
   vault:
-    run_as_root: true
     expose_ports:
       - 8200
       - 8201

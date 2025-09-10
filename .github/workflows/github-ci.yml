@@ -3,7 +3,7 @@ run-name: Test AVR25 Rakuten MLOps actions started by ${{ github.actor }}
 on:
   push:
     branches:
-      - '*'  # Cela signifie toutes les branches
+      - 'master'
   pull_request:
     types:
       - opened
@@ -12,11 +12,9 @@ on:
 env:
   FORCE_COLOR: "1"
 jobs:
-
   clear-containers:
-    runs-on: [self-hosted, phil-host]
+    runs-on: [self-hosted]
     strategy:
-      # max-parallel: 10
       matrix:
         service: [vault, consul, mongodb, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
     steps:
@@ -29,18 +27,12 @@ jobs:
         run: |
           VERSION=${{ steps.get_version.outputs.VERSION }}
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
-          # TAG="${VERSION}-${BRANCH_NAME}"
           TAG="${BRANCH_NAME}-${VERSION}"
-          # Arrêter et retirer le conteneur
-          # docker stop ${{ matrix.service }}-${BRANCH_NAME}-${VERSION} || true
-          # docker rm ${{ matrix.service }}-${BRANCH_NAME}-${VERSION} || true
           docker stop ${{ matrix.service }}-${BRANCH_NAME}|| true
           docker rm ${{ matrix.service }}-${BRANCH_NAME} || true
 
-
-
   clear-network:
-    runs-on: [self-hosted, phil-host]
+    runs-on: [self-hosted]
     needs: [clear-containers]
     steps:
       - name: Remove Docker network
@@ -54,9 +46,8 @@ jobs:
             echo "Réseau $NETWORK_NAME n'existe pas, pas besoin de le supprimer."
           fi
 
-
   create-network:
-    runs-on: [self-hosted, phil-host]
+    runs-on: [self-hosted]
     needs: [clear-containers, clear-network]
     steps:
       - name: Create Docker network
@@ -65,11 +56,8 @@ jobs:
           NETWORK_NAME="network-${BRANCH_NAME}"
           docker network create $NETWORK_NAME || true # Ignore if network exists
 
-
-
-
   build:
-    runs-on: [self-hosted, phil-host]
+    runs-on: [self-hosted]
     needs: [clear-containers]
     strategy:
       matrix:
@@ -95,17 +83,13 @@ jobs:
         run: |
           VERSION=${{ steps.get_version.outputs.VERSION }}
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
-          # TAG="${VERSION}-${BRANCH_NAME}"
           TAG="${BRANCH_NAME}-${VERSION}"
           cd src/${{ matrix.service }}
           docker build -t ${{ matrix.service }}:$TAG .
 
-
-
-
   start-containers:
-    runs-on: [self-hosted, phil-host]
-    needs: [create-network, build] # Ce job dépend de la réussite du job "build"
+    runs-on: [self-hosted]
+    needs: [create-network, build]
     strategy:
       matrix:
         service: [vault, consul, mongodb, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
@@ -121,19 +105,10 @@ jobs:
         run: |
           VERSION=${{ steps.get_version.outputs.VERSION }}
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
-          # TAG="${VERSION}-${BRANCH_NAME}"
           TAG="${BRANCH_NAME}-${VERSION}"
-          # CONTAINER_NAME="${{ matrix.service }}-${BRANCH_NAME}-${VERSION}"
+          NETWORK_NAME="network-${BRANCH_NAME}"
           CONTAINER_NAME="${{ matrix.service }}-${BRANCH_NAME}"
           CONFIG=$(/usr/local/bin/yq eval ".services.${{ matrix.service }}" services_config.yaml)
-          RUN_AS_ROOT=$(/usr/local/bin/yq eval ".run_as_root" <<< "$CONFIG")
-          NETWORK_NAME="network-${BRANCH_NAME}"
-          if [ -z "$RUN_AS_ROOT" ] || [ "$RUN_AS_ROOT" = "null" ]; then
-            RUN_AS_ROOT=false
-          fi
-
-          NETWORK_ALIASES=$(/usr/local/bin/yq eval ".network-alias // []" <<< "$CONFIG" || echo "")
-
 
           ENV_VARS=""
           # Traiter les env_vars existantes
@@ -142,7 +117,6 @@ jobs:
               echo "Clé: $key, Valeur: $processed_value"
               ENV_VARS+=" -e $key=$processed_value"
           done < <(yq eval ".services.${{ matrix.service }}.env_vars | to_entries | .[] | \"\(.key) \(.value)\"" services_config.yaml)
-
 
           CAP_ADD=$(/usr/local/bin/yq eval ".cap_add | join(\",\")" <<< "$CONFIG" || true)
           CAP_OPTIONS=""
@@ -159,27 +133,28 @@ jobs:
                   EXPOSE_OPTIONS+=" --expose=$port"
               done
           fi
-          echo "DEBUG: EXPOSE_OPTIONS=$EXPOSE_OPTIONS"
 
-          echo "Running with:"
-          echo "docker run -d --user root $CAP_OPTIONS --name $CONTAINER_NAME $EXPOSE_OPTIONS $ENV_VARS ${{ matrix.service }}:$TAG"
+          RUN_AS_ROOT=$(/usr/local/bin/yq eval ".run_as_root" <<< "$CONFIG")
+          if [ -z "$RUN_AS_ROOT" ] || [ "$RUN_AS_ROOT" = "null" ]; then
+            RUN_AS_ROOT=false
+          fi
+
           if [ "$RUN_AS_ROOT" = true ]; then
             docker run -d --user root $CAP_OPTIONS --name $CONTAINER_NAME  $EXPOSE_OPTIONS $ENV_VARS ${{ matrix.service }}:$TAG
           else
             docker run -d $CAP_OPTIONS --name $CONTAINER_NAME $ENV_VARS ${{ matrix.service }}:$TAG
           fi
 
+          NETWORK_ALIASES=$(/usr/local/bin/yq eval ".network-alias // []" <<< "$CONFIG" || echo "")
           # Ajout des alias réseau après le démarrage du conteneur
           if [ -n "$NETWORK_ALIASES" ] && [ "$NETWORK_ALIASES" != "null" ]; then
               for alias in $(echo "$NETWORK_ALIASES" | /usr/local/bin/yq eval '.[]' - 2>/dev/null); do
-                  echo "Ajout de l'alias $alias pour $CONTAINER_NAME sur $NETWORK_NAME"
                   docker network connect --alias "$alias" "$NETWORK_NAME" "$CONTAINER_NAME" || echo "Erreur lors de l'ajout de l'alias $alias"
               done
           fi
 
-
   health-check-containers:
-    runs-on: [self-hosted, phil-host]
+    runs-on: [self-hosted]
     needs: start-containers
     strategy:
       matrix:
@@ -196,31 +171,7 @@ jobs:
           set +e
           VERSION=${{ steps.get_version.outputs.VERSION }}
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
-          echo "Version: $VERSION"
-          echo "Branch Name: $BRANCH_NAME"
           NETWORK_NAME="network-${BRANCH_NAME}"
-
-
-          # HEALTH_CHECK=$(/usr/local/bin/yq eval ".services.${{ matrix.service }}.health_check.urls" services_config.yaml)
-          # echo "Health Check Config: $HEALTH_CHECK"
-
-          # echo "$HEALTH_CHECK" | /usr/local/bin/yq eval '.[]' | while read -r check; do
-          #   echo "check= $check"
-          #   URL=$(/usr/local/bin/yq eval '.url' <<< "$check")
-          #   EXPECTED_CODE=$(/usr/local/bin/yq eval '.expected_code' <<< "$check")
-          #   # Ajouter URL au tableau si elle n'est pas nulle
-          #   if [ -n "$URL" ]; then
-          #     URLS+=("$URL")
-          #   fi
-
-          #   # Ajouter expected_code au tableau s'il n'est pas nul
-          #   if [ -n "$EXPECTED_CODE" ]; then
-          #     EXPECTED_CODES+=("$EXPECTED_CODE")
-          #   fi
-          # done
-          # echo "EXPECTED_CODES = $EXPECTED_CODES"
-          # echo "URL = $URL"
-
 
           # Initialiser des tableaux pour stocker les URLs et les codes attendus
           URLS=()
@@ -228,7 +179,6 @@ jobs:
 
           # Récupérer tous les couples URL et code attendu
           while IFS= read -r check; do
-            echo "check -> $check"
             # Extraire les valeurs pour url et expected_code
             URL=$(/usr/local/bin/yq eval '.url' <<< "$check")
             EXPECTED_CODE=$(/usr/local/bin/yq eval '.expected_code' <<< "$check")
@@ -244,17 +194,6 @@ jobs:
             fi
           done < <(/usr/local/bin/yq eval ".services.${{ matrix.service }}.health_check.urls | .[]" services_config.yaml)
 
-          # Affichage des URLs et des codes pour vérification
-          echo "URLs:"
-          for url in "${URLS[@]}"; do
-            echo "$url"
-          done
-
-          echo "Expected Codes:"
-          for code in "${EXPECTED_CODES[@]}"; do
-            echo "$code"
-          done
-
           # Boucle infinie pour vérifier la santé des URLs
           while true; do
             all_healthy=true
@@ -264,11 +203,6 @@ jobs:
                 URL="${URLS[i]}"
                 EXPECTED_CODE="${EXPECTED_CODES[i]}"
                 echo "Checking URL: $URL with expected code: $EXPECTED_CODE"
-
-                # Exécuter curl depuis un conteneur sur le réseau spécifié
-                # echo "docker run --rm --network $NETWORK_NAME --name ${{ matrix.service }}-$BRANCH_NAME-curl curlimages/curl curl -s -k -o /dev/null -w %{http_code} $URL"
-                # docker run --rm --network "$NETWORK_NAME"  --name "${{ matrix.service }}-$BRANCH_NAME-curl" curlimages/curl curl -s -k -o /dev/null -w "%{http_code}" "$URL"
-                # HTTP_CODE=$(docker run --rm --network "$NETWORK_NAME"  --name "${{ matrix.service }}-$BRANCH_NAME-curl" curlimages/curl curl -s -k -o /dev/null -w "%{http_code}" "$URL")
 
                 # Essayer d'obtenir le code HTTP
                 if HTTP_CODE=$(docker run --rm --network "$NETWORK_NAME" --name "${{ matrix.service }}-$BRANCH_NAME-curl" curlimages/curl curl -s -k -o /dev/null -w "%{http_code}" "$URL"); then
@@ -287,18 +221,6 @@ jobs:
                 else
                   echo "$URL is healthy."
                 fi
-
-                if [ "$?" -ne 0 ]; then
-                  echo "Error occurred while accessing $URL"
-                  all_healthy=false
-                  continue
-                fi
-                if [ "$HTTP_CODE" -ne "$EXPECTED_CODE" ]; then
-                  echo "Waiting for $URL to be healthy. Current HTTP code: $HTTP_CODE"
-                  all_healthy=false
-                else
-                  echo "$URL is healthy."
-                fi
               else
                 echo "Skipping check for URL ${URLS[i]} as there is no corresponding expected code."
                 all_healthy=false
@@ -311,11 +233,9 @@ jobs:
             sleep 1
           done
 
-
-
   stop-containers:
-    runs-on: [self-hosted, phil-host]
-    needs: health-check-containers  # Ce job dépend de la réussite du job "start-containers"
+    runs-on: [self-hosted]
+    needs: health-check-containers
     strategy:
       matrix:
         service: [vault, consul, mongodb, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
@@ -333,362 +253,16 @@ jobs:
           docker stop ${{ matrix.service }}-${BRANCH_NAME} || true
           docker rm ${{ matrix.service }}-${BRANCH_NAME} || true
 
-
-
-
   remove-network:
-    runs-on: [self-hosted, phil-host]
-    needs: stop-containers  # Assure que tous les conteneurs sont arrêtés et retirés avant de supprimer le réseau
+    runs-on: [self-hosted]
+    needs: stop-containers  
     steps:
       - name: Remove Docker network
         run: |
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
           NETWORK_NAME="network-${BRANCH_NAME}"
-          # docker network rm $NETWORK_NAME #|| true  # Ignore l'erreur si le réseau n'existe pas ou ne peut pas être supprimé
           if docker network inspect $NETWORK_NAME &> /dev/null; then
             docker network rm $NETWORK_NAME
           else
             echo "Réseau $NETWORK_NAME n'existe pas, pas besoin de le supprimer."
           fi
-
-
-
-
-      # - name: Start containers
-      #   run: |
-      #     VERSION=${{ steps.get_version.outputs.VERSION }}
-      #     BRANCH_NAME=${GITHUB_REF#refs/heads/}
-      #     TAG="${VERSION}-${BRANCH_NAME}"
-      #     # Extraire les variables pour le service actuel
-      #     CONFIG=$(yq eval ".services.${{ matrix.service }}.env_vars" services_config.yaml)
-      #     ENV_VARS=""
-      #     # Générer les arguments -e pour docker run
-      #     echo "$CONFIG" | yq eval '. | to_entries | .[]' | while read -r line; do
-      #       key=$(echo "$line" | yq eval '.key' -)
-      #       value=$(echo "$line" | yq eval '.value' -)
-
-      #       # Remplacer les placeholders par leurs valeurs
-      #       value=${value//\${BRANCH_NAME}/$BRANCH_NAME}
-      #       value=${value//\${VERSION}/$VERSION}
-      #       ENV_VARS+=" -e $key=\"$value\""
-      #     done
-      #     # Démarrer le conteneur avec les variables d'environnement
-      #     docker run -d --name ${{ matrix.service }} $ENV_VARS ${{ matrix.service }}:$TAG
-
-# name: AVR25 Rakuten MLOps - CI
-# run-name: Test AVR25 Rakuten MLOps actions started by ${{ github.actor }}
-# on:
-#   push:
-#     branches:
-#       - master
-#   pull_request:
-#     types:
-#       - opened
-#       - reopened
-#       - synchronize
-# env:
-#   FORCE_COLOR: "1"
-
-# jobs:
-#   build:
-#     runs-on: [self-hosted]
-#     strategy:
-#       max-parallel: 10
-#       matrix:
-#         service: [vault consul mongo api-mongodb postgresql api-postgresql api-gateway frontend reverse-proxy minio api-minio]
-#     permissions:
-#       contents: 'read'
-#       id-token: 'write'
-#     steps:
-#       - name: Check out repository code
-#         uses: actions/checkout@v4
-#       - name: Set up Docker Buildx
-#         uses: docker/setup-buildx-action@v3
-#         with:
-#           driver-opts: |
-#             image=moby/buildkit:v0.16.0
-#       - name: Set up Docker Compose
-#         uses: docker/setup-compose-action@v1
-#       - name: Start services
-#         run: |
-#           docker compose up -d --build --force-recreate ${{ matrix.service }}
-
-#   # build-vault:
-#   #   runs-on: [self-hosted]
-#   #   permissions:
-#   #     contents: 'read'
-#   #     id-token: 'write'
-#   #   steps:
-#   #     - name: Check out repository code
-#   #       uses: actions/checkout@v4
-#   #     - name: Set up Docker Buildx
-#   #       uses: docker/setup-buildx-action@v3
-#   #       with:
-#   #         driver-opts: |
-#   #           image=moby/buildkit:v0.16.0
-#   #     - name: Set up Docker Compose
-#   #       uses: docker/setup-compose-action@v1
-#   #     - name: Start services
-#   #       run: |
-#   #         docker compose up -d --build --force-recreate vault
-
-#   # build-consul:
-#   #   runs-on: [self-hosted]
-#   #   permissions:
-#   #     contents: 'read'
-#   #     id-token: 'write'
-#   #   steps:
-#   #     - name: Check out repository code
-#   #       uses: actions/checkout@v4
-#   #     - name: Set up Docker Buildx
-#   #       uses: docker/setup-buildx-action@v3
-#   #       with:
-#   #         driver-opts: |
-#   #           image=moby/buildkit:v0.16.0
-#   #     - name: Set up Docker Compose
-#   #       uses: docker/setup-compose-action@v1
-#   #     - name: Start services
-#   #       run: |
-#   #         docker compose up -d --build --force-recreate consul
-
-#   # build-mongo:
-#   #   runs-on: [self-hosted]
-#   #   permissions:
-#   #     contents: 'read'
-#   #     id-token: 'write'
-#   #   steps:
-#   #     - name: Check out repository code
-#   #       uses: actions/checkout@v4
-#   #     - name: Set up Docker Buildx
-#   #       uses: docker/setup-buildx-action@v3
-#   #       with:
-#   #         driver-opts: |
-#   #           image=moby/buildkit:v0.16.0
-#   #     - name: Set up Docker Compose
-#   #       uses: docker/setup-compose-action@v1
-#   #     - name: Start services
-#   #       run: |
-#   #         docker compose up -d --build --force-recreate mongo
-
-#   # build-postgresql:
-#   #   runs-on: [self-hosted]
-#   #   permissions:
-#   #     contents: 'read'
-#   #     id-token: 'write'
-#   #   steps:
-#   #     - name: Check out repository code
-#   #       uses: actions/checkout@v4
-#   #     - name: Set up Docker Buildx
-#   #       uses: docker/setup-buildx-action@v3
-#   #       with:
-#   #         driver-opts: |
-#   #           image=moby/buildkit:v0.16.0
-#   #     - name: Set up Docker Compose
-#   #       uses: docker/setup-compose-action@v1
-#   #     - name: Start services
-#   #       run: |
-#   #         docker compose up -d --build --force-recreate postgresql
-
-#   # build-minio:
-#   #   runs-on: [self-hosted]
-#   #   permissions:
-#   #     contents: 'read'
-#   #     id-token: 'write'
-#   #   steps:
-#   #     - name: Check out repository code
-#   #       uses: actions/checkout@v4
-#   #     - name: Set up Docker Buildx
-#   #       uses: docker/setup-buildx-action@v3
-#   #       with:
-#   #         driver-opts: |
-#   #           image=moby/buildkit:v0.16.0
-#   #     - name: Set up Docker Compose
-#   #       uses: docker/setup-compose-action@v1
-#   #     - name: Start services
-#   #       run: |
-#   #         docker compose up -d --build --force-recreate minio
-
-#   # build-frontend:
-#   #   runs-on: [self-hosted]
-#   #   permissions:
-#   #     contents: 'read'
-#   #     id-token: 'write'
-#   #   steps:
-#   #     - name: Check out repository code
-#   #       uses: actions/checkout@v4
-#   #     - name: Set up Docker Buildx
-#   #       uses: docker/setup-buildx-action@v3
-#   #       with:
-#   #         driver-opts: |
-#   #           image=moby/buildkit:v0.16.0
-#   #     - name: Set up Docker Compose
-#   #       uses: docker/setup-compose-action@v1
-#   #     - name: Start services
-#   #       run: |
-#   #         docker compose up -d --build --force-recreate frontend
-
-#   # build-reverse-proxy:
-#   #   runs-on: [self-hosted]
-#   #   permissions:
-#   #     contents: 'read'
-#   #     id-token: 'write'
-#   #   steps:
-#   #     - name: Check out repository code
-#   #       uses: actions/checkout@v4
-#   #     - name: Set up Docker Buildx
-#   #       uses: docker/setup-buildx-action@v3
-#   #       with:
-#   #         driver-opts: |
-#   #           image=moby/buildkit:v0.16.0
-#   #     - name: Set up Docker Compose
-#   #       uses: docker/setup-compose-action@v1
-#   #     - name: Start services
-#   #       run: |
-#   #         docker compose up -d --build --force-recreate reverse-proxy
-
-#   # build-api-minio:
-#   #   runs-on: [self-hosted]
-#   #   permissions:
-#   #     contents: 'read'
-#   #     id-token: 'write'
-#   #   steps:
-#   #     - name: Check out repository code
-#   #       uses: actions/checkout@v4
-#   #     - name: Set up Docker Buildx
-#   #       uses: docker/setup-buildx-action@v3
-#   #       with:
-#   #         driver-opts: |
-#   #           image=moby/buildkit:v0.16.0
-#   #     - name: Set up Docker Compose
-#   #       uses: docker/setup-compose-action@v1
-#   #     - name: Start services
-#   #       run: |
-#   #         docker compose up -d --build --force-recreate api-minio
-
-#   # build-api-mongodb:
-#   #   runs-on: [self-hosted]
-#   #   permissions:
-#   #     contents: 'read'
-#   #     id-token: 'write'
-#   #   steps:
-#   #     - name: Check out repository code
-#   #       uses: actions/checkout@v4
-#   #     - name: Set up Docker Buildx
-#   #       uses: docker/setup-buildx-action@v3
-#   #       with:
-#   #         driver-opts: |
-#   #           image=moby/buildkit:v0.16.0
-#   #     - name: Set up Docker Compose
-#   #       uses: docker/setup-compose-action@v1
-#   #     - name: Start services
-#   #       run: |
-#   #         docker compose up -d --build --force-recreate api-mongodb
-
-#   # build-api-postgresql:
-#   #   runs-on: [self-hosted]
-#   #   permissions:
-#   #     contents: 'read'
-#   #     id-token: 'write'
-#   #   steps:
-#   #     - name: Check out repository code
-#   #       uses: actions/checkout@v4
-#   #     - name: Set up Docker Buildx
-#   #       uses: docker/setup-buildx-action@v3
-#   #       with:
-#   #         driver-opts: |
-#   #           image=moby/buildkit:v0.16.0
-#   #     - name: Set up Docker Compose
-#   #       uses: docker/setup-compose-action@v1
-#   #     - name: Start services
-#   #       run: |
-#   #         docker compose up -d --build --force-recreate api-postgresql
-
-
-#   tests:
-#     runs-on: [self-hosted]
-#     # needs: [build-vault, build-consul, build-mongo, build-postgresql, build-minio, build-frontend, build-reverse-proxy, build-api-minio, build-api-mongodb, build-api-postgresql]
-#     needs: [build]
-#     permissions:
-#       contents: 'read'
-#       id-token: 'write'
-#     steps:
-#       - name: Check out repository code
-#         uses: actions/checkout@v4
-#       - name: Set up Docker Buildx
-#         uses: docker/setup-buildx-action@v3
-#         with:
-#           driver-opts: |
-#             image=moby/buildkit:v0.16.0
-#       - name: Set up Docker Compose
-#         uses: docker/setup-compose-action@v1
-#       # - name: Start services
-#       #   run: |
-#       #     docker compose up -d --build --force-recreate
-#       - name: Wait for services to be up
-#         run: |
-#           sleep 120
-#       - name: Launch unit tests
-#         run: |
-#           sh scripts/launch_test.sh
-#       # - name: Set python version
-#       #   uses: actions/setup-python@v5
-#       #   with:
-#       #     python-version: "3.12.3"
-#       # - name: Setting up Python environment
-#       #   run: |
-#       #     mkdir coverage
-#       #     pip install pipenv
-#       #     pipenv install --dev --ignore-pipfile
-#       # - name: Linting API
-#       #   run: |
-#       #     # printing linter configuration
-#       #     echo --------------------------
-#       #     echo "Executing linter with the following error code disabled"
-#       #     echo "  - C0111: Missing docstrings"
-#       #     echo "  - R0902: Too many instance attributes"
-#       #     echo "  - W0511: Fix me"
-#       #     echo "  - W0702: No exception type(s) specified"
-#       #     echo "  - R0913: Too many arguments"
-#       #     echo "  - R0903: Too few public methods"
-#       #     echo "  - R0904: Too many public methods"
-#       #     echo "  - R0912: Too many branches"
-#       #     echo "  - R0801: Similar lines in 2 files"
-#       #     echo "  - W1514: Using open without explicitly specifying an encoding"
-#       #     echo "  - R0916: Too many boolean expressions in if statement"
-#       #     echo "  - R0901: Too many ancestors"
-#       #     echo --------------------------
-#       #     pipenv run pylint --disable=C0111,R0902,W0511,W0702,R0913,R0903,R0904,R0912,R0801,W1514,R0916,R0901 app
-#       # - name: Running API tests
-#       #   run: pipenv run pytest --capture=sys --cov-report term-missing --cov=app tests | tee coverage/coverage.txt
-#       - name: Archive CI test results
-#         uses: actions/upload-artifact@v4
-#         if: always()
-#         with:
-#           name: ci-test_results
-#           path: test_results/*test_result.xml
-#       - name: Archive CI code coverages
-#         uses: actions/upload-artifact@v4
-#         if: always()
-#         with:
-#           name: ci-test_coverages
-#           path: test_results/*test_coverage.xml
-
-#   stop-services:
-#     runs-on: [self-hosted]
-#     needs: [tests]
-#     permissions:
-#       contents: 'read'
-#       id-token: 'write'
-#     steps:
-#       - name: Check out repository code
-#         uses: actions/checkout@v4
-#       - name: Set up Docker Buildx
-#         uses: docker/setup-buildx-action@v3
-#         with:
-#           driver-opts: |
-#             image=moby/buildkit:v0.16.0
-#       - name: Set up Docker Compose
-#         uses: docker/setup-compose-action@v1
-#       - name: Stop services
-#         run: |
-#           docker compose down
