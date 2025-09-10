@@ -255,7 +255,7 @@ jobs:
 
   stop-containers:
     runs-on: [self-hosted, phil-host]
-    needs: health-check-containers
+    needs: [tests, lint]
     strategy:
       matrix:
         service: [vault, consul, mongodb, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
