@@ -1,6 +1,5 @@
 from fastapi import FastAPI
 from api import main
-from api.minio.entity import images
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
@@ -12,6 +11,7 @@ from api.config.model_loader import (
     get_language_detector_model,
     get_translator_model,
 )
+from api.text_processing import processing
 
 from jose import JWTError, jwt
 
@@ -92,4 +92,4 @@ app.add_middleware(InternalAccessMiddleware)
 app.add_middleware(LoggingMiddleware)
 
 app.include_router(main.router)
-app.include_router(images.router)
+app.include_router(processing.router)

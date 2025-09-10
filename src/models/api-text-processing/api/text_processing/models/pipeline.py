@@ -6,7 +6,6 @@ from bs4 import MarkupResemblesLocatorWarning
 from ftfy import fix_text
 import re
 import unicodedata
-
 from sklearn.base import BaseEstimator, TransformerMixin
 import pandas as pd
 from tqdm import tqdm
@@ -26,21 +25,18 @@ import warnings
 
 from sklearn.pipeline import Pipeline
 
+from api.config.config import get_settings
+from api.config.model_loader import get_french_words, get_translator_model
+
 tqdm.pandas()
 
-
-MODEL = fasttext.load_model("data/models/lid.176.bin")
-MODEL_DIR = "data/models/distilbert"
 warnings.filterwarnings("ignore", category=MarkupResemblesLocatorWarning)
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 ##### Variables  and constants #####
+
 # key words for clean_text (delete complete line)
 key_words_to_delete = [r"\battention\s*!{3}\b"]
-
-# load french dictionary
-with open("data/index.json", "r", encoding="utf-8") as f:
-    FRENCH_WORDS = set(json.load(f))
 
 # french words to detect and force FR language
 FRENCH_HINTS = {
@@ -155,11 +151,6 @@ def clean_text_basic(texte):
     Return:
         text cleaned
     """
-    import re, html
-    import numpy as np
-    from bs4 import BeautifulSoup
-    from ftfy import fix_text  # type: ignore
-
     if not isinstance(texte, str):
         return texte
     # clean invisible characters
@@ -290,7 +281,9 @@ def detect_language(text, fasttext_model):
     # FR heuristic
     if any(word in FRENCH_HINTS for word in tokens):
         return ("fr", 0.6)
-    fr_words_in_text = [word for word in tokens if word in FRENCH_WORDS]
+    fr_words_in_text = [
+        word for word in tokens if word in get_french_words(settings=get_settings())
+    ]
     fr_hint_count = len(fr_words_in_text)
     hint_ratio = fr_hint_count / word_count if word_count else 0
     if fr_hint_count >= 3 and hint_ratio > 0.4:
@@ -306,27 +299,11 @@ def detect_language(text, fasttext_model):
         return ("fr", 0.0)
 
 
-# translation
-
-# memory monitoring
-# def log_mem(prefix=""):
-#     try:
-#         ram = psutil.Process(os.getpid()).memory_info().rss // (1024**2)
-#         print(f"{prefix}RAM used: {ram} MB")
-#         if torch.cuda.is_available():
-#             print(f"{prefix}VRAM used: {torch.cuda.memory_allocated() // (1024**2)} MB / {torch.cuda.get_device_properties(0).total_memory // (1024**2)} MB")
-#     except Exception as e:
-#         print(f"{prefix}Memory log error: {e}")
-
-
-# load tokenizer and model
+@lru_cache
 def load_translation_model():
-    from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
-
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    translate_model_name = "data/models/nllb-200"
-    tokenizer = AutoTokenizer.from_pretrained(translate_model_name)
-    model = AutoModelForSeq2SeqLM.from_pretrained(translate_model_name).to(device)
+    model, tokenizer = get_translator_model(settings=get_settings())
+    model = model.to(device)
     return tokenizer, model, device
 
 
@@ -465,16 +442,15 @@ def batch_translate_texts(
 # translate
 def translate_dataframe_with_cache(
     translated_df,
+    model,
+    tokenizer,
+    device,
     source_languages,
     tgt_lang_code,
     cache,
     chunk_max_tokens=512,
     batch_size=8,
 ):
-    # print("Translation step :")
-    tokenizer, model, device = load_translation_model()
-    # log_mem(prefix="[start] ")
-
     for language in source_languages:
         # print(f"Process forlang : {language}...")
         mask = (translated_df["src_languages"] == language) & translated_df[
@@ -556,11 +532,36 @@ def translate_dataframe_with_cache(
     return translated_df
 
 
-# %%
-
-
 ### Pipeline ###
-def full_process_english(df):
+def get_prepocess_pipeline(
+    language_detector, translator_model, translator_tokenizer, device
+):
+    # preprocess pipeline
+    return Pipeline(
+        [
+            ("full_cleaning", TextCleanerFull()),
+            (
+                "lang_detect",
+                LanguageDetector(
+                    text_col="full_cleaned_text", fasttext_model=language_detector
+                ),
+            ),
+            ("basic_cleaning", TextCleanerBasic(text_col="raw_text")),
+            (
+                "translation",
+                Translator(
+                    model=translator_model,
+                    tokenizer=translator_tokenizer,
+                    device=device,
+                ),
+            ),
+        ]
+    )
+
+
+def full_process_english(
+    df, language_detector, translator_model, translator_tokenizer, device
+):
     """
     preprocessing pipeline :
     - full cleaning
@@ -583,28 +584,48 @@ def full_process_english(df):
     )
     # delete '\n'
     text_merged = text_merged.str.replace(r"\s+", " ", regex=True).str.strip()
-    # preprocess pipeline
-    preprocess_pipeline = Pipeline(
-        [
-            ("full_cleaning", TextCleanerFull()),
-            ("lang_detect", LanguageDetector(text_col="full_cleaned_text")),
-            ("basic_cleaning", TextCleanerBasic(text_col="raw_text")),
-            ("translation", Translator()),
-        ]
+
+    preprocess_pipeline = get_prepocess_pipeline(
+        language_detector=language_detector,
+        translator_model=translator_model,
+        translator_tokenizer=translator_tokenizer,
+        device=device,
     )
+
     translated_df = preprocess_pipeline.fit_transform(
         pd.DataFrame({"text": text_merged})
     )
+
     en_serie = translated_df.apply(_find_en, axis=1)
     df_en = pd.DataFrame({"text": en_serie})
     return df_en
 
 
+@lru_cache
+def get_device():
+    return "cuda" if torch.cuda.is_available() else "cpu"
+
+
 def inference(
     df,
+    language_detector,
+    text_classifier,
+    text_tokenizer,
+    translator_model,
+    translator_tokenizer,
 ):
-    df_en = full_process_english(df)
-    clf = InferenceClassifier()
+    device = get_device()
+    #  TODO: See if we need to do -> translator_model = translator_model.to(device)
+    df_en = full_process_english(
+        df=df,
+        language_detector=language_detector,
+        translator_model=translator_model,
+        translator_tokenizer=translator_tokenizer,
+        device=device,
+    )
+    clf = InferenceClassifier(
+        model=text_classifier, tokenizer=text_tokenizer, device=device
+    )
     clf.fit(df_en)
     df_pred = clf.transform(df_en)
     clf.cleanup()
@@ -634,7 +655,7 @@ class TextCleanerFull(BaseEstimator, TransformerMixin):
 
 
 class LanguageDetector(BaseEstimator, TransformerMixin):
-    def __init__(self, fasttext_model=MODEL, text_col="full_cleaned_text"):
+    def __init__(self, fasttext_model, text_col="full_cleaned_text"):
         self.fasttext_model = fasttext_model
         self.text_col = text_col
 
@@ -680,6 +701,9 @@ class TextCleanerBasic(BaseEstimator, TransformerMixin):
 class Translator(BaseEstimator, TransformerMixin):
     def __init__(
         self,
+        model,
+        tokenizer,
+        device,
         source_languages=SOURCE_LANGUAGES,
         tgt_lang_code=TARGET_LANGUAGE,
         cache=CACHE_FILE,
@@ -692,6 +716,9 @@ class Translator(BaseEstimator, TransformerMixin):
                 self.cache = pickle.load(f)
         else:
             self.cache = {}
+        self.model = model
+        self.tokenizer = tokenizer
+        self.device = device
 
     def fit(self, X, y=None):
         return self
@@ -700,6 +727,9 @@ class Translator(BaseEstimator, TransformerMixin):
         X["src_languages"] = X["src_languages"].replace(LANG_CODE_MAP)
         df_translated = translate_dataframe_with_cache(
             X,
+            model=self.model,
+            tokenizer=self.tokenizer,
+            device=self.device,
             source_languages=self.source_languages,
             tgt_lang_code=self.tgt_lang_code,
             cache=self.cache,
@@ -710,33 +740,17 @@ class Translator(BaseEstimator, TransformerMixin):
 
 
 class InferenceClassifier(BaseEstimator, TransformerMixin):
-    def __init__(self, model_dir=MODEL_DIR, batch_size=32, use_gpu=True):
-        self.model_dir = model_dir
+    def __init__(self, model, tokenizer, device="cpu", batch_size=32, use_gpu=True):
         self.batch_size = batch_size
         self.use_gpu = use_gpu
-        self.model = None
-        self.tokenizer = None
+        self.model = model
+        self.tokenizer = tokenizer
+        self.device = device if use_gpu else "cpu"
 
     def fit(self, X, y=None):
-        import torch
-        from transformers import AutoModelForSequenceClassification, AutoTokenizer
-
-        self.model = AutoModelForSequenceClassification.from_pretrained(
-            self.model_dir, local_files_only=True
-        )
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            self.model_dir, local_files_only=True
-        )
-        self.model.eval()
-        self.device = torch.device(
-            "cuda" if self.use_gpu and torch.cuda.is_available() else "cpu"
-        )
-        self.model.to(self.device)
         return self
 
     def transform(self, X):
-        import torch
-
         df = X.copy()
         texts = df["text"].tolist()
         preds = []
@@ -761,8 +775,6 @@ class InferenceClassifier(BaseEstimator, TransformerMixin):
         return df
 
     def cleanup(self):
-        import torch, gc
-
         del self.model, self.tokenizer
         torch.cuda.empty_cache()
         gc.collect()
