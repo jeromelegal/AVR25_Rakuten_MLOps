@@ -176,6 +176,30 @@ services:
       VAULT_USERNAME: "api-image-processing-user"
       VAULT_PASSWORD: "api-image-processing-password"
 
+  api-text-processing:
+    build:
+      context: ./src/models/api-text-processing
+      dockerfile: Dockerfile
+    container_name: api-text-processing
+    ports:
+      - "8040:8040"
+    environment:
+      VAULT_ADDR: "https://vault:8200"
+      VAULT_USERNAME: "api-text-processing"
+      VAULT_PASSWORD: "api-text-processing"
+  
+  api-processing:
+    build:
+      context: ./src/models/api-processing
+      dockerfile: Dockerfile
+    container_name: api-processing
+    ports:
+      - "8050:8050"
+    environment:
+      VAULT_ADDR: "https://vault:8200"
+      VAULT_USERNAME: "api-processing"
+      VAULT_PASSWORD: "api-processing"
+
   # zookeeper:
   #   build:
   #     context: ./src/zookeeper
@@ -188,18 +212,6 @@ services:
   #   environment:
   #     ZOOKEEPER_CLIENT_PORT: 2181
   #     ZOOKEEPER_TICK_TIME: 2000
-  
-  api-text-processing:
-    build:
-      context: ./src/models/api-text-processing
-      dockerfile: Dockerfile
-    container_name: api-text-processing
-    ports:
-      - "8040:8040"
-    environment:
-      VAULT_ADDR: "https://vault:8200"
-      VAULT_USERNAME: "api-text-processing"
-      VAULT_PASSWORD: "api-text-processing"
 
 volumes:
   minio-volume:

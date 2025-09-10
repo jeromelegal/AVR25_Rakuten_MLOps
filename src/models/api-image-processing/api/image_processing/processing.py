@@ -3,17 +3,16 @@ from typing import Annotated, Any
 from .models.image_processing import get_images_predictions, Results
 from fastapi import APIRouter, Depends, File, HTTPException
 from api.config.model_loader import get_image_classifier_model
-
-VERSION = "0.0.1"
+from api.config.config import Settings, get_settings
 
 router = APIRouter()
 
 
 @router.get("/api/internal/api-image-processing")
-def get_version():
+def get_version(settings: Annotated[Settings, Depends(get_settings)]):
     return {
         "message": "Image prediction API - Rakuten Project AVR25",
-        "version": VERSION,
+        "version": settings.SERVICE_VERSION,
     }
 
 

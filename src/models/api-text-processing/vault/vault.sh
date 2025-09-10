@@ -177,3 +177,24 @@ EOF
 cat <<EOF > $TEXT_PROCESSING_API_MINIO_CA_PATH
 $(printf "%s" "$TEXT_PROCESSING_API_MINIO_CA")
 EOF
+
+# Ajouter les certificats pour l'API de processing générale
+if vault kv get -field=cert secret/api-text-processing/api-processing/certs > /dev/null 2>&1 && vault kv get -field=key secret/api-text-processing/api-processing/certs > /dev/null 2>&1; then
+  echo "Le certificat mTLS api-text-processing pour le service api-processing existe déjà"
+else
+  # Générer le certificat et la clé
+  echo "Générer le certificat et la clé"
+  vault write -format=json pki_api-text-processing/issue/api-text-processing common_name="api-text-processing"   ttl="72h" > api-text-processing_api-processing_cert.json
+
+  # Extraire le certificat et la clé privée
+  API_TEXT_PROCESSING_API_PROCESSING_CA=$(jq -r '.data.ca_chain[0]' api-text-processing_api-processing_cert.json)
+  API_TEXT_PROCESSING_API_PROCESSING_CERT=$(jq -r '.data.certificate' api-text-processing_api-processing_cert.json)
+  API_TEXT_PROCESSING_API_PROCESSING_KEY=$(jq -r '.data.private_key' api-text-processing_api-processing_cert.json)
+
+
+  # Enregistrer le certificat et la clé privée dans Vault
+  vault kv put secret/api-text-processing/api-processing/certs cert="$API_TEXT_PROCESSING_API_PROCESSING_CERT" key="$API_TEXT_PROCESSING_API_PROCESSING_KEY" ca="$API_TEXT_PROCESSING_API_PROCESSING_CA"
+
+  # Nettoyage des fichiers temporaires
+  rm -f api-text-processing_api-processing_cert.json
+fi

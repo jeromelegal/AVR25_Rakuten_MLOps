@@ -8,16 +8,15 @@ from api.text_processing.models.text_processing import (
     get_text_categories,
 )
 
-VERSION = "0.0.1"
 
 router = APIRouter()
 
 
 @router.get("/api/internal/api-text-processing")
-def get_version():
+def get_version(settings: Annotated[Settings, Depends(get_settings)]):
     return {
         "message": "Text prediction API - Rakuten Project AVR25",
-        "version": VERSION,
+        "version": settings.SERVICE_VERSION,
     }
 
 

@@ -115,7 +115,7 @@ else
 
 
   # Enregistrer le certificat et la clé privée dans Vault
-  vault kv put secret/api-image-processing/api-gateway/certs cert="$API_MINIO_API_GATEWAY_CERT" key="$API_MINIO_API_GATEWAY_KEY" ca="$API_MINIO_API_GATEWAY_CA"
+  vault kv put secret/api-image-processing/api-gateway/certs cert="$API_IMAGE_PROCESSING_API_GATEWAY_CERT" key="$API_IMAGE_PROCESSING_API_GATEWAY_KEY" ca="$API_IMAGE_PROCESSING_API_GATEWAY_CA"
 
   # Nettoyage des fichiers temporaires
   rm -f api-image-processing_api-gateway_cert.json
@@ -177,3 +177,24 @@ EOF
 cat <<EOF > $IMAGE_PROCESSING_API_MINIO_CA_PATH
 $(printf "%s" "$IMAGE_PROCESSING_API_MINIO_CA")
 EOF
+
+# Ajouter les certificats pour l'API de processing générale
+if vault kv get -field=cert secret/api-image-processing/api-processing/certs > /dev/null 2>&1 && vault kv get -field=key secret/api-image-processing/api-processing/certs > /dev/null 2>&1; then
+  echo "Le certificat mTLS api-image-processing pour le service api-processing existe déjà"
+else
+  # Générer le certificat et la clé
+  echo "Générer le certificat et la clé"
+  vault write -format=json pki_api-image-processing/issue/api-image-processing common_name="api-image-processing"   ttl="72h" > api-image-processing_api-processing_cert.json
+
+  # Extraire le certificat et la clé privée
+  API_IMAGE_PROCESSING_API_PROCESSING_CA=$(jq -r '.data.ca_chain[0]' api-image-processing_api-processing_cert.json)
+  API_IMAGE_PROCESSING_API_PROCESSING_CERT=$(jq -r '.data.certificate' api-image-processing_api-processing_cert.json)
+  API_IMAGE_PROCESSING_API_PROCESSING_KEY=$(jq -r '.data.private_key' api-image-processing_api-processing_cert.json)
+
+
+  # Enregistrer le certificat et la clé privée dans Vault
+  vault kv put secret/api-image-processing/api-processing/certs cert="$API_IMAGE_PROCESSING_API_PROCESSING_CERT" key="$API_IMAGE_PROCESSING_API_PROCESSING_KEY" ca="$API_IMAGE_PROCESSING_API_PROCESSING_CA"
+
+  # Nettoyage des fichiers temporaires
+  rm -f api-image-processing_api-processing_cert.json
+fi
