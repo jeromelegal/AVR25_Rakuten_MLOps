@@ -6,7 +6,6 @@ on:
 jobs:
   lint:
     runs-on: [self-hosted, phil-host]
-    needs: [start-containers]
     strategy:
         max-parallel: 10
         matrix:

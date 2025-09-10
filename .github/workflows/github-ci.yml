@@ -241,9 +241,17 @@ jobs:
   
   lint:
     uses: ./.github/workflows/github-lint.yml
+    needs: [start-containers]
+    permissions:
+      contents: 'read'
+      id-token: 'write'
   
   tests:
     uses: ./.github/workflows/github-unit-tests.yml
+    needs: [health-check-containers]
+    permissions:
+      contents: 'read'
+      id-token: 'write'
 
   stop-containers:
     runs-on: [self-hosted, phil-host]

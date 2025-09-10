@@ -5,7 +5,6 @@ on:
 jobs:
   tests-api-minio:
     runs-on: [self-hosted, phil-host, phil-host]
-    needs: [health-check-containers]
     permissions:
       contents: 'read'
       id-token: 'write'
@@ -30,7 +29,6 @@ jobs:
   
   tests-api-mongodb:
     runs-on: [self-hosted, phil-host]
-    needs: [health-check-containers]
     permissions:
       contents: 'read'
       id-token: 'write'
@@ -55,7 +53,6 @@ jobs:
 
   tests-api-postgresql:
     runs-on: [self-hosted, phil-host]
-    needs: [health-check-containers]
     permissions:
       contents: 'read'
       id-token: 'write'
@@ -80,7 +77,6 @@ jobs:
   
   tests-api-gateway:
     runs-on: [self-hosted, phil-host]
-    needs: [health-check-containers]
     permissions:
       contents: 'read'
       id-token: 'write'
