@@ -9,3 +9,13 @@ python-multipart
 anyio
 pydantic-settings
 mlflow
+transformers
+fasttext
+torch
+scikit-learn
+pandas
+tqdm
+psutil
+ftfy
+langdetect
+beautifulsoup4
