@@ -1,32 +1,4 @@
-# %%
-##### Pipelines #####
-
-# inference(df) : full classification (cleaning / detect lang / translate / classification)
-
-### NEED FILES ###
-# index.json : french dict
-# lid.176.bin : fasttext model
-# translation_cache_english.pkl : cache for translation
-# facebook/nllb-200-distilled-600M : translation model
-# distilbert-base-uncased : tokenize model
-
-
-# {
-#   "designation": [
-#     "Olivia: Personalized...",
-#       ...
-#   ],
-#   "description": [
-#     "Journal des Arts...",
-#     ...
-#   ]
-# }
-
-
-# %%
-##### Libraries #####
-
-### cleanning
+from functools import lru_cache
 import numpy as np
 import html
 from bs4 import BeautifulSoup
@@ -35,43 +7,34 @@ from ftfy import fix_text
 import re
 import unicodedata
 
-### class
 from sklearn.base import BaseEstimator, TransformerMixin
 import pandas as pd
 from tqdm import tqdm
 
-tqdm.pandas()
-
-### language detection
 import json
 from langdetect import detect_langs
 import fasttext
 
-### translation
 import pickle
 import hashlib
 import os
 
-# import psutil
 import torch
 
 import gc
 import warnings
 
-### pipeline
 from sklearn.pipeline import Pipeline
 
-# %%
+tqdm.pandas()
 
-##### Instances #####
+
 MODEL = fasttext.load_model("data/models/lid.176.bin")
 MODEL_DIR = "data/models/distilbert"
 warnings.filterwarnings("ignore", category=MarkupResemblesLocatorWarning)
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
-# %%
 
 ##### Variables  and constants #####
-
 # key words for clean_text (delete complete line)
 key_words_to_delete = [r"\battention\s*!{3}\b"]
 

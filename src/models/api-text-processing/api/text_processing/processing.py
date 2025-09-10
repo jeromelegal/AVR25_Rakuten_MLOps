@@ -1,15 +1,15 @@
 from typing import Annotated, Any
 
 from .models.image_processing import get_images_predictions, Results
-from fastapi import Depends, FastAPI, File, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException
 from api.config.model_loader import get_classifier_model, get_translator_model
 
 VERSION = "0.0.1"
 
-app = FastAPI()
+router = APIRouter()
 
 
-@app.post("/api/internal/api-text-processing/predict")
+@router.post("/api/internal/api-text-processing/predict")
 def get_categories(
     files: Annotated[list[bytes], File(description="Multiple files as bytes")],
     translator_model: Annotated[Any, Depends(get_translator_model)],
