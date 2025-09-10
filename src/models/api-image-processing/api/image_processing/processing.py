@@ -9,6 +9,14 @@ VERSION = "0.0.1"
 router = APIRouter()
 
 
+@router.get("/api/internal/api-image-processing")
+def get_version():
+    return {
+        "message": "Image prediction API - Rakuten Project AVR25",
+        "version": VERSION,
+    }
+
+
 @router.post("/api/internal/api-image-processing/predict")
 def get_categories(
     files: Annotated[list[bytes], File(description="Multiple files as bytes")],
