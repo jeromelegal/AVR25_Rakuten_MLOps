@@ -27,6 +27,7 @@ jobs:
         run: |
           VERSION=${{ steps.get_version.outputs.VERSION }}
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          BRANCH_NAME=${BRANCH_NAME//\//-}
           TAG="${BRANCH_NAME}-${VERSION}"
           docker stop ${{ matrix.service }}-${BRANCH_NAME}|| true
           docker rm ${{ matrix.service }}-${BRANCH_NAME} || true
@@ -38,6 +39,7 @@ jobs:
       - name: Remove Docker network
         run: |
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          BRANCH_NAME=${BRANCH_NAME//\//-}
           NETWORK_NAME="network-${BRANCH_NAME}"
           # docker network rm $NETWORK_NAME #|| true  # Ignore l'erreur si le réseau n'existe pas ou ne peut pas être supprimé
           if docker network inspect $NETWORK_NAME &> /dev/null; then
@@ -53,6 +55,7 @@ jobs:
       - name: Create Docker network
         run: |
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          BRANCH_NAME=${BRANCH_NAME//\//-}
           NETWORK_NAME="network-${BRANCH_NAME}"
           docker network create $NETWORK_NAME || true # Ignore if network exists
 
@@ -83,6 +86,7 @@ jobs:
         run: |
           VERSION=${{ steps.get_version.outputs.VERSION }}
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          BRANCH_NAME=${BRANCH_NAME//\//-}
           TAG="${BRANCH_NAME}-${VERSION}"
           cd src/${{ matrix.service }}
           docker build -t ${{ matrix.service }}:$TAG .
@@ -105,6 +109,7 @@ jobs:
         run: |
           VERSION=${{ steps.get_version.outputs.VERSION }}
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          BRANCH_NAME=${BRANCH_NAME//\//-}
           TAG="${BRANCH_NAME}-${VERSION}"
           NETWORK_NAME="network-${BRANCH_NAME}"
           CONTAINER_NAME="${{ matrix.service }}-${BRANCH_NAME}"
@@ -171,6 +176,7 @@ jobs:
           set +e
           VERSION=${{ steps.get_version.outputs.VERSION }}
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          BRANCH_NAME=${BRANCH_NAME//\//-}
           NETWORK_NAME="network-${BRANCH_NAME}"
 
           # Initialiser des tableaux pour stocker les URLs et les codes attendus
@@ -249,6 +255,7 @@ jobs:
         run: |
           VERSION=${{ steps.get_version.outputs.VERSION }}
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          BRANCH_NAME=${BRANCH_NAME//\//-}
           # Arrêter et retirer le conteneur
           docker stop ${{ matrix.service }}-${BRANCH_NAME} || true
           docker rm ${{ matrix.service }}-${BRANCH_NAME} || true
@@ -260,6 +267,7 @@ jobs:
       - name: Remove Docker network
         run: |
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          BRANCH_NAME=${BRANCH_NAME//\//-}
           NETWORK_NAME="network-${BRANCH_NAME}"
           if docker network inspect $NETWORK_NAME &> /dev/null; then
             docker network rm $NETWORK_NAME
