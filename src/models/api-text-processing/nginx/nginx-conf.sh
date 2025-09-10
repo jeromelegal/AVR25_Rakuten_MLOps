@@ -12,8 +12,8 @@ http {
 
         ssl_protocols TLSv1.2 TLSv1.3;
         ssl_ciphers HIGH:!aNULL:!MD5;
-        ssl_certificate $API_IMAGE_PROCESSING_CERT_PATH;
-        ssl_certificate_key $API_IMAGE_PROCESSING_KEY_PATH;
+        ssl_certificate $API_TEXT_PROCESSING_CERT_PATH;
+        ssl_certificate_key $API_TEXT_PROCESSING_KEY_PATH;
 
         location /health {
             include fastcgi_params;
