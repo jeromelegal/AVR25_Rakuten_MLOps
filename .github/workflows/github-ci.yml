@@ -113,7 +113,8 @@ jobs:
           TAG="${BRANCH_NAME}-${VERSION}"
           NETWORK_NAME="network-${BRANCH_NAME}"
           CONTAINER_NAME="${{ matrix.service }}-${BRANCH_NAME}"
-          CONFIG=$(yq eval ".services.${{ matrix.service }}" services_config.yaml)
+          SERVICE="${{ matrix.service }}"
+          CONFIG=$(yq eval ".services[\"$SERVICE\"]" "services_config.yaml")
 
           ENV_VARS=""
           # Traiter les env_vars existantes
@@ -121,7 +122,7 @@ jobs:
               processed_value=$(echo "$value" | sed "s/\${BRANCH_NAME}/$BRANCH_NAME/g" | sed "s/\${VERSION}/$VERSION/g")
               echo "Clé: $key, Valeur: $processed_value"
               ENV_VARS+=" -e $key=$processed_value"
-          done < <(yq eval ".services.${{ matrix.service }}.env_vars | to_entries | .[] | \"\(.key) \(.value)\"" services_config.yaml)
+          done < <(yq eval ".services[\"$SERVICE\"].env_vars | to_entries | .[] | \"\(.key) \(.value)\"" "services_config.yaml")
 
           CAP_ADD=$(yq eval ".cap_add | join(\",\")" <<< "$CONFIG" || true)
           CAP_OPTIONS=""
@@ -178,6 +179,7 @@ jobs:
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
           BRANCH_NAME=${BRANCH_NAME//\//-}
           NETWORK_NAME="network-${BRANCH_NAME}"
+          SERVICE="${{ matrix.service }}"
 
           # Initialiser des tableaux pour stocker les URLs et les codes attendus
           URLS=()
@@ -198,7 +200,7 @@ jobs:
             if [ -n "$EXPECTED_CODE" ] && [ "$EXPECTED_CODE" != "null" ]; then
               EXPECTED_CODES+=("$EXPECTED_CODE")
             fi
-          done < <(yq eval ".services.${{ matrix.service }}.health_check.urls | .[]" services_config.yaml)
+          done < <(yq eval ".services[\"$SERVICE\"].health_check.urls | .[]" "services_config.yaml")
 
           # Boucle infinie pour vérifier la santé des URLs
           while true; do
