@@ -64,12 +64,12 @@ ENV AIRFLOW_ROOT_CERT_PATH=${AIRFLOW_ROOT_CERT_PATH:-"/etc/ssl/airflow/airflow.c
 ENV AIRFLOW_MINIO_PEM_PATH=${AIRFLOW_MINIO_PEM_PATH:-"/etc/ssl/airflow/airflow_airflow.pem"}
 ENV AIRFLOW_MINIO_CA_PATH=${AIRFLOW_MINIO_CA_PATH:-"/etc/ssl/airflow/airflow_airflow.ca"}
 ENV AUTHORIZATION=${AUTHORIZATION:-"enabled"}
-ENV SERVICE_NAME=${SERVICE_NAME:-"minio"}
+ENV SERVICE_NAME=${SERVICE_NAME:-"airflow"}
 ENV VAULT_SERVICE_NAME=${VAULT_SERVICE_NAME:-"vault"}
-ENV VAULT_CERT_FILE=${VAULT_CERT_FILE:-"minio-cert.crt"}
-ENV VAULT_KEY_FILE=${VAULT_KEY_FILE:-"minio.key"}
+ENV VAULT_CERT_FILE=${VAULT_CERT_FILE:-"airflow-cert.crt"}
+ENV VAULT_KEY_FILE=${VAULT_KEY_FILE:-"airflow.key"}
 ENV mTLS=${mTLS:-"false"}
-ENV LOG_PATH=${LOG_PATH:-"/var/log/minio/minio.log"}
+ENV LOG_PATH=${LOG_PATH:-"/var/log/airflow/airflow.log"}
 ENV NGINX_CONFIG_FILE="/etc/nginx/nginx.conf"
 ENV HEALTH_CHECK_FILE="/usr/local/bin/health-check.sh"
 
