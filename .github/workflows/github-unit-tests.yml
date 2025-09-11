@@ -18,18 +18,6 @@ jobs:
           SUFFIX="-$BRANCH_NAME"
           echo "Launching API Minio tests with SUFFIX=$SUFFIX"
           sh scripts/launch_api_minio_tests.sh "$SUFFIX"
-      - name: Archive CI test results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: ci-test_results
-          path: test_results/api-minio_test_result.xml
-      - name: Archive CI code coverages
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: ci-test_coverages
-          path: test_results/api-minio_test_coverage.xml
   
   tests-api-mongodb:
     runs-on: [self-hosted, phil-host]
@@ -46,18 +34,6 @@ jobs:
           SUFFIX="-$BRANCH_NAME"
           echo "Launching API MongoDB tests with SUFFIX=$SUFFIX"
           sh scripts/launch_api_mongodb_tests.sh "$SUFFIX"
-      - name: Archive CI test results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: ci-test_results
-          path: test_results/api-mongodb_test_result.xml
-      - name: Archive CI code coverages
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: ci-test_coverages
-          path: test_results/api-mongodb_test_coverage.xml
 
   tests-api-postgresql:
     runs-on: [self-hosted, phil-host]
@@ -74,18 +50,6 @@ jobs:
           SUFFIX="-$BRANCH_NAME"
           echo "Launching API PostGreSQL test with SUFFIX=$SUFFIX"
           sh scripts/launch_api_postgresql_tests.sh "$SUFFIX"
-      - name: Archive CI test results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: ci-test_results
-          path: test_results/api-postgresql_test_result.xml
-      - name: Archive CI code coverages
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: ci-test_coverages
-          path: test_results/api-postgresql_test_coverage.xml
   
   tests-api-gateway:
     runs-on: [self-hosted, phil-host]
@@ -102,15 +66,23 @@ jobs:
           SUFFIX="-$BRANCH_NAME"
           echo "Launching API Gateway test with SUFFIX=$SUFFIX"
           sh scripts/launch_api_gateway_tests.sh "$SUFFIX"
+    
+  store_test_results:
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+    runs-on: [self-hosted, phil-host]
+    needs: [tests-api-minio, tests-api-mongodb, tests-api-postgresql, tests-api-gateway]
+    steps:
       - name: Archive CI test results
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: ci-test_results
-          path: test_results/api-gateway_test_result.xml
+          path: test_results/*_test_result.xml
       - name: Archive CI code coverages
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: ci-test_coverages
-          path: test_results/api-gateway_test_coverage.xml
+          path: test_results/*_test_coverage.xml
