@@ -2,7 +2,7 @@
 
 SUFFIX="$1"
 RESULT_FOLDER=test_results
-CONTAINER_NAME="api-gateway$SUFFIX"
+CONTAINER_NAME="api-postgresql$SUFFIX"
 
 # Create folder to store test results
 echo "Create test result folder"
