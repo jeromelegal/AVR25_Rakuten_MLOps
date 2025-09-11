@@ -23,13 +23,13 @@ jobs:
         if: always()
         with:
           name: ci-test_results
-          path: test_results/*test_result.xml
+          path: test_results/api-minio_test_result.xml
       - name: Archive CI code coverages
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: ci-test_coverages
-          path: test_results/*test_coverage.xml
+          path: test_results/api-minio_test_coverage.xml
   
   tests-api-mongodb:
     runs-on: [self-hosted, phil-host]
@@ -51,13 +51,13 @@ jobs:
         if: always()
         with:
           name: ci-test_results
-          path: test_results/*test_result.xml
+          path: test_results/api-mongodb_test_result.xml
       - name: Archive CI code coverages
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: ci-test_coverages
-          path: test_results/*test_coverage.xml
+          path: test_results/api-mongodb_test_coverage.xml
 
   tests-api-postgresql:
     runs-on: [self-hosted, phil-host]
@@ -79,13 +79,13 @@ jobs:
         if: always()
         with:
           name: ci-test_results
-          path: test_results/*test_result.xml
+          path: test_results/api-postgresql_test_result.xml
       - name: Archive CI code coverages
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: ci-test_coverages
-          path: test_results/*test_coverage.xml
+          path: test_results/api-postgresql_test_coverage.xml
   
   tests-api-gateway:
     runs-on: [self-hosted, phil-host]
@@ -107,10 +107,10 @@ jobs:
         if: always()
         with:
           name: ci-test_results
-          path: test_results/*test_result.xml
+          path: test_results/api-gateway_test_result.xml
       - name: Archive CI code coverages
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: ci-test_coverages
-          path: test_results/*test_coverage.xml
+          path: test_results/api-gateway_test_coverage.xml
