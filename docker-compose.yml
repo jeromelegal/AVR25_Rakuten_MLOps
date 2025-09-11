@@ -137,7 +137,7 @@ services:
   
   model-downloader:
     build:
-      context: ./src/models/model-downloader
+      context: ./src/model-downloader
       dockerfile: Dockerfile
     container_name: model-downloader
     environment:
@@ -166,7 +166,7 @@ services:
   
   api-image-processing:
     build:
-      context: ./src/models/api-image-processing
+      context: ./src/api-image-processing
       dockerfile: Dockerfile
     container_name: api-image-processing
     ports:
@@ -178,7 +178,7 @@ services:
 
   api-text-processing:
     build:
-      context: ./src/models/api-text-processing
+      context: ./src/api-text-processing
       dockerfile: Dockerfile
     container_name: api-text-processing
     ports:
@@ -190,7 +190,7 @@ services:
   
   api-processing:
     build:
-      context: ./src/models/api-processing
+      context: ./src/api-processing
       dockerfile: Dockerfile
     container_name: api-processing
     ports:
