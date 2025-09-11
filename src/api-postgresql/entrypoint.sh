@@ -15,7 +15,7 @@ vault.sh
 
 set -m
 
-exec uvicorn main:app --host 0.0.0.0 --port $SERVICE_PORT --ssl-keyfile $API_POSTGRESQL_KEY_PATH --ssl-certfile $API_POSTGRESQL_CERT_PATH --ssl-ca-certs $API_POSTGRESQL_CA_PATH --ssl-cert-reqs 2 &
+exec uvicorn main:app --host 0.0.0.0 --port $SERVICE_PORT --ssl-keyfile $API_POSTGRESQL_KEY_PATH --ssl-certfile $API_POSTGRESQL_CERT_PATH --ssl-ca-certs $API_POSTGRESQL_CA_PATH --ssl-cert-reqs 2 --log-level info &
 
 #exec uvicorn main:app --host 0.0.0.0 --port 8000 --ssl-keyfile $API_POSTGRESQL_API_POSTGRESQL_KEY_PATH --ssl-certfile $API_POSTGRESQL_API_POSTGRESQL_CERT_PATH --ssl-ca-certs $API_POSTGRESQL_API_POSTGRESQL_CA_PATH &
 
