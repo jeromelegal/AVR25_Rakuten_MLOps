@@ -266,7 +266,8 @@ jobs:
 
   stop-containers:
     runs-on: [self-hosted, phil-host]
-    needs: [tests, lint]
+    needs: [tests, lint, start-containers]
+    if: always()
     strategy:
       matrix:
         service: [vault, consul, mongodb, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]
