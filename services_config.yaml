@@ -247,3 +247,57 @@ services:
       FRONTEND_SERVICE_PORT: 3000
       API_GATEWAY_SERVICE_NAME: api-gateway
       API_GATEWAY_SERVICE_PORT: 9000
+  api-processing:
+    expose_ports:
+      - 8050
+      - 80
+      - 443
+    network-alias:
+      - api-processing
+    health_check:
+      urls:
+        - url: https://api-processing/health
+          expected_code: 200
+    env_vars:
+      SERVICE_NAME: api-processing
+      SERVICE_PORT: 8050
+      VAULT_ADDR: https://vault:8200
+      VAULT_SERVICE_NAME: vault
+      VAULT_USERNAME: api-processing
+      VAULT_PASSWORD: api-processing
+  api-text-processing:
+    expose_ports:
+      - 8040
+      - 80
+      - 443
+    network-alias:
+      - api-text-processing
+    health_check:
+      urls:
+        - url: https://api-text-processing/health
+          expected_code: 200
+    env_vars:
+      SERVICE_NAME: api-text-processing
+      SERVICE_PORT: 8040
+      VAULT_ADDR: https://vault:8200
+      VAULT_SERVICE_NAME: vault
+      VAULT_USERNAME: api-text-processing
+      VAULT_PASSWORD: api-text-processing
+  api-image-processing:
+    expose_ports:
+      - 8030
+      - 80
+      - 443
+    network-alias:
+      - api-image-processing
+    health_check:
+      urls:
+        - url: https://api-image-processing/health
+          expected_code: 200
+    env_vars:
+      SERVICE_NAME: api-image-processing
+      SERVICE_PORT: 8030
+      VAULT_ADDR: https://vault:8200
+      VAULT_SERVICE_NAME: vault
+      VAULT_USERNAME: api-image-processing
+      VAULT_PASSWORD: api-image-processing
