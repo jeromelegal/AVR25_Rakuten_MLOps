@@ -9,9 +9,9 @@ echo "Create test result folder"
 mkdir -p $RESULT_FOLDER
 
 # Execute api-minio tests
-echo "Executing api-minio tests"
+echo "Executing api-minio tests in container $CONTAINER_NAME"
 docker exec $CONTAINER_NAME pip install --break-system-packages -r requirements/dev.txt && \
-docker cp src/api-minio/test/test.sh api-minio:/usr/local/bin/test.sh  && \
+docker cp src/api-minio/test/test.sh $CONTAINER_NAME:/usr/local/bin/test.sh  && \
 docker exec $CONTAINER_NAME chown root:root /usr/local/bin/test.sh  && \
 docker exec $CONTAINER_NAME +x /usr/local/bin/test.sh  && \
 docker exec $CONTAINER_NAME test.sh  && \

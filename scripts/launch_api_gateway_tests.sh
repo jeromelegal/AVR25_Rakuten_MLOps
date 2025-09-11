@@ -8,7 +8,7 @@ echo "Create test result folder"
 mkdir -p $RESULT_FOLDER
 
 # Execute api-gateway tests
-echo "Executing api-gateway tests"
+echo "Executing api-gateway tests in container $CONTAINER_NAME"
 docker exec $CONTAINER_NAME pip3 install --break-system-packages pytest-cov && \
 docker exec $CONTAINER_NAME python3 -m pytest \
         --junit-xml=test_result.xml \
