@@ -15,7 +15,8 @@ jobs:
         run: |
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
           BRANCH_NAME=${BRANCH_NAME//\//-}
-          SUFFIX="-${BRANCH_NAME}"
+          SUFFIX="-$BRANCH_NAME"
+          echo "Launching API Minio tests with SUFFIX=$SUFFIX"
           sh scripts/launch_api_minio_tests.sh "$SUFFIX"
       - name: Archive CI test results
         uses: actions/upload-artifact@v4
@@ -42,7 +43,8 @@ jobs:
         run: |
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
           BRANCH_NAME=${BRANCH_NAME//\//-}
-          SUFFIX="-${BRANCH_NAME}"
+          SUFFIX="-$BRANCH_NAME"
+          echo "Launching API MongoDB tests with SUFFIX=$SUFFIX"
           sh scripts/launch_api_mongodb_tests.sh "$SUFFIX"
       - name: Archive CI test results
         uses: actions/upload-artifact@v4
@@ -69,7 +71,8 @@ jobs:
         run: |
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
           BRANCH_NAME=${BRANCH_NAME//\//-}
-          SUFFIX="-${BRANCH_NAME}"
+          SUFFIX="-$BRANCH_NAME"
+          echo "Launching API PostGreSQL test with SUFFIX=$SUFFIX"
           sh scripts/launch_api_postgresql_tests.sh "$SUFFIX"
       - name: Archive CI test results
         uses: actions/upload-artifact@v4
@@ -96,7 +99,8 @@ jobs:
         run: |
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
           BRANCH_NAME=${BRANCH_NAME//\//-}
-          SUFFIX="-${BRANCH_NAME}"
+          SUFFIX="-$BRANCH_NAME"
+          echo "Launching API Gateway test with SUFFIX=$SUFFIX"
           sh scripts/launch_api_gateway_tests.sh "$SUFFIX"
       - name: Archive CI test results
         uses: actions/upload-artifact@v4
