@@ -13,7 +13,7 @@ echo "Executing api-minio tests in container $CONTAINER_NAME"
 docker exec $CONTAINER_NAME pip install --break-system-packages -r requirements/dev.txt && \
 docker cp src/api-minio/test/test.sh $CONTAINER_NAME:/usr/local/bin/test.sh  && \
 docker exec $CONTAINER_NAME chown root:root /usr/local/bin/test.sh  && \
-docker exec $CONTAINER_NAME +x /usr/local/bin/test.sh  && \
+docker exec $CONTAINER_NAME chmod +x /usr/local/bin/test.sh  && \
 docker exec $CONTAINER_NAME test.sh  && \
 docker cp $CONTAINER_NAME:/app/test_result.xml $RESULT_FOLDER/api-minio_test_result.xml  && \
 docker cp $CONTAINER_NAME:/app/test_coverage.xml $RESULT_FOLDER/api-minio_test_coverage.xml
