@@ -15,8 +15,6 @@ ENV API_MONGODB_CA_PATH ${API_MONGODB_CA_PATH:-"/etc/ssl/api-mongodb/api-mongodb
 ENV API_MONGODB_KEY_PATH ${API_MONGODB_KEY_PATH:-"/etc/ssl/api-mongodb/api-mongodb.key"}
 ENV API_MONGODB_CERT_PATH ${API_MONGODB_CERT_PATH:-"/etc/ssl/api-mongodb/api-mongodb.crt"}
 
-
-
 ENV API_MONGODB_SECRET_KEY=""
 ENV API_MONGODB_INTERNAL_SECRET_KEY=""
 
@@ -39,15 +37,12 @@ ENV API_MONGODB_HOST=https://$SERVICE_NAME
 ENV API_MONGODB_INTERNAL_ENDPOINT_URL=/api/internal/
 ENV API_MONGODB_PROTECTED_ENDPOINT_URL=/api/protected/
 
-
 ENV API_GATEWAY_SERVICE_NAME ${API_GATEWAY_SERVICE_NAME:-"api-gateway"}
 ENV API_GATEWAY_HOST=https://$API_GATEWAY_SERVICE_NAME
 
 ENV API_MONGODB_INTERNAL_SECRET_KEY=internal_secret_key
 ENV API_MONGODB_ALGORITHM=HS256
 ENV API_MONGODB_ACCESS_TOKEN_EXPIRE_MINUTES=30
-
-
 
 ENV NGINX_CONFIG_FILE="/etc/nginx/nginx.conf"
 ENV NGINX_STATUS_FILE="/var/log/status"
@@ -82,14 +77,6 @@ RUN vault --version
 # Installer Python et pip
 RUN apt update && apt install -y python3-full python3-pip
 
-# Copier le fichier requirements.txt dans le conteneur
-COPY requirements.txt requirements.txt
-
-# Installer les dépendances en contournant la restriction
-RUN pip install --break-system-packages -r requirements.txt
-
-COPY . .
-
 # Installer les dépendances nécessaires
 RUN apt-get update && apt-get install -y curl jq unzip
 
@@ -100,21 +87,25 @@ RUN chmod +x /usr/local/bin/entrypoint.sh
 COPY vault/vault.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/vault.sh
 
-
-
-RUN mv nginx/nginx-fcgiwrap.sh /usr/local/bin/nginx-fcgiwrap.sh
+COPY nginx/nginx-fcgiwrap.sh /usr/local/bin/nginx-fcgiwrap.sh
 RUN chmod +x /usr/local/bin/nginx-fcgiwrap.sh
 
 RUN apt install -y nginx fcgiwrap
 
-RUN mv nginx/health-check.sh /usr/local/bin/health-check.sh
+COPY nginx/health-check.sh /usr/local/bin/health-check.sh
 RUN chmod +x /usr/local/bin/health-check.sh
 
-RUN mv nginx/nginx-conf.sh /usr/local/bin/nginx-conf.sh
+COPY nginx/nginx-conf.sh /usr/local/bin/nginx-conf.sh
 RUN chmod +x /usr/local/bin/nginx-conf.sh
 
+# Copier le fichier requirements.txt dans le conteneur
+COPY requirements.txt requirements.txt
+
+# Installer les dépendances en contournant la restriction
+RUN pip install --break-system-packages -r requirements.txt
+
+COPY . .
 
 EXPOSE 8000 443 80 
 
-# CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 ENTRYPOINT ["entrypoint.sh"]

@@ -1,0 +1,38 @@
+name: AVR25 Rakuten MLOps - CI Unit tests
+run-name: Unit testing AVR25 Rakuten MLOps actions started by ${{ github.actor }}
+on:
+  workflow_call:
+jobs:
+  tests-api:
+    runs-on: [self-hosted, phil-host]
+    strategy:
+      matrix:
+        service: [api-minio, api-mongodb, api-postgresql, api-gateway]
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+      - name: Launch ${{ matrix.service }} unit tests
+        run: |
+          BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          BRANCH_NAME=${BRANCH_NAME//\//-}
+          SUFFIX="-$BRANCH_NAME"
+          SCRIPT_NAME=${{ matrix.service }}
+          SCRIPT_NAME=${SCRIPT_NAME//-/_}
+          SCRIPT_NAME="launch_${SCRIPT_NAME}_tests.sh"
+          echo "Launching ${{ matrix.service }} test with SUFFIX=$SUFFIX"
+          sh "scripts/${SCRIPT_NAME}" "$SUFFIX"
+      - name: Archive CI test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ci-${{ matrix.service }}-test_results
+          path: test_results/${{ matrix.service }}_test_result.xml
+      - name: Archive CI code coverages
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ci-${{ matrix.service }}-test_coverages
+          path: test_results/${{ matrix.service }}_test_coverage.xml

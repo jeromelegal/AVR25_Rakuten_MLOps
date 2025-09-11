@@ -113,7 +113,8 @@ jobs:
           TAG="${BRANCH_NAME}-${VERSION}"
           NETWORK_NAME="network-${BRANCH_NAME}"
           CONTAINER_NAME="${{ matrix.service }}-${BRANCH_NAME}"
-          CONFIG=$(/usr/local/bin/yq eval ".services.${{ matrix.service }}" services_config.yaml)
+          SERVICE="${{ matrix.service }}"
+          CONFIG=$(yq eval ".services[\"$SERVICE\"]" "services_config.yaml")
 
           ENV_VARS=""
           # Traiter les env_vars existantes
@@ -121,9 +122,9 @@ jobs:
               processed_value=$(echo "$value" | sed "s/\${BRANCH_NAME}/$BRANCH_NAME/g" | sed "s/\${VERSION}/$VERSION/g")
               echo "Clé: $key, Valeur: $processed_value"
               ENV_VARS+=" -e $key=$processed_value"
-          done < <(yq eval ".services.${{ matrix.service }}.env_vars | to_entries | .[] | \"\(.key) \(.value)\"" services_config.yaml)
+          done < <(yq eval ".services[\"$SERVICE\"].env_vars | to_entries | .[] | \"\(.key) \(.value)\"" "services_config.yaml")
 
-          CAP_ADD=$(/usr/local/bin/yq eval ".cap_add | join(\",\")" <<< "$CONFIG" || true)
+          CAP_ADD=$(yq eval ".cap_add | join(\",\")" <<< "$CONFIG" || true)
           CAP_OPTIONS=""
           if [ "$CAP_ADD" != "null" ] && [ -n "$CAP_ADD" ]; then
               for cap in $(echo $CAP_ADD | tr ',' '\n'); do
@@ -132,14 +133,14 @@ jobs:
           fi
 
           # Extraire et traiter les ports exposés
-          EXPOSE_PORTS=$(/usr/local/bin/yq eval ".expose_ports | join(\",\")" <<< "$CONFIG" || true)
+          EXPOSE_PORTS=$(yq eval ".expose_ports | join(\",\")" <<< "$CONFIG" || true)
           if [ "$EXPOSE_PORTS" != "null" ] && [ -n "$EXPOSE_PORTS" ]; then
               for port in $(echo $EXPOSE_PORTS | tr ',' '\n'); do
                   EXPOSE_OPTIONS+=" --expose=$port"
               done
           fi
 
-          RUN_AS_ROOT=$(/usr/local/bin/yq eval ".run_as_root" <<< "$CONFIG")
+          RUN_AS_ROOT=$(yq eval ".run_as_root" <<< "$CONFIG")
           if [ -z "$RUN_AS_ROOT" ] || [ "$RUN_AS_ROOT" = "null" ]; then
             RUN_AS_ROOT=false
           fi
@@ -150,10 +151,10 @@ jobs:
             docker run -d $CAP_OPTIONS --name $CONTAINER_NAME $ENV_VARS ${{ matrix.service }}:$TAG
           fi
 
-          NETWORK_ALIASES=$(/usr/local/bin/yq eval ".network-alias // []" <<< "$CONFIG" || echo "")
+          NETWORK_ALIASES=$(yq eval ".network-alias // []" <<< "$CONFIG" || echo "")
           # Ajout des alias réseau après le démarrage du conteneur
           if [ -n "$NETWORK_ALIASES" ] && [ "$NETWORK_ALIASES" != "null" ]; then
-              for alias in $(echo "$NETWORK_ALIASES" | /usr/local/bin/yq eval '.[]' - 2>/dev/null); do
+              for alias in $(echo "$NETWORK_ALIASES" | yq eval '.[]' - 2>/dev/null); do
                   docker network connect --alias "$alias" "$NETWORK_NAME" "$CONTAINER_NAME" || echo "Erreur lors de l'ajout de l'alias $alias"
               done
           fi
@@ -178,6 +179,7 @@ jobs:
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
           BRANCH_NAME=${BRANCH_NAME//\//-}
           NETWORK_NAME="network-${BRANCH_NAME}"
+          SERVICE="${{ matrix.service }}"
 
           # Initialiser des tableaux pour stocker les URLs et les codes attendus
           URLS=()
@@ -186,8 +188,8 @@ jobs:
           # Récupérer tous les couples URL et code attendu
           while IFS= read -r check; do
             # Extraire les valeurs pour url et expected_code
-            URL=$(/usr/local/bin/yq eval '.url' <<< "$check")
-            EXPECTED_CODE=$(/usr/local/bin/yq eval '.expected_code' <<< "$check")
+            URL=$(yq eval '.url' <<< "$check")
+            EXPECTED_CODE=$(yq eval '.expected_code' <<< "$check")
 
             # Ajouter URL au tableau si elle n'est pas nulle
             if [ -n "$URL" ] && [ "$URL" != "null" ]; then
@@ -198,7 +200,7 @@ jobs:
             if [ -n "$EXPECTED_CODE" ] && [ "$EXPECTED_CODE" != "null" ]; then
               EXPECTED_CODES+=("$EXPECTED_CODE")
             fi
-          done < <(/usr/local/bin/yq eval ".services.${{ matrix.service }}.health_check.urls | .[]" services_config.yaml)
+          done < <(yq eval ".services[\"$SERVICE\"].health_check.urls | .[]" "services_config.yaml")
 
           # Boucle infinie pour vérifier la santé des URLs
           while true; do
@@ -238,10 +240,24 @@ jobs:
             fi
             sleep 1
           done
+  
+  lint:
+    uses: ./.github/workflows/github-lint.yml
+    needs: [start-containers]
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+  
+  tests:
+    uses: ./.github/workflows/github-unit-tests.yml
+    needs: [health-check-containers]
+    permissions:
+      contents: 'read'
+      id-token: 'write'
 
   stop-containers:
     runs-on: [self-hosted, phil-host]
-    needs: health-check-containers
+    needs: [tests, lint]
     strategy:
       matrix:
         service: [vault, consul, mongodb, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio]

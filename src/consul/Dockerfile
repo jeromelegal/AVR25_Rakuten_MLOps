@@ -74,36 +74,19 @@ RUN setcap -r /usr/bin/vault
 
 RUN vault --version
 
+COPY vault/vault.sh /usr/local/bin/vault.sh
+COPY consul/consul.sh /usr/local/bin/consul.sh 
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh 
+COPY nginx/nginx-fcgiwrap.sh /usr/local/bin/nginx-fcgiwrap.sh
+COPY nginx/health-check.sh /usr/local/bin/health-check.sh
+COPY nginx/nginx-conf.sh /usr/local/bin/nginx-conf.sh
+
+RUN chmod +x /usr/local/bin/*
 
 COPY . . 
-
-
-RUN mv vault/vault.sh /usr/local/bin/vault.sh
-RUN chmod +x /usr/local/bin/vault.sh
-
-RUN mv consul/consul.sh /usr/local/bin/consul.sh 
-RUN chmod +x /usr/local/bin/consul.sh
-
-RUN mv entrypoint.sh /usr/local/bin/entrypoint.sh 
-RUN chmod +x /usr/local/bin/entrypoint.sh
-
-
-RUN mv nginx/nginx-fcgiwrap.sh /usr/local/bin/nginx-fcgiwrap.sh
-RUN chmod +x /usr/local/bin/nginx-fcgiwrap.sh
-
-RUN mv nginx/health-check.sh /usr/local/bin/health-check.sh
-RUN chmod +x /usr/local/bin/health-check.sh
-
-RUN mv nginx/nginx-conf.sh /usr/local/bin/nginx-conf.sh
-RUN chmod +x /usr/local/bin/nginx-conf.sh
-
-
 
 EXPOSE 8600/udp 8500 8501 80 443
 
 ENTRYPOINT ["entrypoint.sh"]
-
-# Définir la commande pour démarrer Consul
-#CMD ["consul" "agent "]
 
 
