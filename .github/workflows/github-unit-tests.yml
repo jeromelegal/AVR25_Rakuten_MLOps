@@ -3,86 +3,36 @@ run-name: Unit testing AVR25 Rakuten MLOps actions started by ${{ github.actor }
 on:
   workflow_call:
 jobs:
-  tests-api-minio:
-    runs-on: [self-hosted, phil-host, phil-host]
+  tests-api:
+    runs-on: [self-hosted, phil-host]
+    strategy:
+      matrix:
+        service: [api-minio, api-mongodb, api-postgresql, api-gateway]
     permissions:
       contents: 'read'
       id-token: 'write'
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
-      - name: Launch API Minio unit tests
+      - name: Launch ${{ matrix.service }} unit tests
         run: |
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
           BRANCH_NAME=${BRANCH_NAME//\//-}
           SUFFIX="-$BRANCH_NAME"
-          echo "Launching API Minio tests with SUFFIX=$SUFFIX"
-          sh scripts/launch_api_minio_tests.sh "$SUFFIX"
-  
-  tests-api-mongodb:
-    runs-on: [self-hosted, phil-host]
-    permissions:
-      contents: 'read'
-      id-token: 'write'
-    steps:
-      - name: Check out repository code
-        uses: actions/checkout@v4
-      - name: Launch API MongoDB unit tests
-        run: |
-          BRANCH_NAME=${GITHUB_REF#refs/heads/}
-          BRANCH_NAME=${BRANCH_NAME//\//-}
-          SUFFIX="-$BRANCH_NAME"
-          echo "Launching API MongoDB tests with SUFFIX=$SUFFIX"
-          sh scripts/launch_api_mongodb_tests.sh "$SUFFIX"
-
-  tests-api-postgresql:
-    runs-on: [self-hosted, phil-host]
-    permissions:
-      contents: 'read'
-      id-token: 'write'
-    steps:
-      - name: Check out repository code
-        uses: actions/checkout@v4
-      - name: Launch API PostGreSQL unit tests
-        run: |
-          BRANCH_NAME=${GITHUB_REF#refs/heads/}
-          BRANCH_NAME=${BRANCH_NAME//\//-}
-          SUFFIX="-$BRANCH_NAME"
-          echo "Launching API PostGreSQL test with SUFFIX=$SUFFIX"
-          sh scripts/launch_api_postgresql_tests.sh "$SUFFIX"
-  
-  tests-api-gateway:
-    runs-on: [self-hosted, phil-host]
-    permissions:
-      contents: 'read'
-      id-token: 'write'
-    steps:
-      - name: Check out repository code
-        uses: actions/checkout@v4
-      - name: Launch API Gateway unit tests
-        run: |
-          BRANCH_NAME=${GITHUB_REF#refs/heads/}
-          BRANCH_NAME=${BRANCH_NAME//\//-}
-          SUFFIX="-$BRANCH_NAME"
-          echo "Launching API Gateway test with SUFFIX=$SUFFIX"
-          sh scripts/launch_api_gateway_tests.sh "$SUFFIX"
-    
-  store_test_results:
-    permissions:
-      contents: 'read'
-      id-token: 'write'
-    runs-on: [self-hosted, phil-host]
-    needs: [tests-api-minio, tests-api-mongodb, tests-api-postgresql, tests-api-gateway]
-    steps:
+          SCRIPT_NAME=${{ matrix.service }}
+          SCRIPT_NAME=${SCRIPT_NAME//-/_}
+          SCRIPT_NAME="launch_${SCRIPT_NAME}_tests.sh"
+          echo "Launching ${{ matrix.service }} test with SUFFIX=$SUFFIX"
+          sh "scripts/${SCRIPT_NAME}" "$SUFFIX"
       - name: Archive CI test results
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: ci-test_results
-          path: test_results/*_test_result.xml
+          name: ci-${{ matrix.service }}-test_results
+          path: test_results/${{ matrix.service }}_test_result.xml
       - name: Archive CI code coverages
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: ci-test_coverages
-          path: test_results/*_test_coverage.xml
+          name: ci-${{ matrix.service }}-test_coverages
+          path: test_results/${{ matrix.service }}_test_coverage.xml

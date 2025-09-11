@@ -69,7 +69,7 @@ services:
       VAULT_SERVICE_NAME: vault
   api-postgresql:
     expose_ports:
-      - 8020
+      - 8010
       - 80
       - 443
     network-alias:
@@ -80,7 +80,7 @@ services:
           expected_code: 200
     env_vars:
       SERVICE_NAME: api-postgresql
-      SERVICE_PORT: 8080
+      SERVICE_PORT: 8010
       POSTGRESQL_SERVICE_NAME: postgresql
       POSTGRESQL_SERVICE_PORT: 5432
       VAULT_ADDR: https://vault:8200
