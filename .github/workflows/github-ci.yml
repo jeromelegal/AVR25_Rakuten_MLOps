@@ -159,6 +159,15 @@ jobs:
               done
           fi
 
+  prune-unused-images:
+    runs-on: [self-hosted, phil-host]
+    needs: start-containers
+    steps:
+      - name: Prune Docker images
+        run: |
+          echo "Removing all unused images..."
+          docker system prune -f
+
   health-check-containers:
     runs-on: [self-hosted, phil-host]
     needs: start-containers
