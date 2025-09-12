@@ -4,6 +4,7 @@ from api.middlewares.auth_middleware import AuthMiddleware
 from api.middlewares.logging_middleware import LoggingMiddleware
 from api.routes.login import router as login_router
 from api.routes.signup import router as signup_router
+from api.routes.delete import router as delete_router
 from api.config.settings import settings
 import logging
 
@@ -31,6 +32,7 @@ app.add_middleware(AuthMiddleware)
 # Inclure les routeurs avec le préfixe protégé
 app.include_router(login_router, prefix=settings.API_GATEWAY_PROTECTED_ENDPOINT_URL, tags=["login"])
 app.include_router(signup_router, prefix=settings.API_GATEWAY_PROTECTED_ENDPOINT_URL, tags=["signup"])
+app.include_router(delete_router, prefix=settings.API_GATEWAY_PROTECTED_ENDPOINT_URL, tags=["delete"])
 
 @app.get("/")
 async def root():

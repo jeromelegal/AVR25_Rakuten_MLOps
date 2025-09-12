@@ -6,7 +6,6 @@ from requests.exceptions import HTTPError
 from urllib3.util.ssl_ import create_urllib3_context
 from typing import Optional, Dict
 from api.config.settings import settings
-from api.auth.token_manager import create_access_token
 
 class PostgreSQLClient:
     def __init__(self):
@@ -15,7 +14,7 @@ class PostgreSQLClient:
         self.ca_path = settings.API_POSTGRESQL_API_GATEWAY_CA_PATH
         self.key_path = settings.API_POSTGRESQL_API_GATEWAY_KEY_PATH
         self.cert_path = settings.API_POSTGRESQL_API_GATEWAY_CERT_PATH
-        self.internal_api_token = create_access_token({"scope": "internal"})
+        self.token = None
         self.session = self.get_session()
 
     def get_session(self):
@@ -38,18 +37,24 @@ class PostgreSQLClient:
         session.mount('https://', MTLSAdapter(self.ca_path, self.key_path, self.cert_path))
         return session
 
+    def set_token(self, token):
+        self.token = token
+
     def get_headers(self):
-        return {
+        headers = {
             "Referer": f"{settings.HOST}{settings.PROTECTED_ENDPOINT_URL}",
-            "X-API-Key": self.internal_api_token
         }
+        if self.token:
+            headers["X-API-Key"] = f"{self.token}"
+            headers["Authorization"] = f"Bearer {self.token}"
+        return headers
 
     def authenticate(self, credentials: Dict[str, str]) -> Optional[str]:
         headers = self.get_headers()
         try:
             response = self.session.post(f"{self.base_url}/token", data=credentials, headers=headers)
             response.raise_for_status()
-            return response.json().get("access_token")
+            return response.json().get("user_id"), response.json().get("access_token")
         except HTTPError as e:
             return None
 
@@ -62,5 +67,14 @@ class PostgreSQLClient:
     def create_user(self, user_data: Dict[str, str]):
         headers = self.get_headers()
         response = self.session.post(f"{self.base_url}/api/internal/postgresql/entity/user", json=user_data, headers=headers)
+        response.raise_for_status()
+        return response.json()
+
+    def delete_user(self, user_id: str):
+        headers = self.get_headers()
+        response = self.session.delete(
+            f"{self.base_url}/api/internal/postgresql/entity/user/{user_id}",
+            headers=headers,
+        )
         response.raise_for_status()
         return response.json()

@@ -172,12 +172,14 @@ async def test_delete_user():
         headers = {
             "Authorization": f"Bearer {token}",
             "Referer": API_GATEWAY_HOST + PROTECTED_ENDPOINT_URL,
-            "X-API-Key": api_token,
+            "X-API-Key": token,
         }
 
         response = client.delete(
             f"/api/internal/mongodb/entity/user/{user_id}", headers=headers
         )
+
+        print(f"response.json() {response.json()}")
         assert response.status_code == 200
         assert response.json() == {"message": "User deleted successfully"}
 

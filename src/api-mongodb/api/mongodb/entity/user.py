@@ -63,7 +63,6 @@ async def update_user(user_id: str, user: User, current_user: dict = Depends(get
 async def delete_user(user_id: str, current_user: dict = Depends(get_current_user)):
     if current_user["user_id"] != user_id and "superadmin" not in current_user.get("roles", []):
         raise HTTPException(status_code=403, detail="Not enough permissions")
-
     async with get_db_client() as db:
         result = await db.users.delete_one({"_id": ObjectId(user_id)})
         if result.deleted_count == 1:

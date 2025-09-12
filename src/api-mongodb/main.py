@@ -26,7 +26,6 @@ from jose import JWTError, jwt
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("internal_access_middleware")
 
-
 # Chemins d'endpoints qui ne nécessitent pas de token
 PUBLIC_ENDPOINTS = {
     ("POST", "/api/internal/mongodb/entity/user"): True,
@@ -34,6 +33,7 @@ PUBLIC_ENDPOINTS = {
 }
 class InternalAccessMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
+
         # Vérifier si l'endpoint est public
         if PUBLIC_ENDPOINTS.get((request.method, request.url.path)):
             return await call_next(request)
@@ -53,7 +53,7 @@ class InternalAccessMiddleware(BaseHTTPMiddleware):
                 if payload.get("scope") != "internal":
                     return JSONResponse(status_code=403, content={"detail": "Invalid scope"})
             except JWTError:
-                return JSONResponse(status_code=401, content={"detail": "Invalid API key", "new_token": internal_api_token})
+                return JSONResponse(status_code=401, content={"detail": "Invalid API key"})
 
         response = await call_next(request)
         return response
