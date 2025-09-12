@@ -9,7 +9,7 @@ jobs:
     strategy:
         max-parallel: 10
         matrix:
-          service: [vault, api-mongodb, api-postgresql, api-gateway, api-minio]
+          service: [vault, api-mongodb, api-postgresql, api-gateway, api-minio, api-image-processing, api-text-processing, api-processing]
     steps:
         - name: Check out repository code
           uses: actions/checkout@v4

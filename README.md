@@ -7,12 +7,28 @@ Rakuten MLOps
 docker-compose up --build
 ```
 
+>**Note:** When the architecture is initialized for the first time, the first version of the image and text classification models must be downloaded and charged as the fisrt versions of tracked models. To do so, we uploaded our models in a publicly available GDrive available [here](https://drive.google.com/drive/folders/1YA1I7YONolKU_lN3beyNBlwSJhqojXTs?usp=drive_link). This GDrive will be available for the evaluation of this project. In order to load, these first version, one should use the following command:
+>```bash
+>docker-compose --profile setup up --build
+>```
+
+
 ### Start services
 ```bash
 docker-compose up --force-recreate
 ```
 The `--force-recreate` option is required for vault to be able to initialize
 
+
+# Architecture
+## Models
+### Image processing
+The image processing API, expect the model defined in the envrionment variable `MLFLOW_IMAGE_CLASSIFIER_MODEL_NAME` to be available in the version defined in the environment variable `MLFLOW_IMAGE_CLASSIFIER_MODEL_VERSION` on the MLFlow server available at the address defined in the environment variable `MLFLOW_ADDR`. The model is loaded when the service started. The deployment of a new version of the image processing model should be done by executing the following steps:
+- Train a new model and track it using MLFlow
+- Add the new model to the MLFlow Model registry and increment the new version
+- Restart the `api-image-processing` service/pod with the `MLFLOW_IMAGE_CLASSIFIER_MODEL_VERSION` updated
+
+**Note** These steps could be triggered using a service such as Airflow
 
 # Data storage
 ## Data Lake

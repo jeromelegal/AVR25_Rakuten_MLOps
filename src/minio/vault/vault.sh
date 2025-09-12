@@ -136,10 +136,6 @@ else
   rm -f vault_service_cert.json
 fi
 
-
-
-
-
 # Vérifier si le certificat et la clé Vault existent déjà
 if vault kv get -field=cert secret/minio/mlflow/certs > /dev/null 2>&1 && vault kv get -field=key secret/minio/mlflow/certs > /dev/null 2>&1; then
   echo "Le certificat mTLS minio pour le service mlflow existe déjà"
@@ -156,6 +152,26 @@ else
 
   # Enregistrer le certificat et la clé privée dans Vault
   vault kv put secret/minio/mlflow/certs cert="$MINIO_MLFLOW_CERT" key="$MINIO_MLFLOW_KEY" ca="$MINIO_MLFLOW_CA"
+  # Nettoyage des fichiers temporaires
+  rm -f vault_service_cert.json
+fi
+
+# Vérifier si le certificat et la clé Vault existent déjà pour le model downloader
+if vault kv get -field=cert secret/minio/model-downloader/certs > /dev/null 2>&1 && vault kv get -field=key secret/minio/model-downloader/certs > /dev/null 2>&1; then
+  echo "Le certificat mTLS minio pour le service model-downloader existe déjà"
+else
+  # Générer le certificat et la clé pour Vault
+  echo "Générer le certificat et la clé pour Vault pour le model-downloader"
+  vault write -format=json pki_minio/issue/minio common_name="minio"   ttl="72h" > minio_model-downloader_cert.json
+  # TODO: Define certificate duration as an env variable
+
+  # Extraire le certificat et la clé privée
+  MINIO_MODEL_DOWNLOADER_CA=$(jq -r '.data.ca_chain[0]' minio_model-downloader_cert.json)
+  MINIO_MODEL_DOWNLOADER_CERT=$(jq -r '.data.certificate' minio_model-downloader_cert.json)
+  MINIO_MODEL_DOWNLOADER_KEY=$(jq -r '.data.private_key' minio_model-downloader_cert.json)
+
+  # Enregistrer le certificat et la clé privée dans Vault
+  vault kv put secret/minio/model-downloader/certs cert="$MINIO_MODEL_DOWNLOADER_CERT" key="$MINIO_MODEL_DOWNLOADER_KEY" ca="$MINIO_MODEL_DOWNLOADER_CA"
 
   # Nettoyage des fichiers temporaires
   rm -f vault_service_cert.json

@@ -134,6 +134,22 @@ services:
       VAULT_USERNAME: "api-minio"
       VAULT_PASSWORD: "api-minio"
       ENVIRONMENT: "prod"
+  
+  model-downloader:
+    build:
+      context: ./src/model-downloader
+      dockerfile: Dockerfile
+    container_name: model-downloader
+    environment:
+      VAULT_ADDR: "https://vault:8200"
+      VAULT_USERNAME: "model-downloader"
+      VAULT_PASSWORD: "model-downloader"
+    profiles: [setup]
+    depends_on:
+      minio:
+        condition: service_healthy
+    volumes:
+      - model-downloader-volume:/app/data
 
   mlflow:
     build:
@@ -147,7 +163,58 @@ services:
       VAULT_ADDR: "https://vault:8200"
       VAULT_USERNAME: "mlflow"
       VAULT_PASSWORD: "mlflow"
+  
+  api-image-processing:
+    build:
+      context: ./src/api-image-processing
+      dockerfile: Dockerfile
+    container_name: api-image-processing
+    ports:
+      - "8030:8030"
+    environment:
+      VAULT_ADDR: "https://vault:8200"
+      VAULT_USERNAME: "api-image-processing-user"
+      VAULT_PASSWORD: "api-image-processing-password"
+
+  api-text-processing:
+    build:
+      context: ./src/api-text-processing
+      dockerfile: Dockerfile
+    container_name: api-text-processing
+    ports:
+      - "8040:8040"
+    environment:
+      VAULT_ADDR: "https://vault:8200"
+      VAULT_USERNAME: "api-text-processing"
+      VAULT_PASSWORD: "api-text-processing"
+  
+  api-processing:
+    build:
+      context: ./src/api-processing
+      dockerfile: Dockerfile
+    container_name: api-processing
+    ports:
+      - "8050:8050"
+    environment:
+      VAULT_ADDR: "https://vault:8200"
+      VAULT_USERNAME: "api-processing"
+      VAULT_PASSWORD: "api-processing"
+
+  # zookeeper:
+  #   build:
+  #     context: ./src/zookeeper
+  #     dockerfile: Dockerfile
+  #   container_name: zookeeper
+  #   ports:
+  #     - "2181:2181"
+  #   # volumes:
+  #   #   - ./src/sources.list:/etc/apt/sources.list
+  #   environment:
+  #     ZOOKEEPER_CLIENT_PORT: 2181
+  #     ZOOKEEPER_TICK_TIME: 2000
+
 volumes:
   minio-volume:
   mongodb-volume:
   postgresql-volume:
+  model-downloader-volume:

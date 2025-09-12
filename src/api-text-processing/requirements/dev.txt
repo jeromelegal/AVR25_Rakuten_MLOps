@@ -1,0 +1,8 @@
+-r common.txt
+pytest
+pytest-asyncio
+pytest-tornasync
+pytest-trio
+pytest-twisted
+twisted
+pytest-cov
