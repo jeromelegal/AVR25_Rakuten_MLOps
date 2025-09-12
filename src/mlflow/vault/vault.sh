@@ -147,20 +147,20 @@ else
 fi
 
 
-cat <<EOF > $MLFLOW_MLFLOW_KEY_PATH
+cat <<EOF > $MLFLOW_KEY_PATH
 $(printf "%s" "$MLFLOW_MLFLOW_KEY")
 EOF
 
-cat <<EOF > $MLFLOW_MLFLOW_CERT_PATH
+cat <<EOF > $MLFLOW_CERT_PATH
 $(printf "%s" "$MLFLOW_MLFLOW_CERT")
 EOF
 
-cat <<EOF > $MLFLOW_MLFLOW_PEM_PATH
+cat <<EOF > $MLFLOW_PEM_PATH
 $(printf "%s" "$MLFLOW_MLFLOW_KEY")
 $(printf "%s" "$MLFLOW_MLFLOW_CERT")
 EOF
 
-cat <<EOF > $MLFLOW_MLFLOW_CA_PATH
+cat <<EOF > $MLFLOW_CA_PATH
 $(printf "%s" "$MLFLOW_MLFLOW_CA")
 EOF
 
