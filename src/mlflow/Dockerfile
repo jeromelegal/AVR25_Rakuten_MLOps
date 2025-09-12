@@ -18,48 +18,32 @@ ENV MLFLOW_CERT_PATH ${MLFLOW_CERT_PATH:-"/etc/ssl/mlflow/mlflow.crt"}
 ENV MLFLOW_SECRET_KEY=""
 ENV MLFLOW_INTERNAL_SECRET_KEY=""
 
-ENV MONGODB_SERVICE_NAME ${MONGODB_SERVICE_NAME:-"mongodb"}
-ENV MONGODB_SERVICE_PORT ${MONGODB_SERVICE_PORT:-"27017"}
-ENV MONGODB_MLFLOW_USER ${MONGODB_MLFLOW_USER:-"db_manager_user"}
-ENV MONGODB_MLFLOW_PASSWORD ${MONGODB_MLFLOW_PASSWORD:-"db_manager_user_password"}
-ENV MONGODB_MLFLOW_DATABASE ${MONGODB_MLFLOW_DATABASE:-"file_storage"}
-ENV MONGODB_MLFLOW_PEM_PATH ${MONGODB_MLFLOW_PEM_PATH:-"/etc/ssl/mlflow/mongodb_mlflow.pem"}
-ENV MONGODB_MLFLOW_CA_PATH ${MONGODB_MLFLOW_CA_PATH:-"/etc/ssl/mlflow/mongodb_mlflow.ca"}
-ENV MONGODB_MLFLOW_KEY_PATH ${MONGODB_MLFLOW_KEY_PATH:-"/etc/ssl/mlflow/mongodb_mlflow.key"}
-ENV MONGODB_MLFLOW_CERT_PATH ${MONGODB_MLFLOW_CERT_PATH:-"/etc/ssl/mlflow/mongodb_mlflow.crt"}
-
+ENV POSTGRESQL_SERVICE_NAME ${POSTGRESQL_SERVICE_NAME:-"postgresql"}
+ENV POSTGRESQL_SERVICE_PORT ${POSTGRESQL_SERVICE_PORT:-"5432"}
+ENV POSTGRESQL_MLFLOW_USER ${POSTGRESQL_MLFLOW_USER:-"mlflow_user"}
+ENV POSTGRESQL_MLFLOW_PASSWORD ${POSTGRESQL_MLFLOW_PASSWORD:-"mlflow_user_password"}
+ENV POSTGRESQL_MLFLOW_DATABASE ${POSTGRESQL_MLFLOW_DATABASE:-"mlflow"}
+ENV POSTGRESQL_MLFLOW_PEM_PATH ${POSTGRESQL_MLFLOW_PEM_PATH:-"/etc/ssl/mlflow/postgresql_mlflow.pem"}
+ENV POSTGRESQL_MLFLOW_CA_PATH ${POSTGRESQL_MLFLOW_CA_PATH:-"/etc/ssl/mlflow/postgresql_mlflow.ca"}
+ENV POSTGRESQL_MLFLOW_KEY_PATH ${POSTGRESQL_MLFLOW_KEY_PATH:-"/etc/ssl/mlflow/postgresql_mlflow.key"}
+ENV POSTGRESQL_MLFLOW_CERT_PATH ${POSTGRESQL_MLFLOW_CERT_PATH:-"/etc/ssl/mlflow/postgresql_mlflow.crt"}
 
 ENV MINIO_SERVICE_NAME ${MINIO_SERVICE_NAME:-"minio"}
 ENV MINIO_SERVICE_PORT ${MINIO_SERVICE_PORT:-"9010"}
-# ENV MINIO_MLFLOW_USER ${MINIO_MLFLOW_USER:-"db_manager_user"}
-# ENV MINIO_MLFLOW_PASSWORD ${MINIO_MLFLOW_PASSWORD:-"db_manager_user_password"}
-# ENV MINIO_MLFLOW_DATABASE ${MINIO_MLFLOW_DATABASE:-"file_storage"}
+ENV MINIO_MLFLOW_USER ${MINIO_MLFLOW_USER:-"minio-user"}
+ENV MINIO_MLFLOW_PASSWORD ${MINIO_MLFLOW_PASSWORD:-"minio-password"}
 ENV MINIO_MLFLOW_PEM_PATH ${MINIO_MLFLOW_PEM_PATH:-"/etc/ssl/mlflow/minio_mlflow.pem"}
 ENV MINIO_MLFLOW_CA_PATH ${MINIO_MLFLOW_CA_PATH:-"/etc/ssl/mlflow/minio_mlflow.ca"}
 ENV MINIO_MLFLOW_KEY_PATH ${MINIO_MLFLOW_KEY_PATH:-"/etc/ssl/mlflow/minio_mlflow.key"}
 ENV MINIO_MLFLOW_CERT_PATH ${MINIO_MLFLOW_CERT_PATH:-"/etc/ssl/mlflow/minio_mlflow.crt"}
 
-ENV MLFLOW_MLFLOW_PEM_PATH ${MLFLOW_MLFLOW_PEM_PATH:-"/etc/ssl/mlflow/mlflow_mlflow.pem"}
-ENV MLFLOW_MLFLOW_CA_PATH ${MLFLOW_MLFLOW_CA_PATH:-"/etc/ssl/mlflow/mlflow_mlflow.ca"}
-ENV MLFLOW_MLFLOW_KEY_PATH ${MLFLOW_MLFLOW_KEY_PATH:-"/etc/ssl/mlflow/mlflow_mlflow.key"}
-ENV MLFLOW_MLFLOW_CERT_PATH ${MLFLOW_MLFLOW_CERT_PATH:-"/etc/ssl/mlflow/mlflow_mlflow.crt"}
-
 ENV MLFLOW_HOST=https://$SERVICE_NAME
-ENV MLFLOW_USERNAME=${VMLFLOW_USERNAME:-"mlflow-user"}
-ENV MLFLOW_PASSWORD=${VMLFLOW_PASSWORD:-"mlflow-password"}
-
-# ENV MLFLOW_INTERNAL_ENDPOINT_URL=/api/internal/
-# ENV MLFLOW_PROTECTED_ENDPOINT_URL=/api/protected/
-
-
-# ENV API_GATEWAY_SERVICE_NAME ${API_GATEWAY_SERVICE_NAME:-"api-gateway"}
-# ENV API_GATEWAY_HOST=https://$API_GATEWAY_SERVICE_NAME
+ENV MLFLOW_USERNAME=${MLFLOW_USERNAME:-"mlflow-user"}
+ENV MLFLOW_PASSWORD=${MLFLOW_PASSWORD:-"mlflow-password"}
 
 ENV MLFLOW_INTERNAL_SECRET_KEY=internal_secret_key
 ENV MLFLOW_ALGORITHM=HS256
 ENV MLFLOW_ACCESS_TOKEN_EXPIRE_MINUTES=30
-
-
 
 ENV NGINX_CONFIG_FILE="/etc/nginx/nginx.conf"
 ENV NGINX_STATUS_FILE="/var/log/status"
@@ -113,8 +97,6 @@ RUN chmod +x /usr/local/bin/entrypoint.sh
 COPY vault/vault.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/vault.sh
 
-
-
 RUN mv nginx/nginx-fcgiwrap.sh /usr/local/bin/nginx-fcgiwrap.sh
 RUN chmod +x /usr/local/bin/nginx-fcgiwrap.sh
 
@@ -127,7 +109,6 @@ RUN mv nginx/nginx-conf.sh /usr/local/bin/nginx-conf.sh
 RUN chmod +x /usr/local/bin/nginx-conf.sh
 
 
-EXPOSE 8000
+EXPOSE 5000
 
-# CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 ENTRYPOINT ["entrypoint.sh"]

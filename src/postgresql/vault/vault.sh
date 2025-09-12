@@ -89,7 +89,7 @@ chmod 600 /etc/ssl/${SERVICE_NAME}/${SERVICE_NAME}-keyfile
 
 
 #Liste des services pour lesquels générer les certificats
-services=("${SERVICE_NAME}" "api-postgresql")
+services=("${SERVICE_NAME}" "api-postgresql" "mlflow")
 
 # Boucle sur chaque service
 for service_name in "${services[@]}"; do
