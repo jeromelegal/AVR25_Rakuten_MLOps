@@ -15,7 +15,7 @@ class AdToClassify(BaseModel):
     file: Annotated[list[bytes], File(description="Multiple files as bytes")]
 
 
-class Prediction:
+class Prediction(BaseModel):
     category: Optional[str]
     probability: Optional[float]
     overall_probabilities: Optional[Dict[str, float]]

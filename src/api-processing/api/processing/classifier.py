@@ -168,7 +168,7 @@ class ImageTextClassifier:
         if description is None:
             description = ""
 
-        data.update({"description": ""})
+        data.update({"description": description})
         data.update({"designation": designation})
 
         data = self._get_api_result(url=self._text_api_url, json={"inputs": [data]})
