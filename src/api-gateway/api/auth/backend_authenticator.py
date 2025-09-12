@@ -11,18 +11,22 @@ class BackendAuthenticator:
         ]
 
     def authenticate(self, credentials: Dict[str, str]):
-        user_data = {
-            "username": credentials.get("username"),
-            #"email": credentials.get("email"),
-            #"user_id": "12345"
-        }
+
 
         backend_tokens = {}
-
+        backend_uid = {}
+        concat_uid = ""
         for client in self.clients:
             # Authentifier l'utilisateur sur chaque backend et récupérer les tokens
-            token = client.authenticate(credentials)
+            user_id, token  = client.authenticate(credentials)
+            print(f"client.name:{client.name}\n token:\n{token}  ")
             backend_tokens[client.name] = token
+            backend_uid[client.name] = user_id
+            concat_uid += f"_{user_id}"
+        
+        user_data = {
+            "user_id": concat_uid,
+        }        
 
         # Renvoie les informations de l'utilisateur et les tokens des backends
-        return user_data, backend_tokens
+        return user_data, backend_tokens, backend_uid

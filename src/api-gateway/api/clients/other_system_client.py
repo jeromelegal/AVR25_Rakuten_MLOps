@@ -2,13 +2,14 @@ import os
 import requests
 from typing import Dict
 from api.config.settings import settings
-from api.auth.token_manager import create_access_token
+
 
 class OtherSystemClient:
     def __init__(self):
         self.name = "other_system"
         self.base_url = os.getenv('OTHER_SYSTEM_BASE_URL')
-        self.internal_api_token = create_access_token({"scope": "internal"})
+        # self.internal_api_token = create_access_token({"scope": "internal"})
+        self.internal_api_token = None
 
     def get_headers(self):
         return {

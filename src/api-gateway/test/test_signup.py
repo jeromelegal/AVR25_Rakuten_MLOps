@@ -4,23 +4,33 @@ from fastapi.testclient import TestClient
 
 # Ajouter le chemin absolu de l'application
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "/app")))
-
 from main import app
 from api.config.settings import settings
 
-client = TestClient(app)
 
+import random
+
+# Générer un entier aléatoire entre 1 et 100
+nombre_aleatoire = random.randint(1, 100000)
+
+# Variables pour les informations de connexion
+PROTECTED_ENDPOINT_URL = settings.API_GATEWAY_PROTECTED_ENDPOINT_URL
+USERNAME = f"{nombre_aleatoire}newuser-gateway-signup"
+EMAIL = f"{USERNAME}@example.com"
+PASSWORD = f"{USERNAME}"
+
+client = TestClient(app)
 
 def test_signup():
     # Exemple de test pour l'endpoint de signup
     response = client.post(
-        f"{settings.API_GATEWAY_PROTECTED_ENDPOINT_URL}/signup",
+        f"{PROTECTED_ENDPOINT_URL}/signup",
         json={
-            "username": "newuser-gateway",
-            "email": "newuser-gateway@example.com",
-            "password": "newpass",
+            "username": USERNAME,
+            "email": EMAIL,
+            "password": PASSWORD,
         },
     )
     assert response.status_code == 200
     assert response.json()["message"] == "User created successfully"
-    # assert "user_id" in response.json()  # Vérifier la présence de user_id
+

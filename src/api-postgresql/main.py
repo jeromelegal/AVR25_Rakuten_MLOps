@@ -37,7 +37,6 @@ class InternalAccessMiddleware(BaseHTTPMiddleware):
             api_key = request.headers.get("X-API-Key")
             if not api_key:
                 return JSONResponse(status_code=401, content={"detail": "API key is missing"})
-
             try:
                 payload = jwt.decode(api_key, INTERNAL_SECRET_KEY, algorithms=[ALGORITHM])
                 if payload.get("scope") != "internal":

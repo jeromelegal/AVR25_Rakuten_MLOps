@@ -28,8 +28,6 @@ async def create_user(user: User):
         user_dict["created_at"] = datetime.now(timezone.utc).replace(tzinfo=None)  # Set the creation date
         user_dict["created_by"] = 0  # Assuming the system creates the user
 
-
-        print("user_dict[\"created_at\"] ", user_dict["created_at"])
         # Insert the user into the database
         user_id = await conn.fetchval(
             "INSERT INTO users (username, email, password, created_at, created_by) VALUES ($1, $2, $3, $4, $5) RETURNING id",
@@ -39,7 +37,6 @@ async def create_user(user: User):
             user_dict["created_at"],
             user_dict["created_by"]
         )
-        print('Création user_id ' , user_id)
         user_dict["user_id"] = str(user_id)
         return UserResponse(**user_dict)
 
