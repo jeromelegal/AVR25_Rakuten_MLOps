@@ -22,28 +22,24 @@ class Settings(BaseSettings):
     INTERNAL_SECRET_KEY: str = os.getenv("API_GATEWAY_INTERNAL_SECRET_KEY", "")
     ALGORITHM: str = os.getenv("API_GATEWAY_ALGORITHM", "")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("API_GATEWAY_ACCESS_TOKEN_EXPIRE_MINUTES", 30))  # Valeur par défaut de 30 minutes
-    RSA_PRIVATE_KEY: str = os.getenv("RSA_PRIVATE_KEY", "")  # Valeur par défaut vide
-
-    @classmethod
-    def generate_rsa_private_key(cls):
-        # Générer une clé privée RSA
-        private_key = rsa.generate_private_key(
-            public_exponent=65537,
-            key_size=2048,
-            backend=default_backend()
-        )
-        # Sérialiser la clé en format PEM
-        private_pem = private_key.private_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PrivateFormat.PKCS8,
-            encryption_algorithm=serialization.NoEncryption()
-        )
-        return private_pem.decode('utf-8')
 
     def __init__(self, **kwargs):
-        super().__init__(**kwargs)  # Appel du constructeur parent en premier
-        # Générer la clé si elle n'est pas définie
-        if not self.RSA_PRIVATE_KEY:
-            self.RSA_PRIVATE_KEY = self.generate_rsa_private_key()
+        super().__init__(**kwargs)
+        # Set INTERNAL_SECRET_KEY by reading from the file specified by API_GATEWAY_INTERNAL_SECRET_KEY_PATH
+        secret_key_path = os.getenv("API_GATEWAY_INTERNAL_SECRET_KEY_PATH")
+        if secret_key_path:
+            try:
+                with open(secret_key_path, 'r') as file:
+                    self.INTERNAL_SECRET_KEY = file.read().strip()
+            except FileNotFoundError:
+                self.INTERNAL_SECRET_KEY = ""
+                print("Le fichier spécifié n'a pas été trouvé.")
+            except Exception as e:
+                self.INTERNAL_SECRET_KEY = ""
+                print(f"Une erreur s'est produite : {e}")
+        else:
+            self.INTERNAL_SECRET_KEY = ""
+            print("La variable d'environnement API_GATEWAY_INTERNAL_SECRET_KEY_PATH n'est pas définie.")
+
 
 settings = Settings()
