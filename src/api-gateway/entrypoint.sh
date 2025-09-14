@@ -20,6 +20,8 @@ done
 
 vault.sh
 
+API_GATEWAY_INTERNAL_SECRET_KEY=$(cat $API_GATEWAY_INTERNAL_SECRET_KEY_PATH)
+
 set -m
 
 # Démarrer Uvicorn avec les certificats

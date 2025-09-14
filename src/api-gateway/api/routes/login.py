@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from api.auth.backend_authenticator import BackendAuthenticator
-from api.auth.token_manager import create_meta_token, create_signed_encrypted_token
+from api.auth.token_manager import create_meta_token, create_signed_token
 router = APIRouter()
 
 @router.post("/login")
@@ -27,7 +27,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     meta_token_payload = create_meta_token(user_data, backend_uid, backend_tokens)
 
     # Créer un méta-token signé et chiffré
-    meta_token = create_signed_encrypted_token(meta_token_payload)
+    meta_token = create_signed_token(meta_token_payload)
 
     return {
         "username": form_data.username,

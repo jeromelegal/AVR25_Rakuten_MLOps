@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Header
 from pydantic import BaseModel
 from typing import Dict
 from api.clients.client_manager import client_manager
-from api.auth.token_manager import get_user_data_from_token, create_meta_token, create_signed_encrypted_token
+from api.auth.token_manager import get_user_data_from_token, create_meta_token, create_signed_token
 from datetime import datetime, timedelta, timezone
 from jose import jwt
 import secrets

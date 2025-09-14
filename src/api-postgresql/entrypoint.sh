@@ -9,25 +9,18 @@ until [ $HTTP_CODE -eq 200 ]; do
     sleep 1
 done
 
-#export POSTGRESQL_IP=$(nslookup $POSTGRESQL_SERVICE_NAME | awk '/^Address: / { print $2 }' | tail -n 1)
-
 vault.sh
+
+API_POSTGRESQL_INTERNAL_SECRET_KEY=$(cat $API_POSTGRESQL_INTERNAL_SECRET_KEY_PATH)
 
 set -m
 
 exec uvicorn main:app --host 0.0.0.0 --port $SERVICE_PORT --ssl-keyfile $API_POSTGRESQL_KEY_PATH --ssl-certfile $API_POSTGRESQL_CERT_PATH --ssl-ca-certs $API_POSTGRESQL_CA_PATH --ssl-cert-reqs 2 --log-level info &
-
-#exec uvicorn main:app --host 0.0.0.0 --port 8000 --ssl-keyfile $API_POSTGRESQL_API_POSTGRESQL_KEY_PATH --ssl-certfile $API_POSTGRESQL_API_POSTGRESQL_CERT_PATH --ssl-ca-certs $API_POSTGRESQL_API_POSTGRESQL_CA_PATH &
 
 jobs
 
 nginx-fcgiwrap.sh
 
 nginx-conf.sh
-
-# curl --cert $API_POSTGRESQL_API_POSTGRESQL_CERT_PATH \
-#       --key $API_POSTGRESQL_API_POSTGRESQL_KEY_PATH \
-#       --cacert $API_POSTGRESQL_API_POSTGRESQL_CA_PATH \
-#       https://$SERVICE_NAME:8000
 
 fg %1

@@ -19,7 +19,6 @@ until vault login -method=userpass username=$VAULT_USERNAME password=$VAULT_PASS
     sleep 1
 done
 
-
 services=("${SERVICE_NAME}" "vault" "consul" )
 
 # Boucle sur chaque service
@@ -55,8 +54,6 @@ $(jq -r '.data.certificate' ${SERVICE_NAME}_cert.json)
 EOF
 
 # Extraire le certificat et la clé privée
-
-
 cat <<EOF > /etc/ssl/${SERVICE_NAME}/${SERVICE_NAME}.crt
 $(jq -r '.data.certificate' ${SERVICE_NAME}_cert.json)
 EOF
@@ -83,6 +80,24 @@ retrieve=$(vault kv get -field=value secret/${SERVICE_NAME}/keyfile)
 mkdir -p /etc/ssl/${SERVICE_NAME}/
 echo $retrieve > /etc/ssl/${SERVICE_NAME}/${SERVICE_NAME}-keyfile
 chmod 600 /etc/ssl/${SERVICE_NAME}/${SERVICE_NAME}-keyfile
+
+
+
+
+
+# Vérifier si le certificat et la clé Backend existent déjà
+if ! vault kv get -field=value secret/api-postgresql/internal_keyfile > /dev/null 2>&1; then
+  key_value=$(openssl rand -base64 741 | tr -d '\n' )
+  vault kv put secret/api-postgresql/internal_keyfile value=$key_value
+fi
+
+API_POSTGRESQL_INTERNAL_SECRET_KEY=$(vault kv get -field=value secret/api-postgresql/internal_keyfile)
+
+cat <<EOF > $API_POSTGRESQL_INTERNAL_SECRET_KEY_PATH
+$(printf "%s" "$API_POSTGRESQL_INTERNAL_SECRET_KEY")
+EOF
+
+
 
 
 
@@ -126,12 +141,6 @@ for service_name in "${services[@]}"; do
   PEM_PATH="/etc/ssl/${SERVICE_NAME}/${SERVICE_NAME}_${service_name}.pem"
   CA_PATH="/etc/ssl/${SERVICE_NAME}/${SERVICE_NAME}_${service_name}_ca.crt"
 
-# echo "KEY_PATH $KEY_PATH"
-# echo "CERT_PATH $CERT_PATH"
-# echo "PEM_PATH $PEM_PATH"
-# echo "CA_PATH $CA_PATH"
-
-
   cat <<EOF > "${KEY_PATH}"
 $(printf "%s" "$KEY")
 EOF
@@ -152,75 +161,6 @@ EOF
   echo "Traitement terminé pour le service : $service_name"
 done
 
-
-
-
-
-
-
-
-
-
-
-
-# # Extraire le certificat et la clé privée
-# API_POSTGRESQL_API_POSTGRESQL_CA=$(vault kv get -field=ca secret/postgresql/api-postgresql/certs)
-# API_POSTGRESQL_API_POSTGRESQL_CERT=$(vault kv get -field=cert secret/postgresql/api-postgresql/certs)
-# API_POSTGRESQL_API_POSTGRESQL_KEY=$(vault kv get -field=key secret/postgresql/api-postgresql/certs)
-
-
-# cat <<EOF > $API_POSTGRESQL_API_POSTGRESQL_KEY_PATH
-# $(printf "%s" "$API_POSTGRESQL_API_POSTGRESQL_KEY")
-# EOF
-
-# cat <<EOF > $API_POSTGRESQL_API_POSTGRESQL_CERT_PATH
-# $(printf "%s" "$API_POSTGRESQL_API_POSTGRESQL_CERT")
-# EOF
-
-# cat <<EOF > $API_POSTGRESQL_API_POSTGRESQL_PEM_PATH
-# $(printf "%s" "$API_POSTGRESQL_API_POSTGRESQL_KEY")
-# $(printf "%s" "$API_POSTGRESQL_API_POSTGRESQL_CERT")
-# EOF
-
-# cat <<EOF > $API_POSTGRESQL_API_POSTGRESQL_CA_PATH
-# $(printf "%s" "$API_POSTGRESQL_API_POSTGRESQL_CA")
-# EOF
-
-
-# chmod 600 $API_POSTGRESQL_API_POSTGRESQL_KEY_PATH
-
-# # Extraire le certificat et la clé privée
-# POSTGRESQL_API_POSTGRESQL_CA=$(vault kv get -field=ca secret/postgresql/api-postgresql/certs)
-# POSTGRESQL_API_POSTGRESQL_CERT=$(vault kv get -field=cert secret/postgresql/api-postgresql/certs)
-# POSTGRESQL_API_POSTGRESQL_KEY=$(vault kv get -field=key secret/postgresql/api-postgresql/certs)
-
-
-# cat <<EOF > $POSTGRESQL_API_POSTGRESQL_KEY_PATH
-# $(printf "%s" "$POSTGRESQL_API_POSTGRESQL_KEY")
-# EOF
-
-# cat <<EOF > $POSTGRESQL_API_POSTGRESQL_CERT_PATH
-# $(printf "%s" "$POSTGRESQL_API_POSTGRESQL_CERT")
-# EOF
-
-# cat <<EOF > $POSTGRESQL_API_POSTGRESQL_PEM_PATH
-# $(printf "%s" "$POSTGRESQL_API_POSTGRESQL_KEY")
-# $(printf "%s" "$POSTGRESQL_API_POSTGRESQL_CERT")
-# EOF
-
-# cat <<EOF > $POSTGRESQL_API_POSTGRESQL_CA_PATH
-# $(printf "%s" "$POSTGRESQL_API_POSTGRESQL_CA")
-# EOF
-
-
-# chmod 600 $POSTGRESQL_API_POSTGRESQL_KEY_PATH
-
-
-
-
-
-
-
 # Liste des services pour lesquels générer les certificats
 services=("postgresql" "api-postgresql")
 
@@ -238,11 +178,6 @@ for service_name in "${services[@]}"; do
   CERT_PATH="/etc/ssl/${SERVICE_NAME}/${service_name}_${SERVICE_NAME}.crt"
   PEM_PATH="/etc/ssl/${SERVICE_NAME}/${service_name}_${SERVICE_NAME}.pem"
   CA_PATH="/etc/ssl/${SERVICE_NAME}/${service_name}_${SERVICE_NAME}_ca.crt"
-
-  # echo "KEY_PATH $KEY_PATH"
-  # echo "CERT_PATH $CERT_PATH"
-  # echo "PEM_PATH $PEM_PATH"
-  # echo "CA_PATH $CA_PATH"
 
   cat <<EOF > "${KEY_PATH}"
 $(printf "%s" "$KEY")
