@@ -5,7 +5,8 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from config.db import get_db_client
 from bson import ObjectId
 from api.auth import hash_password, create_internal_api_access_token
-from config.config import API_GATEWAY_HOST, PROTECTED_ENDPOINT_URL
+# from config.config import API_GATEWAY_HOST, settings.PROTECTED_ENDPOINT_URL
+from config.settings import settings 
 
 client = TestClient(app)
 
@@ -31,7 +32,7 @@ async def test_create_ad():
         api_token = create_internal_api_access_token( data={"scope": "internal"})
 
         # Set the Authorization header
-        headers = {"Authorization": f"Bearer {token}", "Referer": API_GATEWAY_HOST + PROTECTED_ENDPOINT_URL, "X-API-Key": api_token}
+        headers = {"Authorization": f"Bearer {token}", "Referer": settings.API_GATEWAY_HOST + settings.PROTECTED_ENDPOINT_URL, "X-API-Key": api_token}
 
         payload = {"designation": "newtitle", 
                    "description": "vinyl", 
@@ -77,7 +78,7 @@ async def test_get_ad():
         api_token = create_internal_api_access_token( data={"scope": "internal"})
 
         # Set the Authorization header
-        headers = {"Authorization": f"Bearer {token}", "Referer": API_GATEWAY_HOST + PROTECTED_ENDPOINT_URL, "X-API-Key": api_token}
+        headers = {"Authorization": f"Bearer {token}", "Referer": settings.API_GATEWAY_HOST + settings.PROTECTED_ENDPOINT_URL, "X-API-Key": api_token}
 
         # Create an ad
         ad_id = ObjectId()
@@ -119,7 +120,7 @@ async def test_update_ad():
         api_token = create_internal_api_access_token( data={"scope": "internal"})
 
         # Set the Authorization header
-        headers = {"Authorization": f"Bearer {token}", "Referer": API_GATEWAY_HOST + PROTECTED_ENDPOINT_URL, "X-API-Key": api_token}
+        headers = {"Authorization": f"Bearer {token}", "Referer": settings.API_GATEWAY_HOST + settings.PROTECTED_ENDPOINT_URL, "X-API-Key": api_token}
 
         # Create a ad
         ad_id = ObjectId()
@@ -167,7 +168,7 @@ async def test_delete_ad():
         api_token = create_internal_api_access_token( data={"scope": "internal"})
 
         # Set the Authorization header
-        headers = {"Authorization": f"Bearer {token}", "Referer": API_GATEWAY_HOST + PROTECTED_ENDPOINT_URL, "X-API-Key": api_token}
+        headers = {"Authorization": f"Bearer {token}", "Referer": settings.API_GATEWAY_HOST + settings.PROTECTED_ENDPOINT_URL, "X-API-Key": api_token}
 
         # Create a ad
         ad_id = ObjectId()

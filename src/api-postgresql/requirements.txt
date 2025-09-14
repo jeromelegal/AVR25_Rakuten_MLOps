@@ -10,3 +10,4 @@ fastapi-jwt-auth
 python-multipart
 anyio
 pytest-asyncio
+pydantic-settings

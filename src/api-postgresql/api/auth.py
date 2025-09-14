@@ -7,7 +7,8 @@ from config.db import get_db_client
 import asyncpg
 from typing import Optional
 import hashlib
-from config.config import SECRET_KEY, INTERNAL_SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
+# from config.config import SECRET_KEY, settings.INTERNAL_SECRET_KEY, settings.ALGORITHM, settings.ACCESS_TOKEN_EXPIRE_MINUTES
+from config.settings import settings 
 
 router = APIRouter()
 
@@ -44,7 +45,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     else:
         expire = datetime.now(UTC) + timedelta(minutes=15)
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, INTERNAL_SECRET_KEY, algorithm=ALGORITHM)
+    encoded_jwt = jwt.encode(to_encode, settings.INTERNAL_SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
 
 def create_internal_api_access_token(data: dict, expires_delta: Optional[timedelta] = None):
@@ -54,7 +55,7 @@ def create_internal_api_access_token(data: dict, expires_delta: Optional[timedel
     else:
         expire = datetime.now(UTC) + timedelta(minutes=15)
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, INTERNAL_SECRET_KEY, algorithm=ALGORITHM)
+    encoded_jwt = jwt.encode(to_encode, settings.INTERNAL_SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
 
 async def get_current_user(token: str = Depends(oauth2_scheme)):
@@ -64,7 +65,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        payload = jwt.decode(token, INTERNAL_SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, settings.INTERNAL_SECRET_KEY, algorithms=[settings.ALGORITHM])
         username: str = payload.get("sub")
         if username is None:
             raise credentials_exception
@@ -89,7 +90,7 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
                 detail="Incorrect username or password",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token = create_access_token(
             data={"user_id": user["id"],"sub": user["username"], 'scope': 'internal'}, expires_delta=access_token_expires
         )

@@ -4,7 +4,9 @@ from main import app
 from config.db import get_db_client
 import asyncpg
 from api.auth import hash_password, create_internal_api_access_token
-from config.config import API_GATEWAY_HOST, PROTECTED_ENDPOINT_URL
+# from config.config import settings.API_GATEWAY_HOST, settings.PROTECTED_ENDPOINT_URL
+from config.settings import settings 
+
 
 client = TestClient(app)
 
@@ -25,7 +27,7 @@ async def test_create_role_user():
         api_token = create_internal_api_access_token(data={"scope": "internal"})
 
         # Set the Authorization header
-        headers = {"Authorization": f"Bearer {token}", "Referer": API_GATEWAY_HOST + PROTECTED_ENDPOINT_URL, "X-API-Key": api_token}
+        headers = {"Authorization": f"Bearer {token}", "Referer": settings.API_GATEWAY_HOST + settings.PROTECTED_ENDPOINT_URL, "X-API-Key": api_token}
 
         # Create a role
         role_id = await conn.fetchval(
@@ -64,7 +66,7 @@ async def test_get_role_user():
         api_token = create_internal_api_access_token(data={"scope": "internal"})
 
         # Set the Authorization header
-        headers = {"Authorization": f"Bearer {token}", "Referer": API_GATEWAY_HOST + PROTECTED_ENDPOINT_URL, "X-API-Key": api_token}
+        headers = {"Authorization": f"Bearer {token}", "Referer": settings.API_GATEWAY_HOST + settings.PROTECTED_ENDPOINT_URL, "X-API-Key": api_token}
 
         # Create a role
         role_id = await conn.fetchval(
@@ -107,7 +109,7 @@ async def test_update_role_user():
         api_token = create_internal_api_access_token(data={"scope": "internal"})
 
         # Set the Authorization header
-        headers = {"Authorization": f"Bearer {token}", "Referer": API_GATEWAY_HOST + PROTECTED_ENDPOINT_URL, "X-API-Key": api_token}
+        headers = {"Authorization": f"Bearer {token}", "Referer": settings.API_GATEWAY_HOST + settings.PROTECTED_ENDPOINT_URL, "X-API-Key": api_token}
 
         # Create a role
         role_id = await conn.fetchval(
@@ -150,7 +152,7 @@ async def test_delete_role_user():
         api_token = create_internal_api_access_token(data={"scope": "internal"})
 
         # Set the Authorization header
-        headers = {"Authorization": f"Bearer {token}", "Referer": API_GATEWAY_HOST + PROTECTED_ENDPOINT_URL, "X-API-Key": api_token}
+        headers = {"Authorization": f"Bearer {token}", "Referer": settings.API_GATEWAY_HOST + settings.PROTECTED_ENDPOINT_URL, "X-API-Key": api_token}
 
         # Create a role
         role_id = await conn.fetchval(

@@ -5,7 +5,8 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from config.db import get_db_client
 from bson import ObjectId
 from api.auth import hash_password, create_internal_api_access_token
-from config.config import API_GATEWAY_HOST, PROTECTED_ENDPOINT_URL
+# from config.config import API_GATEWAY_HOST, PROTECTED_ENDPOINT_URL
+from config.settings import settings 
 
 client = TestClient(app)
 
@@ -25,7 +26,7 @@ async def test_create_role():
         api_token = create_internal_api_access_token( data={"scope": "internal"})
 
         # Set the Authorization header
-        headers = {"Authorization": f"Bearer {token}", "Referer": API_GATEWAY_HOST + PROTECTED_ENDPOINT_URL, "X-API-Key": api_token}
+        headers = {"Authorization": f"Bearer {token}", "Referer": settings.API_GATEWAY_HOST + settings.PROTECTED_ENDPOINT_URL, "X-API-Key": api_token}
 
         response = client.post("/api/internal/mongodb/entity/role", json={"name": "newrole"}, headers=headers)
         assert response.status_code == 200
@@ -54,7 +55,7 @@ async def test_get_role():
         api_token = create_internal_api_access_token( data={"scope": "internal"})
 
         # Set the Authorization header
-        headers = {"Authorization": f"Bearer {token}", "Referer": API_GATEWAY_HOST + PROTECTED_ENDPOINT_URL, "X-API-Key": api_token}
+        headers = {"Authorization": f"Bearer {token}", "Referer": settings.API_GATEWAY_HOST + settings.PROTECTED_ENDPOINT_URL, "X-API-Key": api_token}
 
         # Create a role
         role_id = str(ObjectId())
@@ -85,7 +86,7 @@ async def test_update_role():
         api_token = create_internal_api_access_token( data={"scope": "internal"})
 
         # Set the Authorization header
-        headers = {"Authorization": f"Bearer {token}", "Referer": API_GATEWAY_HOST + PROTECTED_ENDPOINT_URL, "X-API-Key": api_token}
+        headers = {"Authorization": f"Bearer {token}", "Referer": settings.API_GATEWAY_HOST + settings.PROTECTED_ENDPOINT_URL, "X-API-Key": api_token}
 
         # Create a role
         role_id = str(ObjectId())
@@ -116,7 +117,7 @@ async def test_delete_role():
         api_token = create_internal_api_access_token( data={"scope": "internal"})
 
         # Set the Authorization header
-        headers = {"Authorization": f"Bearer {token}", "Referer": API_GATEWAY_HOST + PROTECTED_ENDPOINT_URL, "X-API-Key": api_token}
+        headers = {"Authorization": f"Bearer {token}", "Referer": settings.API_GATEWAY_HOST + settings.PROTECTED_ENDPOINT_URL, "X-API-Key": api_token}
 
         # Create a role
         role_id = str(ObjectId())

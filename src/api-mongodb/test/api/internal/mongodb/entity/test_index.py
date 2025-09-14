@@ -6,7 +6,8 @@ from config.db import get_db_client
 from bson import ObjectId
 from api.auth import hash_password, create_internal_api_access_token
 import uuid
-from config.config import API_GATEWAY_HOST, PROTECTED_ENDPOINT_URL
+# from config.config import API_GATEWAY_HOST, PROTECTED_ENDPOINT_URL
+from config.settings import settings 
 
 client = TestClient(app)
 
@@ -26,7 +27,7 @@ async def test_create_index():
         api_token = create_internal_api_access_token( data={"scope": "internal"})
 
         # Set the Authorization header
-        headers = {"Authorization": f"Bearer {token}", "Referer": API_GATEWAY_HOST + PROTECTED_ENDPOINT_URL, "X-API-Key": api_token}
+        headers = {"Authorization": f"Bearer {token}", "Referer": settings.API_GATEWAY_HOST + settings.PROTECTED_ENDPOINT_URL, "X-API-Key": api_token}
 
         response = client.post("/api/internal/mongodb/entity/index", json={"name": "newindex", "description": "New index description", "statistics": {"mean": 5.0, "std_dev": 1.5}}, headers=headers)
         assert response.status_code == 200
@@ -58,7 +59,7 @@ async def test_get_index():
         api_token = create_internal_api_access_token( data={"scope": "internal"})
 
         # Set the Authorization header
-        headers = {"Authorization": f"Bearer {token}", "Referer": API_GATEWAY_HOST + PROTECTED_ENDPOINT_URL, "X-API-Key": api_token}
+        headers = {"Authorization": f"Bearer {token}", "Referer": settings.API_GATEWAY_HOST + settings.PROTECTED_ENDPOINT_URL, "X-API-Key": api_token}
 
         # Create an index
         index_id = str(ObjectId())
@@ -93,7 +94,7 @@ async def test_update_index():
         api_token = create_internal_api_access_token( data={"scope": "internal"})
 
         # Set the Authorization header
-        headers = {"Authorization": f"Bearer {token}", "Referer": API_GATEWAY_HOST + PROTECTED_ENDPOINT_URL, "X-API-Key": api_token}
+        headers = {"Authorization": f"Bearer {token}", "Referer": settings.API_GATEWAY_HOST + settings.PROTECTED_ENDPOINT_URL, "X-API-Key": api_token}
 
         # Create an index
         index_id = str(ObjectId())
@@ -128,7 +129,7 @@ async def test_delete_index():
         api_token = create_internal_api_access_token( data={"scope": "internal"})
 
         # Set the Authorization header
-        headers = {"Authorization": f"Bearer {token}", "Referer": API_GATEWAY_HOST + PROTECTED_ENDPOINT_URL, "X-API-Key": api_token}
+        headers = {"Authorization": f"Bearer {token}", "Referer": settings.API_GATEWAY_HOST + settings.PROTECTED_ENDPOINT_URL, "X-API-Key": api_token}
 
         # Create an index
         index_id = str(ObjectId())

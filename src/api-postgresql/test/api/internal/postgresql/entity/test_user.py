@@ -4,7 +4,9 @@ from main import app
 from config.db import get_db_client
 import asyncpg
 from api.auth import hash_password, create_internal_api_access_token
-from config.config import API_GATEWAY_HOST, PROTECTED_ENDPOINT_URL
+# from config.config import settings.API_GATEWAY_HOST, settings.PROTECTED_ENDPOINT_URL
+from config.settings import settings 
+
 from datetime import datetime
 
 
@@ -18,7 +20,7 @@ async def test_create_user():
 
         # Set the Authorization header
         headers = {
-            "Referer": API_GATEWAY_HOST + PROTECTED_ENDPOINT_URL,
+            "Referer": settings.API_GATEWAY_HOST + settings.PROTECTED_ENDPOINT_URL,
             "X-API-Key": api_token,
         }
 
@@ -47,7 +49,7 @@ async def test_get_user():
     async with get_db_client() as conn:
         api_token = create_internal_api_access_token(data={"scope": "internal"})
         headers = {
-            "Referer": API_GATEWAY_HOST + PROTECTED_ENDPOINT_URL,
+            "Referer": settings.API_GATEWAY_HOST + settings.PROTECTED_ENDPOINT_URL,
             "X-API-Key": api_token,
         }
         response = client.post(
@@ -74,7 +76,7 @@ async def test_get_user():
         # Set the Authorization header
         headers = {
             "Authorization": f"Bearer {token}",
-            "Referer": API_GATEWAY_HOST + PROTECTED_ENDPOINT_URL,
+            "Referer": settings.API_GATEWAY_HOST + settings.PROTECTED_ENDPOINT_URL,
             "X-API-Key": api_token,
         }
 
@@ -96,7 +98,7 @@ async def test_update_user():
         # Create a base user
         api_token = create_internal_api_access_token(data={"scope": "internal"})
         headers = {
-            "Referer": API_GATEWAY_HOST + PROTECTED_ENDPOINT_URL,
+            "Referer": settings.API_GATEWAY_HOST + settings.PROTECTED_ENDPOINT_URL,
             "X-API-Key": api_token,
         }
         response = client.post(
@@ -123,7 +125,7 @@ async def test_update_user():
         # Set the Authorization header
         headers = {
             "Authorization": f"Bearer {token}",
-            "Referer": API_GATEWAY_HOST + PROTECTED_ENDPOINT_URL,
+            "Referer": settings.API_GATEWAY_HOST + settings.PROTECTED_ENDPOINT_URL,
             "X-API-Key": api_token,
         }
 
@@ -151,7 +153,7 @@ async def test_delete_user():
         # Create a base user
         api_token = create_internal_api_access_token(data={"scope": "internal"})
         headers = {
-            "Referer": API_GATEWAY_HOST + PROTECTED_ENDPOINT_URL,
+            "Referer": settings.API_GATEWAY_HOST + settings.PROTECTED_ENDPOINT_URL,
             "X-API-Key": api_token,
         }
         response = client.post(
@@ -178,7 +180,7 @@ async def test_delete_user():
         # Set the Authorization header
         headers = {
             "Authorization": f"Bearer {token}",
-            "Referer": API_GATEWAY_HOST + PROTECTED_ENDPOINT_URL,
+            "Referer": settings.API_GATEWAY_HOST + settings.PROTECTED_ENDPOINT_URL,
             "X-API-Key": api_token,
         }
 
