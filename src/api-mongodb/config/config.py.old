@@ -1,11 +1,6 @@
 #from dotenv import load_dotenv
 import os
 
-# Charger les variables d'environnement à partir du fichier .env
-#load_dotenv()
-
-# Accéder aux variables d'environnement
-
 #API_MONGODB_HOST = os.getenv("API_MONGODB_HOST")
 API_GATEWAY_HOST = os.getenv("API_GATEWAY_HOST")
 INTERNAL_ENDPOINT_URL = os.getenv("API_MONGODB_INTERNAL_ENDPOINT_URL")

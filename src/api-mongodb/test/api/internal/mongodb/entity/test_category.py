@@ -5,7 +5,8 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from config.db import get_db_client
 from bson import ObjectId
 from api.auth import hash_password, create_internal_api_access_token
-from config.config import API_GATEWAY_HOST, PROTECTED_ENDPOINT_URL
+# from config.config import API_GATEWAY_HOST, PROTECTED_ENDPOINT_URL
+from config.settings import settings 
 
 client = TestClient(app)
 
@@ -31,7 +32,7 @@ async def test_create_category():
         api_token = create_internal_api_access_token( data={"scope": "internal"})
 
         # Set the Authorization header
-        headers = {"Authorization": f"Bearer {token}", "Referer": API_GATEWAY_HOST + PROTECTED_ENDPOINT_URL, "X-API-Key": api_token}
+        headers = {"Authorization": f"Bearer {token}", "Referer": API_GATEWAY_HOST + settings.PROTECTED_ENDPOINT_URL, "X-API-Key": api_token}
 
         response = client.post("/api/internal/mongodb/entity/category", json={"code": 9999, "label": "TEST"}, headers=headers)
         assert response.status_code == 200
@@ -72,7 +73,7 @@ async def test_get_category():
         api_token = create_internal_api_access_token( data={"scope": "internal"})
 
         # Set the Authorization header
-        headers = {"Authorization": f"Bearer {token}", "Referer": API_GATEWAY_HOST + PROTECTED_ENDPOINT_URL, "X-API-Key": api_token}
+        headers = {"Authorization": f"Bearer {token}", "Referer": API_GATEWAY_HOST + settings.PROTECTED_ENDPOINT_URL, "X-API-Key": api_token}
 
         # Create a category
         category_id = ObjectId()
@@ -104,7 +105,7 @@ async def test_update_category():
         api_token = create_internal_api_access_token( data={"scope": "internal"})
 
         # Set the Authorization header
-        headers = {"Authorization": f"Bearer {token}", "Referer": API_GATEWAY_HOST + PROTECTED_ENDPOINT_URL, "X-API-Key": api_token}
+        headers = {"Authorization": f"Bearer {token}", "Referer": API_GATEWAY_HOST + settings.PROTECTED_ENDPOINT_URL, "X-API-Key": api_token}
 
         # Create a ad
         category_id = ObjectId()
@@ -140,7 +141,7 @@ async def test_delete_category():
         api_token = create_internal_api_access_token( data={"scope": "internal"})
 
         # Set the Authorization header
-        headers = {"Authorization": f"Bearer {token}", "Referer": API_GATEWAY_HOST + PROTECTED_ENDPOINT_URL, "X-API-Key": api_token}
+        headers = {"Authorization": f"Bearer {token}", "Referer": API_GATEWAY_HOST + settings.PROTECTED_ENDPOINT_URL, "X-API-Key": api_token}
 
         # Create a ad
         category_id = ObjectId()

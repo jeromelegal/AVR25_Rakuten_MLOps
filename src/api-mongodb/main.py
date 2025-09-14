@@ -16,7 +16,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 import logging
-from config.config import API_GATEWAY_HOST, INTERNAL_SECRET_KEY, ALGORITHM, PROTECTED_ENDPOINT_URL, INTERNAL_ENDPOINT_URL
+# from config.config import API_GATEWAY_HOST, INTERNAL_SECRET_KEY, ALGORITHM, PROTECTED_ENDPOINT_URL, INTERNAL_ENDPOINT_URL
+from config.settings import settings 
 
 from api.auth import create_internal_api_access_token
 
@@ -39,9 +40,9 @@ class InternalAccessMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         # Vérifier si l'endpoint est interne
-        if request.url.path.startswith(INTERNAL_ENDPOINT_URL):
+        if request.url.path.startswith(settings.INTERNAL_ENDPOINT_URL):
             referer = request.headers.get("Referer")
-            if not referer or not referer.startswith(API_GATEWAY_HOST) :
+            if not referer or not referer.startswith(settings.API_GATEWAY_HOST) :
                 return JSONResponse(status_code=403, content={"detail": "Forbidden origin"})
 
             api_key = request.headers.get("X-API-Key")
@@ -49,7 +50,7 @@ class InternalAccessMiddleware(BaseHTTPMiddleware):
                 return JSONResponse(status_code=401, content={"detail": "API key is missing"})
 
             try:
-                payload = jwt.decode(api_key, INTERNAL_SECRET_KEY, algorithms=[ALGORITHM])
+                payload = jwt.decode(api_key, settings.INTERNAL_SECRET_KEY, algorithms=[settings.ALGORITHM])
                 if payload.get("scope") != "internal":
                     return JSONResponse(status_code=403, content={"detail": "Invalid scope"})
             except JWTError:
