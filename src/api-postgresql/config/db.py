@@ -1,15 +1,18 @@
 import os
 from contextlib import asynccontextmanager
-# from config.config import settings.POSTGRESQL_USER, settings.POSTGRESQL_PASSWORD, settings.POSTGRESQL_SERVICE_NAME, settings.POSTGRESQL_SERVICE_PORT, settings.POSTGRESQL_DATABASE, settings.POSTGRESQL_API_POSTGRESQL_CA_PATH, settings.POSTGRESQL_API_POSTGRESQL_CERT_PATH, settings.POSTGRESQL_API_POSTGRESQL_KEY_PATH
-from config.settings import settings 
-
 import asyncpg
 import ssl
 
-async def get_db():
+async def get_db(settings):
     # Configuration de la connexion SSL
-    ssl_context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile=settings.POSTGRESQL_API_POSTGRESQL_CA_PATH)
-    ssl_context.load_cert_chain(certfile=settings.POSTGRESQL_API_POSTGRESQL_CERT_PATH, keyfile=settings.POSTGRESQL_API_POSTGRESQL_KEY_PATH)
+    ssl_context = ssl.create_default_context(
+        ssl.Purpose.SERVER_AUTH,
+        cafile=settings.POSTGRESQL_API_POSTGRESQL_CA_PATH
+    )
+    ssl_context.load_cert_chain(
+        certfile=settings.POSTGRESQL_API_POSTGRESQL_CERT_PATH,
+        keyfile=settings.POSTGRESQL_API_POSTGRESQL_KEY_PATH
+    )
 
     # Connexion à la base de données PostgreSQL
     conn = await asyncpg.connect(
@@ -23,10 +26,16 @@ async def get_db():
     return conn
 
 @asynccontextmanager
-async def get_db_client():
+async def get_db_client(settings):
     # Configuration de la connexion SSL
-    ssl_context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile=settings.POSTGRESQL_API_POSTGRESQL_CA_PATH)
-    ssl_context.load_cert_chain(certfile=settings.POSTGRESQL_API_POSTGRESQL_CERT_PATH, keyfile=settings.POSTGRESQL_API_POSTGRESQL_KEY_PATH)
+    ssl_context = ssl.create_default_context(
+        ssl.Purpose.SERVER_AUTH,
+        cafile=settings.POSTGRESQL_API_POSTGRESQL_CA_PATH
+    )
+    ssl_context.load_cert_chain(
+        certfile=settings.POSTGRESQL_API_POSTGRESQL_CERT_PATH,
+        keyfile=settings.POSTGRESQL_API_POSTGRESQL_KEY_PATH
+    )
 
     # Connexion à la base de données PostgreSQL
     conn = await asyncpg.connect(

@@ -1,7 +1,7 @@
-from pydantic_settings import BaseSettings
 import os
+from pydantic_settings import BaseSettings
 
-class Settings(BaseSettings):
+class TestSettings(BaseSettings):
     API_GATEWAY_HOST: str = os.getenv("API_GATEWAY_HOST", "")
     INTERNAL_ENDPOINT_URL: str = os.getenv("API_POSTGRESQL_INTERNAL_ENDPOINT_URL", "")
     PROTECTED_ENDPOINT_URL: str = os.getenv("API_POSTGRESQL_PROTECTED_ENDPOINT_URL", "")
@@ -37,4 +37,5 @@ class Settings(BaseSettings):
             self.INTERNAL_SECRET_KEY = ""
             print("La variable d'environnement API_POSTGRESQL_INTERNAL_SECRET_KEY_PATH n'est pas définie.")
 
-settings = Settings()
+# Créez une instance de TestSettings pour l'utiliser dans vos tests
+test_settings = TestSettings()

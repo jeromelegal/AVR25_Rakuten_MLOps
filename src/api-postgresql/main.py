@@ -1,76 +1,39 @@
 from fastapi import FastAPI
-from api import main, auth
+from fastapi.middleware.cors import CORSMiddleware
+from api import hello as hello_router, auth as auth_router
 from api.postgresql.entity import user, role
 from api.postgresql.relation import roles_users
+from middleware.auth_middleware import create_auth_middleware
+from middleware.log_middleware import create_log_middleware
+from config.settings import Settings
 
-from fastapi.middleware.cors import CORSMiddleware
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import JSONResponse
-import logging
-# from config.config import settings.API_GATEWAY_HOST, settings.INTERNAL_SECRET_KEY, settings.ALGORITHM, settings.PROTECTED_ENDPOINT_URL, settings.INTERNAL_ENDPOINT_URL
-from config.settings import settings 
+def create_app(settings: Settings):
+    app = FastAPI()
+    app.state.settings = settings
 
-from api.auth import create_internal_api_access_token
+    # Ajoutez le middleware CORS
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
-from jose import JWTError, jwt
+    # Ajoutez les middlewares
+    log_middleware = create_log_middleware()
+    auth_middleware = create_auth_middleware(settings)
+    app.add_middleware(log_middleware)
+    app.add_middleware(auth_middleware)
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("internal_access_middleware")
+    # Inclure les routeurs
+    app.include_router(hello_router.router)
+    app.include_router(auth_router.router)
+    app.include_router(user.router)
+    app.include_router(role.router)
+    app.include_router(roles_users.router)
 
-# Chemins d'endpoints qui ne nécessitent pas de token
-PUBLIC_ENDPOINTS = {
-    ("POST", "/api/internal/postgresql/entity/user"): True,
-    ("POST", "/token"): True,
-}
+    return app
 
-class InternalAccessMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request, call_next):
-        # Vérifier si l'endpoint est public
-        if PUBLIC_ENDPOINTS.get((request.method, request.url.path)):
-            return await call_next(request)
-
-        # Vérifier si l'endpoint est interne
-        if request.url.path.startswith(settings.INTERNAL_ENDPOINT_URL):
-            referer = request.headers.get("Referer")
-            if not referer or not referer.startswith(settings.API_GATEWAY_HOST) :
-                return JSONResponse(status_code=403, content={"detail": "Forbidden origin"})
-
-            api_key = request.headers.get("X-API-Key")
-            if not api_key:
-                return JSONResponse(status_code=401, content={"detail": "API key is missing"})
-            try:
-                payload = jwt.decode(api_key, settings.INTERNAL_SECRET_KEY, algorithms=[settings.ALGORITHM])
-                if payload.get("scope") != "internal":
-                    return JSONResponse(status_code=403, content={"detail": "Invalid scope"})
-            except JWTError:
-                return JSONResponse(status_code=401, content={"detail": "Invalid API key"})
-
-        response = await call_next(request)
-        return response
-
-class LoggingMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request, call_next):
-        logger.info(f"Request: {request.method} {request.url}")
-        response = await call_next(request)
-        logger.info(f"Response: {response.status_code}")
-        return response
-
-app = FastAPI()
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-app.add_middleware(InternalAccessMiddleware)
-app.add_middleware(LoggingMiddleware)
-
-app.include_router(main.router)
-app.include_router(auth.router)
-app.include_router(user.router)
-app.include_router(role.router)
-
-app.include_router(roles_users.router)
+settings = Settings()
+app = create_app(settings)
