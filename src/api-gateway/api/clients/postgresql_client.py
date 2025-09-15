@@ -54,12 +54,6 @@ class PostgreSQLClient:
         except HTTPError as e:
             return None
 
-    def get_user_by_email(self, token: str, email: str):
-        headers = self.get_headers(token=token)
-        response = self.session.get(f"{self.base_url}/api/internal/postgresql/entity/user?email={email}", headers=headers)
-        response.raise_for_status()
-        return response.json()
-
     def create_user(self, token: str, user_data: Dict[str, str]):
         headers = self.get_headers(token=token)
         response = self.session.post(f"{self.base_url}/api/internal/postgresql/entity/user", json=user_data, headers=headers)

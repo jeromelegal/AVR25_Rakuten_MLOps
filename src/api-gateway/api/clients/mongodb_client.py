@@ -12,7 +12,6 @@ class MongoDBClient:
         self.ca_path = settings.API_MONGODB_API_GATEWAY_CA_PATH
         self.key_path = settings.API_MONGODB_API_GATEWAY_KEY_PATH
         self.cert_path = settings.API_MONGODB_API_GATEWAY_CERT_PATH
-        self.internal_api_token = None
         self.session = self.get_session()
 
     def get_session(self):
