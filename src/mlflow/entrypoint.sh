@@ -54,6 +54,8 @@ su mlflow -c "mlflow server \
     --backend-store-uri '${BACKEND_DSN}' \
     --serve-artifacts \
     --uvicorn-opts \"--ssl-keyfile $MLFLOW_KEY_PATH --ssl-certfile $MLFLOW_CERT_PATH\"" &
+# We could have enabled mTLS using this options instead:
+# --uvicorn-opts \"--ssl-keyfile $MLFLOW_KEY_PATH --ssl-certfile $MLFLOW_CERT_PATH --ssl-ca-certs $MLFLOW_CA_PATH --ssl-cert-reqs 2\"" &
 
 jobs
 
