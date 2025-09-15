@@ -12,7 +12,7 @@ done
 # Se connecter à Vault et récupérer un token
 export VAULT_SKIP_VERIFY="1"
 
-mkdir -p $(dirname $MLFLOW_PEM_PATH)  $(dirname $MLFLOW_CA_PATH) $(dirname $POSTGRESQL_MLFLOW_PEM_PATH) $(dirname $POSTGRESQL_MLFLOW_CA_PATH) 
+mkdir -p $(dirname $MLFLOW_PEM_PATH)  $(dirname $MLFLOW_CA_PATH) $(dirname $POSTGRESQL_MLFLOW_PEM_PATH) $(dirname $POSTGRESQL_MLFLOW_CA_PATH) $(dirname $MINIO_MLFLOW_PEM_PATH) $(dirname $MINIO_MLFLOW_CA_PATH) 
 
 until vault login -method=userpass username=$VAULT_USERNAME password=$VAULT_PASSWORD > /dev/null; do
     echo "Échec de l'authentification. Nouvelle tentative dans 1 seconde..."
