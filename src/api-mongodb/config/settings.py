@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # Ajoutez ici votre logique supplémentaire pour certaines variables si nécessaire
-        secret_key_path = os.getenv("API_MONGODB_INTERNAL_SECRET_KEY_PATH")
+        secret_key_path = os.getenv("INTERNAL_SECRET_KEY_PATH")
         if secret_key_path:
             try:
                 with open(secret_key_path, 'r') as file:
@@ -34,6 +34,8 @@ class Settings(BaseSettings):
                 print(f"Une erreur s'est produite : {e}")
         else:
             self.INTERNAL_SECRET_KEY = ""
-            print("La variable d'environnement API_MONGODB_INTERNAL_SECRET_KEY_PATH n'est pas définie.")
+            print("La variable d'environnement INTERNAL_SECRET_KEY_PATH n'est pas définie.")
 
+
+            
 settings = Settings()
