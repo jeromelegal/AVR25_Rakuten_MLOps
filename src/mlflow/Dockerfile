@@ -91,10 +91,10 @@ COPY requirements.txt requirements.txt
 RUN pip install --break-system-packages -r requirements.txt
 
 # Defining Minio related env. variables and certificates here to not mess with pip certificates
-ENV MLFLOW_S3_ENDPOINT_URL=http://${MINIO_SERVICE_NAME}:${MINIO_SERVICE_PORT}
+ENV MLFLOW_S3_ENDPOINT_URL=https://${MINIO_SERVICE_NAME}:${MINIO_SERVICE_PORT}
 ENV AWS_ACCESS_KEY_ID=${MINIO_MLFLOW_USER}
 ENV AWS_SECRET_ACCESS_KEY=${MINIO_MLFLOW_PASSWORD}
-ENV AWS_CA_BUNDLE=${MLFLOW_PEM_PATH}
+ENV AWS_CA_BUNDLE=${MINIO_MLFLOW_CA_PATH}
 ENV REQUESTS_CA_BUNDLE=${MLFLOW_PEM_PATH}
 
 COPY . .
@@ -121,6 +121,6 @@ RUN mv nginx/nginx-conf.sh /usr/local/bin/nginx-conf.sh
 RUN chmod +x /usr/local/bin/nginx-conf.sh
 
 
-EXPOSE 5000
+EXPOSE 5000 80 443
 
 ENTRYPOINT ["entrypoint.sh"]

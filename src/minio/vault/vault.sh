@@ -13,7 +13,7 @@ done
 # Se connecter à Vault et récupérer un token
 export VAULT_SKIP_VERIFY="1"
 
-mkdir -p $(dirname $MINIO_PEM_PATH)  $(dirname $MINIO_CA_PATH) $(dirname $MINIO_MINIO_PEM_PATH) $(dirname $MINIO_MINIO_CA_PATH) 
+mkdir -p $(dirname $MINIO_PEM_PATH)  $(dirname $MINIO_CA_PATH) $(dirname $MINIO_MINIO_PEM_PATH) $(dirname $MINIO_MINIO_CA_PATH) $(dirname $MINIO_MLFLOW_PEM_PATH) $(dirname $MINIO_MLFLOW_CA_PATH) 
 
 until vault login -method=userpass username=$VAULT_USERNAME password=$VAULT_PASSWORD > /dev/null; do
     echo "Échec de l'authentification. Nouvelle tentative dans 1 secondes..."
@@ -24,6 +24,7 @@ done
 vault kv get -field=certificate secret/vault/ca > vault_ca.crt
 vault kv get -field=certificate secret/consul/ca > consul_ca.crt
 vault kv get -field=certificate secret/minio/ca > minio_ca.crt
+vault kv get -field=certificate secret/mlflow/ca > mlflow_ca.crt
 
 cp minio_ca.crt $MINIO_CA_PATH
 
@@ -31,6 +32,7 @@ cp minio_ca.crt $MINIO_CA_PATH
 cp vault_ca.crt /usr/local/share/ca-certificates/
 cp consul_ca.crt /usr/local/share/ca-certificates/
 cp minio_ca.crt /usr/local/share/ca-certificates/
+cp mlflow_ca.crt /usr/local/share/ca-certificates/
 
 update-ca-certificates
 
@@ -139,6 +141,9 @@ fi
 # Vérifier si le certificat et la clé Vault existent déjà
 if vault kv get -field=cert secret/minio/mlflow/certs > /dev/null 2>&1 && vault kv get -field=key secret/minio/mlflow/certs > /dev/null 2>&1; then
   echo "Le certificat mTLS minio pour le service mlflow existe déjà"
+  MINIO_MLFLOW_CA=$(vault kv get -field=ca secret/minio/mlflow/certs)
+  MINIO_MLFLOW_CERT=$(vault kv get -field=cert secret/minio/mlflow/certs)
+  MINIO_MLFLOW_KEY=$(vault kv get -field=key secret/minio/mlflow/certs)  
 else
   # Générer le certificat et la clé pour Vault
   echo "Générer le certificat et la clé pour Vault"
@@ -155,6 +160,13 @@ else
   # Nettoyage des fichiers temporaires
   rm -f vault_service_cert.json
 fi
+
+cat <<EOF > $MINIO_MLFLOW_PEM_PATH
+$(printf "%s" "$MINIO_MLFLOW_KEY")
+$(printf "%s" "$MINIO_MLFLOW_CERT")
+EOF
+
+printf "%s" $MINIO_MLFLOW_CA > $MINIO_MLFLOW_CA_PATH
 
 # Vérifier si le certificat et la clé Vault existent déjà pour le model downloader
 if vault kv get -field=cert secret/minio/model-downloader/certs > /dev/null 2>&1 && vault kv get -field=key secret/minio/model-downloader/certs > /dev/null 2>&1; then

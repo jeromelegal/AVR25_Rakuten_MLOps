@@ -46,6 +46,8 @@ ENV MINIO_KEY_PATH=${MINIO_KEY_PATH:-"/etc/ssl/minio/minio.key"}
 ENV MINIO_CERT_PATH=${MINIO_CERT_PATH:-"/etc/ssl/minio/minio.crt"}
 ENV MINIO_MINIO_PEM_PATH=${MINIO_MINIO_PEM_PATH:-"/etc/ssl/minio/minio_minio.pem"}
 ENV MINIO_MINIO_CA_PATH=${MINIO_MINIO_CA_PATH:-"/etc/ssl/minio/minio_minio.ca"}
+ENV MINIO_MLFLOW_PEM_PATH=${MINIO_MLFLOW_PEM_PATH:-"/etc/ssl/minio/minio_mlflow.pem"}
+ENV MINIO_MLFLOW_CA_PATH=${MINIO_MLFLOW_CA_PATH:-"/etc/ssl/minio/minio_mlflow.ca"}
 ENV AUTHORIZATION=${AUTHORIZATION:-"enabled"}
 ENV SERVICE_NAME=${SERVICE_NAME:-"minio"}
 ENV VAULT_SERVICE_NAME=${VAULT_SERVICE_NAME:-"vault"}
@@ -97,6 +99,6 @@ COPY vault/vault.sh /usr/local/bin/vault.sh
 RUN chmod +x /usr/local/bin/*.sh
 
 # Définir le point d'entrée et exposer le port
-EXPOSE 9010 9011
+EXPOSE 9010 9011 80 443
 
 ENTRYPOINT ["entrypoint.sh"]
