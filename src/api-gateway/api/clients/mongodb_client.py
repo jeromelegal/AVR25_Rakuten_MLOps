@@ -14,7 +14,6 @@ class MongoDBClient:
         self.cert_path = settings.API_MONGODB_API_GATEWAY_CERT_PATH
         self.internal_api_token = None
         self.session = self.get_session()
-        self.token = None
 
     def get_session(self):
         session = requests.Session()
@@ -38,20 +37,18 @@ class MongoDBClient:
         )
         return session
 
-    def set_token(self, token):
-        self.token = token
 
-    def get_headers(self):
+    def get_headers(self, token: str):
         headers = {
             "Referer": f"{settings.HOST}{settings.PROTECTED_ENDPOINT_URL}",
         }
-        if self.token:
-            headers["X-API-Key"] = f"{self.token}"
-            headers["Authorization"] = f"Bearer {self.token}"
+        if token:
+            headers["X-API-Key"] = f"{token}"
+            headers["Authorization"] = f"Bearer {token}"
         return headers
 
-    def authenticate(self, credentials: Dict[str, str]) -> Optional[str]:
-        headers = self.get_headers()
+    def authenticate(self, token: str, credentials: Dict[str, str]) -> Optional[str]:
+        headers = self.get_headers(token=token)
         try:
             response = self.session.post(
                 f"{self.base_url}/token", data=credentials, headers=headers
@@ -61,17 +58,8 @@ class MongoDBClient:
         except HTTPError as e:
             return None
 
-    def get_user_by_email(self, email: str):
-        headers = self.get_headers()
-        response = self.session.get(
-            f"{self.base_url}/api/internal/mongodb/entity/user?email={email}",
-            headers=headers,
-        )
-        response.raise_for_status()
-        return response.json()
-
-    def create_user(self, user_data: Dict[str, str]):
-        headers = self.get_headers()
+    def create_user(self, token: str, user_data: Dict[str, str]):
+        headers = self.get_headers(token=token)
         response = self.session.post(
             f"{self.base_url}/api/internal/mongodb/entity/user",
             json=user_data,
@@ -80,8 +68,8 @@ class MongoDBClient:
         response.raise_for_status()
         return response.json()
 
-    def delete_user(self, user_id: str):
-        headers = self.get_headers()
+    def delete_user(self, token: str, user_id: str):
+        headers = self.get_headers(token=token)
         response = self.session.delete(
             f"{self.base_url}/api/internal/mongodb/entity/user/{user_id}",
             headers=headers,
@@ -89,8 +77,8 @@ class MongoDBClient:
         response.raise_for_status()
         return response.json()
 
-    def create_ad(self, ad_data: Dict[str, str]):
-        headers = self.get_headers()
+    def create_ad(self, token: str, ad_data: Dict[str, str]):
+        headers = self.get_headers(token=token)
         response = self.session.post(
             f"{self.base_url}/api/internal/mongodb/entity/ad",
             json=ad_data,
@@ -99,15 +87,16 @@ class MongoDBClient:
         response.raise_for_status()
         return response.json()
 
-    def get_ad(self, ad_id: str):
-        headers = self.get_headers()
+    def get_ad(self, token: str, ad_id: str):
+        headers = self.get_headers(token=token)
         response = self.session.post(
             f"{self.base_url}/api/internal/mongodb/entity/ad/{ad_id}", headers=headers
         )
         response.raise_for_status()
         return response.json()
-    def update_ad(self, ad_data: Dict[str, str]):
-        headers = self.get_headers()
+
+    def update_ad(self, token: str, ad_data: Dict[str, str]):
+        headers = self.get_headers(token=token)
         ad_id = ad_data["ad_id"]
         response = self.session.post(
             f"{self.base_url}/api/internal/mongodb/entity/ad/{ad_id}",
@@ -117,16 +106,16 @@ class MongoDBClient:
         response.raise_for_status()
         return response.json()
 
-    def delete_ad(self, ad_id: str):
-        headers = self.get_headers()
+    def delete_ad(self, token: str, ad_id: str):
+        headers = self.get_headers(token=token)
         response = self.session.post(
             f"{self.base_url}/api/internal/mongodb/entity/ad/{ad_id}", headers=headers
         )
         response.raise_for_status()
         return response.json()
 
-    def create_category(self, category_data: Dict[str, str]):
-        headers = self.get_headers()
+    def create_category(self, token: str, category_data: Dict[str, str]):
+        headers = self.get_headers(token=token)
         response = self.session.post(
             f"{self.base_url}/api/internal/mongodb/entity/category",
             json=category_data,
@@ -135,8 +124,8 @@ class MongoDBClient:
         response.raise_for_status()
         return response.json()
 
-    def get_category(self, category_id: str):
-        headers = self.get_headers()
+    def get_category(self, token: str, category_id: str):
+        headers = self.get_headers(token=token)
         response = self.session.post(
             f"{self.base_url}/api/internal/mongodb/entity/category/{category_id}",
             headers=headers,
@@ -144,8 +133,8 @@ class MongoDBClient:
         response.raise_for_status()
         return response.json()
 
-    def update_category(self, category_data: Dict[str, str]):
-        headers = self.get_headers()
+    def update_category(self, token: str, category_data: Dict[str, str]):
+        headers = self.get_headers(token=token)
         category_id = category_data["ad_id"]
         response = self.session.post(
             f"{self.base_url}/api/internal/mongodb/entity/category/{category_id}",
@@ -155,8 +144,8 @@ class MongoDBClient:
         response.raise_for_status()
         return response.json()
 
-    def delete_category(self, category_id: str):
-        headers = self.get_headers()
+    def delete_category(self, token: str, category_id: str):
+        headers = self.get_headers(token=token)
         response = self.session.post(
             f"{self.base_url}/api/internal/mongodb/entity/category/{category_id}",
             headers=headers,
@@ -164,8 +153,8 @@ class MongoDBClient:
         response.raise_for_status()
         return response.json()
 
-    def create_ad_category(self, ad_category_data: Dict[str, str]):
-        headers = self.get_headers()
+    def create_ad_category(self, token: str, ad_category_data: Dict[str, str]):
+        headers = self.get_headers(token=token)
         response = self.session.post(
             f"{self.base_url}/api/internal/mongodb/entity/ad_category",
             json=ad_category_data,
@@ -174,8 +163,8 @@ class MongoDBClient:
         response.raise_for_status()
         return response.json()
 
-    def get_ad_category(self, relation_id: str):
-        headers = self.get_headers()
+    def get_ad_category(self, token: str, relation_id: str):
+        headers = self.get_headers(token=token)
         response = self.session.post(
             f"{self.base_url}/api/internal/mongodb/entity/ad_category/{relation_id}",
             headers=headers,
@@ -183,8 +172,8 @@ class MongoDBClient:
         response.raise_for_status()
         return response.json()
 
-    def update_ad_category(self, ad_category_data: Dict[str, str]):
-        headers = self.get_headers()
+    def update_ad_category(self, token: str, ad_category_data: Dict[str, str]):
+        headers = self.get_headers(token=token)
         relation_id = ad_category_data["ad_id"]
         response = self.session.post(
             f"{self.base_url}/api/internal/mongodb/entity/ad_category/{relation_id}",
@@ -194,8 +183,8 @@ class MongoDBClient:
         response.raise_for_status()
         return response.json()
 
-    def delete_ad_category(self, relation_id: str):
-        headers = self.get_headers()
+    def delete_ad_category(self, token: str, relation_id: str):
+        headers = self.get_headers(token=token)
         response = self.session.post(
             f"{self.base_url}/api/internal/mongodb/entity/ad_category/{relation_id}",
             headers=headers,

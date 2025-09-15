@@ -21,7 +21,7 @@ async def signup_mongodb_action(user: User):
         "email": user.email,
         "password": user.password
     }
-    response = mongodb_client.create_user(user_data)
+    response = mongodb_client.create_user(token=None, user_data=user_data)
     return {"message": "User created successfully in MongoDB", "user_id": response.get("user_id")}
 
 async def signup_postgresql_action(user: User):
@@ -31,7 +31,7 @@ async def signup_postgresql_action(user: User):
         "email": user.email,
         "password": user.password
     }
-    response = postgresql_client.create_user(user_data)
+    response = postgresql_client.create_user(token=None, user_data=user_data)
     return {"message": "User created successfully in PostgreSQL", "user_id": response.get("user_id")}
 
 @router.post("/signup")

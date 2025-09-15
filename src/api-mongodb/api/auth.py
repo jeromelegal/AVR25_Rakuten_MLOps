@@ -7,7 +7,6 @@ from config.db import get_db_client
 from motor.motor_asyncio import AsyncIOMotorClient
 from typing import Optional
 import hashlib
-# from config.config import SECRET_KEY, INTERNAL_SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
 from config.settings import settings 
 
 router = APIRouter()
@@ -97,5 +96,4 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
         access_token = create_access_token(
             data=data, expires_delta=access_token_expires
         )
-
         return {"user_id": user["user_id"], "access_token": access_token, "token_type": "bearer"}

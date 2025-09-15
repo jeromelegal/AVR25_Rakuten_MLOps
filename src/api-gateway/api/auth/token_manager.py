@@ -14,7 +14,7 @@ def create_meta_token(user_data: dict, backend_uid: dict, backend_tokens: dict) 
     payload = {
         "user_id": user_data.get("user_id"),
         "tokens": backend_tokens,
-        "uid": backend_uid,
+        "uids": backend_uid,
         "exp": exp,
         "iat": now_utc,
         "scope": "access_token"
@@ -24,11 +24,6 @@ def create_meta_token(user_data: dict, backend_uid: dict, backend_tokens: dict) 
 def create_signed_token(payload: Dict) -> str:
     """Crée un JWT signé avec la clé privée."""
     to_encode = payload.copy()
-    # return jwt.encode(
-    #     to_encode,
-    #     settings.INTERNAL_SECRET_KEY,
-    #     algorithm="RS256"
-    # )
     encoded_jwt = jwt.encode(to_encode, settings.INTERNAL_SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
 

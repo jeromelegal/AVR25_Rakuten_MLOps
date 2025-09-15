@@ -18,8 +18,7 @@ class BackendAuthenticator:
         concat_uid = ""
         for client in self.clients:
             # Authentifier l'utilisateur sur chaque backend et récupérer les tokens
-            user_id, token  = client.authenticate(credentials)
-            print(f"client.name:{client.name}\n token:\n{token}  ")
+            user_id, token  = client.authenticate(token=None,credentials=credentials)
             backend_tokens[client.name] = token
             backend_uid[client.name] = user_id
             concat_uid += f"_{user_id}"
