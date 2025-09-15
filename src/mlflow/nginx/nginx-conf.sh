@@ -12,8 +12,8 @@ http {
 
         ssl_protocols TLSv1.2 TLSv1.3;
         ssl_ciphers HIGH:!aNULL:!MD5;
-        ssl_certificate $API_MONGODB_CERT_PATH;
-        ssl_certificate_key $API_MONGODB_KEY_PATH;
+        ssl_certificate $MLFLOW_CERT_PATH;
+        ssl_certificate_key $MLFLOW_KEY_PATH;
 
         location /health {
             include fastcgi_params;

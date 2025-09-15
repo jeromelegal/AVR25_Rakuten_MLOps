@@ -25,6 +25,7 @@ vault kv get -field=certificate secret/consul/ca > consul_ca.crt
 vault kv get -field=certificate secret/api-mongodb/ca > api-mongodb_ca.crt
 vault kv get -field=certificate secret/api-gateway/ca > api-gateway_ca.crt
 vault kv get -field=certificate secret/api-postgresql/ca > api-postgresql_ca.crt
+vault kv get -field=certificate secret/mlflow/ca > mlflow_ca.crt
 
 mkdir -p $(dirname $API_GATEWAY_PEM_PATH)
 mkdir -p $(dirname $API_GATEWAY_CA_PATH)
@@ -39,6 +40,7 @@ cp consul_ca.crt /usr/local/share/ca-certificates/
 cp api-mongodb_ca.crt /usr/local/share/ca-certificates/
 cp api-gateway_ca.crt /usr/local/share/ca-certificates/
 cp api-postgresql_ca.crt /usr/local/share/ca-certificates/
+cp mlflow_ca.crt /usr/local/share/ca-certificates/
 
 update-ca-certificates
 
@@ -181,4 +183,26 @@ EOF
 
 cat <<EOF > $API_POSTGRESQL_API_GATEWAY_CERT_PATH
 $(printf "%s" "$API_POSTGRESQL_API_GATEWAY_CERT")
+EOF
+
+# Extraire le certificat et la clé privée pour MLFlow
+MLFLOW_API_GATEWAY_CA=$(vault kv get -field=ca secret/mlflow/api-gateway/certs)
+MLFLOW_API_GATEWAY_CERT=$(vault kv get -field=cert secret/mlflow/api-gateway/certs)
+MLFLOW_API_GATEWAY_KEY=$(vault kv get -field=key secret/mlflow/api-gateway/certs)
+
+cat <<EOF > $MLFLOW_API_GATEWAY_PEM_PATH
+$(printf "%s" "$MLFLOW_API_GATEWAY_KEY")
+$(printf "%s" "$MLFLOW_API_GATEWAY_CERT")
+EOF
+
+cat <<EOF > $MLFLOW_API_GATEWAY_CA_PATH
+$(printf "%s" "$MLFLOW_API_GATEWAY_CA")
+EOF
+
+cat <<EOF > $MLFLOW_API_GATEWAY_KEY_PATH
+$(printf "%s" "$MLFLOW_API_GATEWAY_KEY")
+EOF
+
+cat <<EOF > $MLFLOW_API_GATEWAY_CERT_PATH
+$(printf "%s" "$MLFLOW_API_GATEWAY_CERT")
 EOF

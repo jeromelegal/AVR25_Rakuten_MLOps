@@ -1,9 +1,18 @@
 #!/bin/bash
 
+# Minio requires certificates to be in the form public.crt / private.key in the folder specified through the --certs-dir
+# option and the CAs in a 'CAs' folder
+mkdir -p /etc/ssl/minio/CAs
+ln -s /etc/ssl/minio/*.ca /etc/ssl/minio/CAs/
+ln -s /etc/ssl/minio/minio.crt /etc/ssl/minio/public.crt
+ln -s /etc/ssl/minio/minio.key /etc/ssl/minio/private.key
+
 # Lauch Minio server
 echo "Starting Minio server..."
-minio server /data --address ":$PORT" --console-address ":$GUI_PORT" &
-HEALTH_URL=http://127.0.0.1:$PORT/minio/health/live
+minio server /data --address ":$PORT" \
+                   --console-address ":$GUI_PORT" \
+                   --certs-dir /etc/ssl/minio &
+HEALTH_URL=https://127.0.0.1:$PORT/minio/health/live
 HTTP_CODE=$(curl -k -o /dev/null -s -w "%{http_code}\n" $HEALTH_URL)
 until [ $HTTP_CODE -eq 200 ]; do
     HTTP_CODE=$(curl -k -o /dev/null -s -w "%{http_code}\n" $HEALTH_URL)
@@ -14,7 +23,7 @@ echo "Minio server started"
 
 # Define alias for the following commands
 ALIAS="myminio"
-HOSTNAME="http://127.0.0.1:$PORT"
+HOSTNAME="https://127.0.0.1:$PORT"
 
 bash +o history
 mc alias set $ALIAS $HOSTNAME $MINIO_ROOT_USER $MINIO_ROOT_PASSWORD

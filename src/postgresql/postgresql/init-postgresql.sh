@@ -39,11 +39,25 @@ chmod 600 $POSTGRESQL_POSTGRESQL_KEY_PATH
 chown postgresql:postgresql $POSTGRESQL_API_POSTGRESQL_KEY_PATH
 chmod 600 $POSTGRESQL_API_POSTGRESQL_KEY_PATH
 
+chown postgresql:postgresql $POSTGRESQL_MLFLOW_KEY_PATH
+chmod 600 $POSTGRESQL_MLFLOW_KEY_PATH
+
 echo "Initialization of the database START"
 # Exécuter le script d'initialisation de la base de données
 su - postgresql -c "psql \"host=$SERVICE_NAME port=5432 user=postgresql dbname=postgres sslmode=verify-full sslcert=$POSTGRESQL_POSTGRESQL_CERT_PATH sslkey=$POSTGRESQL_POSTGRESQL_KEY_PATH sslrootcert=$POSTGRESQL_POSTGRESQL_CA_PATH\" -f /usr/local/bin/init-postgresql.sql"
 echo "Initialization of the database END"
 
+# Create MLFlow database and user
+echo "Setting up MLFlow table and user..."
+su - postgresql -c "psql \"host=$SERVICE_NAME port=5432 user=postgresql dbname=postgres sslmode=verify-full sslcert=$POSTGRESQL_POSTGRESQL_CERT_PATH sslkey=$POSTGRESQL_POSTGRESQL_KEY_PATH sslrootcert=$POSTGRESQL_POSTGRESQL_CA_PATH\" \
+                          --set=mlflow_db='$MLFLOW_DATABASE' \
+                          --set=mlflow_user='$MLFLOW_USER' \
+                          --set=mlflow_user_password='$MLFLOW_USER_PASSWORD' \
+                          -f /usr/local/bin/init-postgresql-mlflow.sql"
+su - postgresql -c "psql \"host=$SERVICE_NAME port=5432 user=$MLFLOW_USER password=$MLFLOW_USER_PASSWORD dbname=$MLFLOW_DATABASE sslmode=verify-full sslcert=$POSTGRESQL_MLFLOW_CERT_PATH sslkey=$POSTGRESQL_MLFLOW_KEY_PATH sslrootcert=$POSTGRESQL_MLFLOW_CA_PATH\""
+echo "MLFlow table and user created."
+
+# List users
 su - postgresql -c "psql \"host=$SERVICE_NAME port=5432 user=db_manager_user password=db_manager_user_password dbname=file_storage sslmode=verify-full sslcert=$POSTGRESQL_API_POSTGRESQL_CERT_PATH sslkey=$POSTGRESQL_API_POSTGRESQL_KEY_PATH sslrootcert=$POSTGRESQL_API_POSTGRESQL_CA_PATH\" -c \" SELECT * FROM users;\""
 
 # Arrêter PostgreSQL
