@@ -1,5 +1,50 @@
 FROM ubuntu:noble-20250127 AS builder
 
+
+# Création de l’utilisateur airflow
+RUN groupadd --gid 999 airflow && \
+    useradd --uid 999 --gid airflow --home-dir /home/airflow airflow && \
+    mkdir -p /home/airflow && \
+    chown -R airflow:airflow /home/airflow
+
+# Variables d’environnement Airflow
+ENV AIRFLOW_HOME=/opt/airflow
+ENV PATH="/opt/airflow_venv/bin:$PATH"
+ENV AIRFLOW__CORE__EXECUTOR=LocalExecutor
+ENV AIRFLOW__CORE__PARALLELISM=0
+#ENV AIRFLOW__CORE__EXECUTOR=KubernetesExecutor
+ENV AIRFLOW__CORE__DAGS_FOLDER=/opt/airflow/dags
+ENV AIRFLOW__CORE__LOAD_EXAMPLES=False
+ENV SERVICE_NAME=${SERVICE_NAME:-"airflow"}
+ENV SERVICE_PORT=${SERVICE_PORT:-"9000"}
+
+# Variables d'env Vault & NGINX
+ENV VAULT_ADDR=${VAULT_ADDR:-"https://vault:8200"}
+ENV VAULT_USERNAME=${VAULT_USERNAME:-"airflow"}
+ENV VAULT_PASSWORD=${VAULT_PASSWORD:-"airflow"}
+ENV VAULT_SERVICE_NAME=${VAULT_SERVICE_NAME:-"vault"}
+
+
+ENV BIND_IP=${BIND_IP:-"0.0.0.0"}
+#ENV TLS_MODE=${TLS_MODE:-"requireTLS"}
+
+ENV AIRFLOW_USER=${AIRFLOW_USER:-"airflow-user"}
+ENV AIRFLOW_PASSWORD=${AIRFLOW_PASSWORD:-"airflow-password"}
+ENV AIRFLOW_CA_PATH=${AIRFLOW_CA_PATH:-"/etc/ssl/airflow/airflow.ca"}
+ENV AIRFLOW_KEY_PATH=${AIRFLOW_KEY_PATH:-"/etc/ssl/airflow/airflow.key"}
+ENV AIRFLOW_CERT_PATH=${AIRFLOW_CERT_PATH:-"/etc/ssl/airflow/airflow_ca.crt"}
+ENV AIRFLOW_PEM_PATH=${AIRFLOW_PEM_PATH:-"/etc/ssl/airflow/airflow_airflow.pem"}
+ENV AIRFLOW_FERNET_KEY_PATH=${AIRFLOW_FERNET_KEY_PATH:-"/etc/ssl/airflow/airflow_fernet_key.txt"}
+
+ENV AUTHORIZATION=${AUTHORIZATION:-"enabled"}
+ENV SERVICE_NAME=${SERVICE_NAME:-"airflow"}
+
+ENV mTLS=${mTLS:-"false"}
+ENV LOG_PATH=${LOG_PATH:-"/var/log/airflow/airflow.log"}
+ENV NGINX_CONFIG_FILE="/etc/nginx/nginx.conf"
+ENV HEALTH_CHECK_FILE="/usr/local/bin/health-check.sh"
+
+
 # Préparation de l’environnement Python
 RUN apt-get update && apt-get install -y \
     python3.12 \
@@ -19,79 +64,50 @@ ENV PATH="/opt/airflow_venv/bin:$PATH"
 
 # Installation d’Airflow et des providers nécessaires
 RUN pip install --upgrade pip && \
-    pip install apache-airflow==2.8.1 \
+    pip install apache-airflow \
     apache-airflow-providers-cncf-kubernetes \
     apache-airflow-providers-mongo \
     apache-airflow-providers-docker \
     apache-airflow-providers-http \
     apache-airflow-providers-slack \
-    pandas \
     requests \
-    pymongo \
-    minio
+    && rm -rf /root/.cache/pip
 
-# ----------
-
-FROM ubuntu:noble-20250127
-
-# Création de l’utilisateur airflow
-RUN groupadd --gid 1000 airflow && \
-    useradd --uid 1000 --gid airflow --home-dir /home/airflow airflow
-
-# Variables d’environnement Airflow
-ENV AIRFLOW_HOME=/opt/airflow
-ENV PATH="/opt/airflow_venv/bin:$PATH"
-ENV AIRFLOW__CORE__EXECUTOR=LocalExecutor
-ENV AIRFLOW__CORE__DAGS_FOLDER=/opt/airflow/dags
-ENV AIRFLOW__CORE__LOAD_EXAMPLES=False
-
-# Variables d'env Vault & NGINX
-ENV VAULT_ADDR=${VAULT_ADDR:-"https://vault:8200"}
-ENV VAULT_USERNAME=${VAULT_USERNAME:-"airflow"}
-ENV VAULT_PASSWORD=${VAULT_PASSWORD:-"airflow"}
-ENV VAULT_ROLE=${VAULT_ROLE:-"your-role"}
-ENV REPLSET_NAME=${REPLSET_NAME:-"rs0"}
-ENV PORT=${PORT:-"9000"}
-ENV GUI_PORT=${GUI_PORT:-"9001"}
-ENV BIND_IP=${BIND_IP:-"0.0.0.0"}
-ENV TLS_MODE=${TLS_MODE:-"requireTLS"}
-ENV AIRFLOW_ROOT_USER=${AIRFLOW_ROOT_USER:-"airflow-user"}
-ENV AIRFLOW_ROOT_PASSWORD=${AIRFLOW_ROOT_PASSWORD:-"airflow-password"}
-ENV AIRFLOW_ROOT_PASSWORD_PEM_PATH=${AIRFLOW_ROOT_PASSWORD_PEM_PATH:-"/etc/ssl/airflow/airflow.pem"}
-ENV AIRFLOW_ROOT_CA_PATH=${AIRFLOW_ROOT_CA_PATH:-"/etc/ssl/airflow/airflow.ca"}
-ENV AIRFLOW_ROOT_KEY_PATH=${AIRFLOW_ROOT_KEY_PATH:-"/etc/ssl/airflow/airflow.key"}
-ENV AIRFLOW_ROOT_CERT_PATH=${AIRFLOW_ROOT_CERT_PATH:-"/etc/ssl/airflow/airflow.crt"}
-ENV AIRFLOW_PEM_PATH=${AIRFLOW_PEM_PATH:-"/etc/ssl/airflow/airflow_airflow.pem"}
-ENV AIRFLOW_CA_PATH=${AIRFLOW_CA_PATH:-"/etc/ssl/airflow/airflow_airflow.ca"}
-ENV AUTHORIZATION=${AUTHORIZATION:-"enabled"}
-ENV SERVICE_NAME=${SERVICE_NAME:-"airflow"}
-ENV VAULT_SERVICE_NAME=${VAULT_SERVICE_NAME:-"vault"}
-ENV VAULT_CERT_FILE=${VAULT_CERT_FILE:-"airflow-cert.crt"}
-ENV VAULT_KEY_FILE=${VAULT_KEY_FILE:-"airflow.key"}
-ENV mTLS=${mTLS:-"false"}
-ENV LOG_PATH=${LOG_PATH:-"/var/log/airflow/airflow.log"}
-ENV NGINX_CONFIG_FILE="/etc/nginx/nginx.conf"
-ENV HEALTH_CHECK_FILE="/usr/local/bin/health-check.sh"
-
-# Copie de l’environnement virtuel
-COPY --from=builder /opt/airflow_venv /opt/airflow_venv
 
 # Copie des DAGs et scripts
-COPY dags/ /opt/airflow/dags/
-COPY scripts/ /opt/airflow/scripts/
+COPY dags/ ${AIRFLOW__CORE__DAGS_FOLDER}
+#COPY scripts/ /opt/airflow/scripts/
 
-# Rendre les scripts exécutables
-RUN chmod +x /opt/airflow/scripts/*.sh
+# Mettre à jour la liste des paquets et installer Vault
+RUN apt-get update && apt-get install -y vault
 
-# Création des dossiers nécessaires
-RUN mkdir -p /opt/airflow/logs && chown -R airflow:airflow /opt/airflow
+#Retirer le verrouillage de la mémoire
+RUN setcap -r /usr/bin/vault
+RUN vault --version
+# Script d'entrée pour obtenir les certificats depuis Vault et démarrer Uvicorn
+COPY entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/entrypoint.sh
+COPY vault/vault.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/vault.sh
 
 # Définir l’utilisateur
 USER airflow
 
 # Ports exposés (webserver)
-EXPOSE 8080
+EXPOSE 9300
 
 # Point d’entrée
-ENTRYPOINT ["/opt/airflow_venv/bin/airflow"]
+ENTRYPOINT ["entrypoint.sh"]
 CMD ["webserver"]
+
+
+
+# Copie de l’environnement virtuel
+#COPY --from=builder /opt/airflow_venv /opt/airflow_venv
+
+# Rendre les scripts exécutables
+#RUN chmod +x /opt/airflow/scripts/*.sh
+
+# Création des dossiers nécessaires
+#RUN mkdir -p /opt/airflow/logs && chown -R airflow:airflow /opt/airflow
+

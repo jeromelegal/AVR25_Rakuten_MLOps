@@ -12,8 +12,8 @@ http {
 
         ssl_protocols TLSv1.2 TLSv1.3;
         ssl_ciphers HIGH:!aNULL:!MD5;
-        ssl_certificate $MONGODB_CERT_PATH;
-        ssl_certificate_key $MONGODB_KEY_PATH;
+        ssl_certificate $AIRFLOW_CERT_PATH;
+        ssl_certificate_key $AIRFLOW_KEY_PATH;
 
         location /health {
             include fastcgi_params;
