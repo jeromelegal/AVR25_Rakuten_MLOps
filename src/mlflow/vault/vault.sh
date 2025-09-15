@@ -76,6 +76,10 @@ cat <<EOF > $MLFLOW_KEY_PATH
 $(jq -r '.data.private_key' mlflow_cert.json)
 EOF
 
+chown mlflow:mlflow $MLFLOW_KEY_PATH
+chmod 600 $MLFLOW_KEY_PATH
+
+
 # Définir les permissions pour les fichiers de certificat et de clé
 chown mlflow:mlflow $MLFLOW_PEM_PATH
 chmod 400 $MLFLOW_PEM_PATH
@@ -147,24 +151,25 @@ else
 fi
 
 
-cat <<EOF > $MLFLOW_KEY_PATH
+cat <<EOF > $MLFLOW_MLFLOW_KEY_PATH
 $(printf "%s" "$MLFLOW_MLFLOW_KEY")
 EOF
 
-cat <<EOF > $MLFLOW_CERT_PATH
+cat <<EOF > $MLFLOW_MLFLOW_CERT_PATH
 $(printf "%s" "$MLFLOW_MLFLOW_CERT")
 EOF
 
-cat <<EOF > $MLFLOW_PEM_PATH
+cat <<EOF > $MLFLOW_MLFLOW_PEM_PATH
 $(printf "%s" "$MLFLOW_MLFLOW_KEY")
 $(printf "%s" "$MLFLOW_MLFLOW_CERT")
 EOF
 
-cat <<EOF > $MLFLOW_CA_PATH
+cat <<EOF > $MLFLOW_MLFLOW_CA_PATH
 $(printf "%s" "$MLFLOW_MLFLOW_CA")
 EOF
 
-
+chown mlflow:mlflow $MLFLOW_MLFLOW_KEY_PATH
+chmod 600 $MLFLOW_MLFLOW_KEY_PATH
 
 # Extraire le certificat et la clé privée de PostGreSQL
 POSTGRESQL_MLFLOW_CA=$(vault kv get -field=ca secret/postgresql/mlflow/certs)
@@ -180,6 +185,17 @@ cat <<EOF > $POSTGRESQL_MLFLOW_CA_PATH
 $(printf "%s" "$POSTGRESQL_MLFLOW_CA")
 EOF
 
+cat <<EOF > "${POSTGRESQL_MLFLOW_KEY_PATH}"
+$(printf "%s" "$POSTGRESQL_MLFLOW_KEY")
+EOF
+
+cat <<EOF > "${POSTGRESQL_MLFLOW_CERT_PATH}"
+$(printf "%s" "$POSTGRESQL_MLFLOW_CERT")
+EOF
+
+chown mlflow:mlflow $POSTGRESQL_MLFLOW_KEY_PATH
+chmod 600 $POSTGRESQL_MLFLOW_KEY_PATH
+
 # Extraire le certificat et la clé privée de Minio
 MINIO_MLFLOW_CA=$(vault kv get -field=ca secret/minio/mlflow/certs)
 MINIO_MLFLOW_CERT=$(vault kv get -field=cert secret/minio/mlflow/certs)
@@ -193,3 +209,14 @@ EOF
 cat <<EOF > $MINIO_MLFLOW_CA_PATH
 $(printf "%s" "$MINIO_MLFLOW_CA")
 EOF
+
+cat <<EOF > "${MINIO_MLFLOW_KEY_PATH}"
+$(printf "%s" "$POSTGRESQL_MLFLOW_KEY")
+EOF
+
+cat <<EOF > "${MINIO_MLFLOW_CERT_PATH}"
+$(printf "%s" "$POSTGRESQL_MLFLOW_CERT")
+EOF
+
+chown mlflow:mlflow $MINIO_MLFLOW_KEY_PATH
+chmod 600 $MINIO_MLFLOW_KEY_PATH

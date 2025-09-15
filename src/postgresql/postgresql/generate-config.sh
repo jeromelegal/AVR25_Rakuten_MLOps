@@ -70,6 +70,7 @@ for ip in $ips; do
     echo -e "hostssl\tall\t\t$MLFLOW_USER\t$ip/16\t\tcert clientcert=verify-full" >> /etc/postgresql/pg_hba.conf
 done
 echo -e "local\tall\t\tpostgresql\t\t\t\tscram-sha-256" >> /etc/postgresql/pg_hba.conf
+echo -e "local\tall\t\t$MLFLOW_USER\t\t\t\tscram-sha-256" >> /etc/postgresql/pg_hba.conf
 
 
 echo "cat /etc/postgresql/pg_hba.conf"

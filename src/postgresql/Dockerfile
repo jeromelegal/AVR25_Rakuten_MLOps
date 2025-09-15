@@ -37,6 +37,14 @@ ENV LOG_PATH=${LOG_PATH:-"/var/log/postgresql/postgresql.log"}
 ENV NGINX_CONFIG_FILE="/etc/nginx/nginx.conf"
 ENV HEALTH_CHECK_FILE="/usr/local/bin/health-check.sh"
 
+ENV MLFLOW_DATABASE=${MLFLOW_DATABASE:-"mlflow"}
+ENV MLFLOW_USER=${MLFLOW_USER:-"mlflow_user"}
+ENV MLFLOW_USER_PASSWORD=${MLFLOW_USER_PASSWORD:-"mlflow_user_password"}
+ENV POSTGRESQL_MLFLOW_PEM_PATH=${POSTGRESQL_MLFLOW_PEM_PATH:-"/etc/ssl/postgresql/postgresql_mlflow.pem"}
+ENV POSTGRESQL_MLFLOW_KEY_PATH=${POSTGRESQL_MLFLOW_KEY_PATH:-"/etc/ssl/postgresql/postgresql_mlflow.key"}
+ENV POSTGRESQL_MLFLOW_CERT_PATH=${POSTGRESQL_MLFLOW_CERT_PATH:-"/etc/ssl/postgresql/postgresql_mlflow.crt"}
+ENV POSTGRESQL_MLFLOW_CA_PATH=${POSTGRESQL_MLFLOW_CA_PATH:-"/etc/ssl/postgresql/postgresql_mlflow_ca.crt"}
+
 RUN mkdir -p $DB_PATH
 RUN chown -R postgresql:postgresql $DB_PATH
 RUN chmod 750 $DB_PATH
@@ -90,6 +98,7 @@ RUN consul --version && vault --version
 # Copier les scripts et les fichiers de configuration
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY postgresql/init-postgresql.sql /usr/local/bin/init-postgresql.sql
+COPY postgresql/init-postgresql-mlflow.sql /usr/local/bin/init-postgresql-mlflow.sql
 COPY postgresql/init-postgresql.sh /usr/local/bin/init-postgresql.sh
 COPY postgresql/generate-config.sh /usr/local/bin/generate-config.sh
 COPY nginx/health-check.sh /usr/local/bin/health-check.sh

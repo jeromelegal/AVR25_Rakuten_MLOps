@@ -3,7 +3,7 @@ FROM ubuntu:noble-20250127
 WORKDIR /app
 
 ENV SERVICE_NAME=${SERVICE_NAME:-"mlflow"}
-ENV SERVICE_PORT=${SERVICE_PORT:-"8000"}
+ENV SERVICE_PORT=${SERVICE_PORT:-"5000"}
 
 ENV VAULT_ADDR ${VAULT_ADDR:-"https://vault:8200"}
 ENV VAULT_USERNAME=${VAULT_USERNAME:-"mlflow"}
@@ -31,6 +31,7 @@ ENV POSTGRESQL_MLFLOW_CERT_PATH ${POSTGRESQL_MLFLOW_CERT_PATH:-"/etc/ssl/mlflow/
 ENV MINIO_SERVICE_NAME ${MINIO_SERVICE_NAME:-"minio"}
 ENV MINIO_SERVICE_PORT ${MINIO_SERVICE_PORT:-"9010"}
 ENV MINIO_MLFLOW_USER ${MINIO_MLFLOW_USER:-"minio-user"}
+ENV MINIO_DEFAULT_MLFLOW_ARTIFACT_BUCKET ${MINIO_DEFAULT_MLFLOW_ARTIFACT_BUCKET:-"models"}
 ENV MINIO_MLFLOW_PASSWORD ${MINIO_MLFLOW_PASSWORD:-"minio-password"}
 ENV MINIO_MLFLOW_PEM_PATH ${MINIO_MLFLOW_PEM_PATH:-"/etc/ssl/mlflow/minio_mlflow.pem"}
 ENV MINIO_MLFLOW_CA_PATH ${MINIO_MLFLOW_CA_PATH:-"/etc/ssl/mlflow/minio_mlflow.ca"}
@@ -40,6 +41,10 @@ ENV MINIO_MLFLOW_CERT_PATH ${MINIO_MLFLOW_CERT_PATH:-"/etc/ssl/mlflow/minio_mlfl
 ENV MLFLOW_HOST=https://$SERVICE_NAME
 ENV MLFLOW_USERNAME=${MLFLOW_USERNAME:-"mlflow-user"}
 ENV MLFLOW_PASSWORD=${MLFLOW_PASSWORD:-"mlflow-password"}
+ENV MLFLOW_MLFLOW_PEM_PATH ${MLFLOW_MLFLOW_PEM_PATH:-"/etc/ssl/mlflow/mlflow_mlflow.pem"}
+ENV MLFLOW_MLFLOW_CA_PATH ${MLFLOW_MLFLOW_CA_PATH:-"/etc/ssl/mlflow/mlflow_mlflow.ca"}
+ENV MLFLOW_MLFLOW_KEY_PATH ${MLFLOW_MLFLOW_KEY_PATH:-"/etc/ssl/mlflow/mlflow_mlflow.key"}
+ENV MLFLOW_MLFLOW_CERT_PATH ${MLFLOW_MLFLOW_CERT_PATH:-"/etc/ssl/mlflow/mlflow_mlflow.crt"}
 
 ENV MLFLOW_INTERNAL_SECRET_KEY=internal_secret_key
 ENV MLFLOW_ALGORITHM=HS256
@@ -57,7 +62,7 @@ RUN groupadd --gid 999 --system mlflow && \
     chown -R mlflow:mlflow /home/mlflow
 
 # Mettre à jour la liste des paquets et installer wget, gpg et lsb-release
-RUN apt-get update && apt-get install -y wget gpg lsb-release curl iptables jq openssl libcap2-bin iproute2 ca-certificates dnsutils
+RUN apt-get update && apt-get install -y wget gpg lsb-release curl iptables jq openssl libcap2-bin iproute2 ca-certificates dnsutils git
 
 RUN apt install -y nginx fcgiwrap
 
@@ -84,6 +89,13 @@ COPY requirements.txt requirements.txt
 
 # Installer les dépendances en contournant la restriction
 RUN pip install --break-system-packages -r requirements.txt
+
+# Defining Minio related env. variables and certificates here to not mess with pip certificates
+ENV MLFLOW_S3_ENDPOINT_URL=http://${MINIO_SERVICE_NAME}:${MINIO_SERVICE_PORT}
+ENV AWS_ACCESS_KEY_ID=${MINIO_MLFLOW_USER}
+ENV AWS_SECRET_ACCESS_KEY=${MINIO_MLFLOW_PASSWORD}
+ENV AWS_CA_BUNDLE=${MLFLOW_PEM_PATH}
+ENV REQUESTS_CA_BUNDLE=${MLFLOW_PEM_PATH}
 
 COPY . .
 

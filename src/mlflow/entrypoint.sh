@@ -28,18 +28,32 @@ vault.sh
 
 set -m
 
-export MLFLOW_TRACKING_URI=postgresql+psycopg://$POSTGRESQL_MLFLOW_USER:$POSTGRESQL_MLFLOW_PASSWORD@$POSTGRESQL_SERVICE_NAME:$POSTGRESQL_SERVICE_PORT/$POSTGRESQL_MLFLOW_DATABASE
-export MLFLOW_S3_ENDPOINT_URL=https://$MINIO_SERVICE_NAME:$MINIO_SERVICE_PORT
-export AWS_ACCESS_KEY_ID=$MINIO_MLFLOW_USER
-export AWS_SECRET_ACCESS_KEY=$MINIO_MLFLOW_PASSWORD
+# \"host=postgresql port=5432 user=$POSTGRESQL_MLFLOW_USER password=$POSTGRESQL_MLFLOW_PASSWORD dbname=$POSTGRESQL_MLFLOW_DATABASE sslmode=verify-full sslcert=$POSTGRESQL_MLFLOW_CERT_PATH sslkey=$POSTGRESQL_MLFLOW_KEY_PATH sslrootcert=$POSTGRESQL_MLFLOW_CA_PATH\""
 
-mlflow server \
+# Generate backend URI using DSN
+qs=$(python3 -c "import urllib.parse; \
+params = { \
+    \"host\": \"${POSTGRESQL_SERVICE_NAME}\", \
+    \"port\": \"${POSTGRESQL_SERVICE_PORT}\", \
+    \"user\": \"${POSTGRESQL_MLFLOW_USER}\", \
+    \"password\": \"${POSTGRESQL_MLFLOW_PASSWORD}\", \
+    \"dbname\": \"${POSTGRESQL_MLFLOW_DATABASE}\", \
+    \"sslmode\": \"verify-full\", \
+    \"sslcert\": \"${POSTGRESQL_MLFLOW_CERT_PATH}\", \
+    \"sslkey\": \"${POSTGRESQL_MLFLOW_KEY_PATH}\", \
+    \"sslrootcert\": \"${POSTGRESQL_MLFLOW_CA_PATH}\", \
+}; \
+print(urllib.parse.urlencode(params))" \
+)
+BACKEND_DSN="postgresql+psycopg:///?${qs}"
+
+su mlflow -c "mlflow server \
     --host 0.0.0.0 \
     --port $SERVICE_PORT \
-    --default-artifact-root ./artifacts \
-    --backend-store-uri $MLFLOW_TRACKING_URI \
+    --default-artifact-root \"s3://${MINIO_DEFAULT_MLFLOW_ARTIFACT_BUCKET}/\" \
+    --backend-store-uri '${BACKEND_DSN}' \
     --serve-artifacts \
-    --gunicorn-opts "--keyfile $MLFLOW_KEY_PATH --certfile $MLFLOW_CERT_PATH"
+    --uvicorn-opts \"--ssl-keyfile $MLFLOW_KEY_PATH --ssl-certfile $MLFLOW_CERT_PATH\"" &
 
 jobs
 
