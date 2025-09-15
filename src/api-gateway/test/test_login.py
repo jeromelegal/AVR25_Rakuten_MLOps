@@ -1,21 +1,21 @@
 import sys
 import os
 from fastapi.testclient import TestClient
+from config import config  # Importer le fichier de configuration
+import random
 
 # Ajouter le chemin absolu de l'application
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "/app")))
 from main import app
 from api.config.settings import settings
 
-import random
-
-# Générer un entier aléatoire entre 1 et 100
-nombre_aleatoire = random.randint(1, 100000)
+# Générer un entier aléatoire dans la plage spécifiée dans le fichier de configuration
+nombre_aleatoire = random.randint(config.RANDOM_RANGE_START, config.RANDOM_RANGE_END)
 
 # Variables pour les informations d'identification de l'utilisateur
 PROTECTED_ENDPOINT_URL = settings.API_GATEWAY_PROTECTED_ENDPOINT_URL
 USERNAME = f"{nombre_aleatoire}newuser-gateway-login"
-EMAIL = f"{USERNAME}@example.com"
+EMAIL = f"{USERNAME}@{config.DEFAULT_DOMAIN}"
 PASSWORD = f"{USERNAME}"
 
 client = TestClient(app)
@@ -44,5 +44,5 @@ def test_login():
     # Vérification de la structure du méta-token
     access_token = response_data["access_token"]
     assert "." in access_token  # Vérifier que le token a un format signé avec des parties séparées par des '.'
-
     print("Test passed: Login successful and meta token received.")
+

@@ -1,20 +1,20 @@
 import sys
 import os
 from fastapi.testclient import TestClient
+from config import config  # Importer le fichier de configuration
+import random
 
 # Ajouter le chemin absolu de l'application
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "/app")))
 from main import app
 from api.config.settings import settings
 
-import random
-
-# Générer un entier aléatoire entre 1 et 100
-nombre_aleatoire = random.randint(1, 100000)
+# Générer un entier aléatoire entre config.RANDOM_RANGE_START et config.RANDOM_RANGE_END
+nombre_aleatoire = random.randint(config.RANDOM_RANGE_START, config.RANDOM_RANGE_END)
 
 # Variables pour les informations d'identification de l'utilisateur
 username = f"{nombre_aleatoire}newuser-gateway-delete"
-email = f"{username}@example.com"
+email = f"{username}@{config.DEFAULT_DOMAIN}"
 password = f"{username}"
 
 client = TestClient(app)
@@ -41,6 +41,7 @@ def test_delete_user():
 
     # Récupérer le token d'accès à partir de la réponse de connexion
     access_token = login_response.json()["access_token"]
+
     # En-têtes pour les requêtes authentifiées
     headers = {
         "Authorization": f"Bearer {access_token}"
@@ -51,7 +52,5 @@ def test_delete_user():
         f"{settings.API_GATEWAY_PROTECTED_ENDPOINT_URL}/delete",
         headers=headers
     )
-
     assert delete_response.status_code == 200
     assert delete_response.json()["message"] == "User deleted successfully from both databases"
-
