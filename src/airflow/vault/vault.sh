@@ -13,20 +13,22 @@ done
 # Se connecter à Vault et récupérer un token
 export VAULT_SKIP_VERIFY="1"
 
-mkdir -p $(dirname $AIRFLOW_PEM_PATH)  $(dirname $AIRFLOW_CA_PATH)
+echo "Vault login..."
+echo $VAULT_USERNAME
 
 until vault login -method=userpass username=$VAULT_USERNAME password=$VAULT_PASSWORD > /dev/null; do
     echo "Échec de l'authentification. Nouvelle tentative dans 1 secondes..."
     sleep 1
 done
 
+echo "Vault récupère les certificats ..."
 # Récupérer les CA à ajouter aux magasins
 vault kv get -field=certificate secret/vault/ca > vault_ca.crt
 vault kv get -field=certificate secret/consul/ca > consul_ca.crt
 vault kv get -field=certificate secret/airflow/ca > airflow_ca.crt
 vault kv get -field=value secret/airflow/fernet_key > airflow_fernet_key.txt
 
-mkdir -p $(dirname $AIRFLOW_PEM_PATH)
+mkdir -p $(dirname $AIRFLOW_PEM_PATH)  
 mkdir -p $(dirname $AIRFLOW_CA_PATH)
 mkdir -p $(dirname $AIRFLOW_KEY_PATH)
 mkdir -p $(dirname $AIRFLOW_CERT_PATH)

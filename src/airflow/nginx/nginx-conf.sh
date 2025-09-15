@@ -1,5 +1,5 @@
 #!/bin/bash
-
+echo "Generating Nginx configuration..."
 cat <<EOF > $NGINX_CONFIG_FILE
 events {
     worker_connections 1024; # Nombre de connexions simultanées qu'un worker peut gérer

@@ -44,7 +44,6 @@ ENV LOG_PATH=${LOG_PATH:-"/var/log/airflow/airflow.log"}
 ENV NGINX_CONFIG_FILE="/etc/nginx/nginx.conf"
 ENV HEALTH_CHECK_FILE="/usr/local/bin/health-check.sh"
 
-
 # Préparation de l’environnement Python
 RUN apt-get update && apt-get install -y \
     python3.12 \
@@ -73,13 +72,25 @@ RUN pip install --upgrade pip && \
     requests \
     && rm -rf /root/.cache/pip
 
+# Mettre à jour la liste des paquets et installer wget, gpg et lsb-release
+RUN apt-get update && apt-get install -y wget gpg lsb-release curl iptables jq openssl libcap2-bin iproute2 ca-certificates dnsutils
+
+RUN apt install -y nginx fcgiwrap
+
+# Télécharger la clé GPG de HashiCorp et l'ajouter au keyring
+RUN wget -O - https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+
+# Ajouter le dépôt HashiCorp à la liste des sources
+RUN echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/hashicorp.list
+
+# Mettre à jour la liste des paquets et installer Vault
+RUN apt-get update && apt-get install -y vault
+
 
 # Copie des DAGs et scripts
 COPY dags/ ${AIRFLOW__CORE__DAGS_FOLDER}
 #COPY scripts/ /opt/airflow/scripts/
 
-# Mettre à jour la liste des paquets et installer Vault
-RUN apt-get update && apt-get install -y vault
 
 #Retirer le verrouillage de la mémoire
 RUN setcap -r /usr/bin/vault
@@ -98,7 +109,7 @@ EXPOSE 9300
 
 # Point d’entrée
 ENTRYPOINT ["entrypoint.sh"]
-CMD ["webserver"]
+#CMD ["webserver"]
 
 
 
