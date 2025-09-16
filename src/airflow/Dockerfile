@@ -1,6 +1,6 @@
 FROM ubuntu:noble-20250127 AS builder
 
-
+WORKDIR /app
 # Création de l’utilisateur airflow
 RUN groupadd --gid 999 airflow && \
     useradd --uid 999 --gid airflow --home-dir /home/airflow airflow && \
@@ -34,7 +34,22 @@ ENV AIRFLOW_CA_PATH=${AIRFLOW_CA_PATH:-"/etc/ssl/airflow/airflow.ca"}
 ENV AIRFLOW_KEY_PATH=${AIRFLOW_KEY_PATH:-"/etc/ssl/airflow/airflow.key"}
 ENV AIRFLOW_CERT_PATH=${AIRFLOW_CERT_PATH:-"/etc/ssl/airflow/airflow_ca.crt"}
 ENV AIRFLOW_PEM_PATH=${AIRFLOW_PEM_PATH:-"/etc/ssl/airflow/airflow_airflow.pem"}
-ENV AIRFLOW_FERNET_KEY_PATH=${AIRFLOW_FERNET_KEY_PATH:-"/etc/ssl/airflow/airflow_fernet_key.txt"}
+#ENV AIRFLOW_FERNET_KEY_PATH=${AIRFLOW_FERNET_KEY_PATH:-"/etc/ssl/airflow/airflow_fernet_key.txt"}
+
+ENV AIRFLOW_AIRFLOW_PEM_PATH=${AIRFLOW_AIRFLOW_PEM_PATH:-"/etc/ssl/airflow/airflow_airflow.pem"}
+ENV AIRFLOW_AIRFLOW_KEY_PATH=${AIRFLOW_AIRFLOW_KEY_PATH:-"/etc/ssl/airflow/airflow_airflow.key"}
+ENV AIRFLOW_AIRFLOW_CERT_PATH=${AIRFLOW_AIRFLOW_CERT_PATH:-"/etc/ssl/airflow/airflow_airflow.crt"}
+ENV AIRFLOW_AIRFLOW_CA_PATH=${AIRFLOW_AIRFLOW_CA_PATH:-"/etc/ssl/airflow/airflow_airflow_ca.crt"}
+
+ENV POSTGRESQL_AIRFLOW_PEM_PATH=${POSTGRESQL_AIRFLOW_PEM_PATH:-"/etc/ssl/postgresql/postgresql_airflow.pem"}
+ENV POSTGRESQL_AIRFLOW_KEY_PATH=${POSTGRESQL_AIRFLOW_KEY_PATH:-"/etc/ssl/postgresql/postgresql_airflow.key"}
+ENV POSTGRESQL_AIRFLOW_CERT_PATH=${POSTGRESQL_AIRFLOW_CERT_PATH:-"/etc/ssl/postgresql/postgresql_airflow.crt"}
+ENV POSTGRESQL_AIRFLOW_CA_PATH=${POSTGRESQL_AIRFLOW_CA_PATH:-"/etc/ssl/postgresql/postgresql_airflow_ca.crt"}
+
+ENV MINIO_AIRFLOW_PEM_PATH=${MINIO_AIRFLOW_PEM_PATH:-"/etc/ssl/minio/minio_airflow.pem"}
+ENV MINIO_AIRFLOW_KEY_PATH=${MINIO_AIRFLOW_KEY_PATH:-"/etc/ssl/minio/minio_airflow.key"}
+ENV MINIO_AIRFLOW_CERT_PATH=${MINIO_AIRFLOW_CERT_PATH:-"/etc/ssl/minio/minio_airflow.crt"}
+ENV MINIO_AIRFLOW_CA_PATH=${MINIO_AIRFLOW_CA_PATH:-"/etc/ssl/minio/minio_airflow_ca.crt"}
 
 ENV AUTHORIZATION=${AUTHORIZATION:-"enabled"}
 ENV SERVICE_NAME=${SERVICE_NAME:-"airflow"}
@@ -86,23 +101,18 @@ RUN echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/h
 # Mettre à jour la liste des paquets et installer Vault
 RUN apt-get update && apt-get install -y vault
 
-
-# Copie des DAGs et scripts
-COPY dags/ ${AIRFLOW__CORE__DAGS_FOLDER}
-#COPY scripts/ /opt/airflow/scripts/
-
-
 #Retirer le verrouillage de la mémoire
 RUN setcap -r /usr/bin/vault
 RUN vault --version
+
+# Copie des DAGs et scripts
+COPY dags/ ${AIRFLOW__CORE__DAGS_FOLDER}
+
 # Script d'entrée pour obtenir les certificats depuis Vault et démarrer Uvicorn
 COPY entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/entrypoint.sh
 COPY vault/vault.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/vault.sh
-
-# Définir l’utilisateur
-USER airflow
 
 # Ports exposés (webserver)
 EXPOSE 9300
