@@ -128,6 +128,48 @@ else
 fi
 
 
+# Vérifier si le certificat et la clé Vault pour API Image processing existent déjà ou les créer
+if vault kv get -field=cert secret/mlflow/api-image-processing/certs > /dev/null 2>&1 && vault kv get -field=key secret/mlflow/api-image-processing/certs > /dev/null 2>&1; then
+  echo "Le certificat mTLS mlflow pour le service api-image-processing existe déjà"
+else
+  # Générer le certificat et la clé
+  echo "Générer le certificat et la clé"
+  vault write -format=json pki_mlflow/issue/mlflow common_name="mlflow"   ttl="72h" > mlflow_api-image-processing_cert.json
+
+  # Extraire le certificat et la clé privée
+  MLFLOW_API_IMAGE_PROCESSING_CA=$(jq -r '.data.ca_chain[0]' mlflow_api-image-processing_cert.json)
+  MLFLOW_API_IMAGE_PROCESSING_CERT=$(jq -r '.data.certificate' mlflow_api-image-processing_cert.json)
+  MLFLOW_API_IMAGE_PROCESSING_KEY=$(jq -r '.data.private_key' mlflow_api-image-processing_cert.json)
+
+
+  # Enregistrer le certificat et la clé privée dans Vault
+  vault kv put secret/mlflow/api-image-processing/certs cert="$MLFLOW_API_IMAGE_PROCESSING_CERT" key="$MLFLOW_API_IMAGE_PROCESSING_KEY" ca="$MLFLOW_API_IMAGE_PROCESSING_CA"
+
+  # Nettoyage des fichiers temporaires
+  rm -f mlflow_api-image-processing_cert.json
+fi
+
+# Vérifier si le certificat et la clé Vault pour API Text processing existent déjà ou les créer
+if vault kv get -field=cert secret/mlflow/api-text-processing/certs > /dev/null 2>&1 && vault kv get -field=key secret/mlflow/api-text-processing/certs > /dev/null 2>&1; then
+  echo "Le certificat mTLS mlflow pour le service api-text-processing existe déjà"
+else
+  # Générer le certificat et la clé
+  echo "Générer le certificat et la clé"
+  vault write -format=json pki_mlflow/issue/mlflow common_name="mlflow"   ttl="72h" > mlflow_api-text-processing_cert.json
+
+  # Extraire le certificat et la clé privée
+  MLFLOW_API_TEXT_PROCESSING_CA=$(jq -r '.data.ca_chain[0]' mlflow_api-text-processing_cert.json)
+  MLFLOW_API_TEXT_PROCESSING_CERT=$(jq -r '.data.certificate' mlflow_api-text-processing_cert.json)
+  MLFLOW_API_TEXT_PROCESSING_KEY=$(jq -r '.data.private_key' mlflow_api-text-processing_cert.json)
+
+
+  # Enregistrer le certificat et la clé privée dans Vault
+  vault kv put secret/mlflow/api-text-processing/certs cert="$MLFLOW_API_TEXT_PROCESSING_CERT" key="$MLFLOW_API_TEXT_PROCESSING_KEY" ca="$MLFLOW_API_TEXT_PROCESSING_CA"
+
+  # Nettoyage des fichiers temporaires
+  rm -f mlflow_api-text-processing_cert.json
+fi
+
 
 # Vérifier si le certificat et la clé Vault existent déjà pour MLFlow
 if vault kv get -field=cert secret/mlflow/mlflow/certs > /dev/null 2>&1 && vault kv get -field=key secret/mlflow/mlflow/certs > /dev/null 2>&1; then

@@ -3,6 +3,7 @@ FROM ubuntu:noble-20250127
 WORKDIR /app
 
 ENV SERVICE_NAME=${SERVICE_NAME:-"api-processing"}
+ENV SERVICE_PORT=${SERVICE_PORT:-"8050"}
 ENV SERVICE_VERSION=${SERVICE_VERSION:-"v0.0.1"}
 
 ENV VAULT_ADDR ${VAULT_ADDR:-"https://vault:8200"}
@@ -105,5 +106,7 @@ COPY requirements/ requirements/
 RUN pip install --break-system-packages -r requirements.txt
 
 COPY . .
+
+EXPOSE 8050 80 433
 
 ENTRYPOINT ["entrypoint.sh"]

@@ -8,8 +8,12 @@ ENV SERVICE_VERSION=${SERVICE_VERSION:-"v0.0.1"}
 
 ENV VAULT_ADDR ${VAULT_ADDR:-"https://vault:8200"}
 ENV VAULT_USERNAME=${VAULT_USERNAME:-"api-image-processing"}
-ENV VAULT_PASSWORD=${VAULT_PASSWORD:-"api-password"}
+ENV VAULT_PASSWORD=${VAULT_PASSWORD:-"api-image-processing"}
 ENV VAULT_SERVICE_NAME ${VAULT_SERVICE_NAME:-"vault"}
+ENV API_IMAGE_PROCESSING_PEM_PATH ${API_IMAGE_PROCESSING_PEM_PATH:-"/etc/ssl/api-image-processing/api-image-processing.pem"}
+ENV API_IMAGE_PROCESSING_CA_PATH ${API_IMAGE_PROCESSING_CA_PATH:-"/etc/ssl/api-image-processing/api-image-processing.ca"}
+ENV API_IMAGE_PROCESSING_KEY_PATH ${API_IMAGE_PROCESSING_KEY_PATH:-"/etc/ssl/api-image-processing/api-image-processing.key"}
+ENV API_IMAGE_PROCESSING_CERT_PATH ${API_IMAGE_PROCESSING_CERT_PATH:-"/etc/ssl/api-image-processing/api-image-processing.crt"}
 
 ENV MLFLOW_ADDR ${VMLFLOW_ADDR:-"https://mlflow:5000"}
 ENV MLFLOW_USERNAME=${VMLFLOW_USERNAME:-"mlflow-user"}
@@ -17,21 +21,16 @@ ENV MLFLOW_PASSWORD=${VMLFLOW_PASSWORD:-"mlflow-password"}
 ENV MLFLOW_SERVICE_NAME ${VMLFLOW_SERVICE_NAME:-"mlflow"}
 ENV MLFLOW_IMAGE_CLASSIFIER_MODEL_NAME ${MLFLOW_IMAGE_CLASSIFIER_MODEL_NAME:-"image_classifier_model"}
 ENV MLFLOW_IMAGE_CLASSIFIER_MODEL_VERSION ${MLFLOW_IMAGE_CLASSIFIER_MODEL_VERSION:-"1"}
-
-ENV API_IMAGE_PROCESSING_PEM_PATH ${API_IMAGE_PROCESSING_PEM_PATH:-"/etc/ssl/api-image-processing/api-image-processing.pem"}
-ENV API_IMAGE_PROCESSING_CA_PATH ${API_IMAGE_PROCESSING_CA_PATH:-"/etc/ssl/api-image-processing/api-image-processing.ca"}
-ENV API_IMAGE_PROCESSING_KEY_PATH ${API_IMAGE_PROCESSING_KEY_PATH:-"/etc/ssl/api-image-processing/api-image-processing.key"}
-ENV API_IMAGE_PROCESSING_CERT_PATH ${API_IMAGE_PROCESSING_CERT_PATH:-"/etc/ssl/api-image-processing/api-image-processing.crt"}
+ENV MLFLOW_API_IMAGE_PROCESSING_PEM_PATH ${MLFLOW_API_IMAGE_PROCESSING_PEM_PATH:-"/etc/ssl/api-image-processing/mlflow_api-image-processing.pem"}
+ENV MLFLOW_API_IMAGE_PROCESSING_CA_PATH ${MLFLOW_API_IMAGE_PROCESSING_CA_PATH:-"/etc/ssl/api-image-processing/mlflow_api-image-processing.ca"}
+ENV MLFLOW_API_IMAGE_PROCESSING_KEY_PATH ${MLFLOW_API_IMAGE_PROCESSING_KEY_PATH:-"/etc/ssl/api-image-processing/mlflow_api-image-processing.key"}
+ENV MLFLOW_API_IMAGE_PROCESSING_CERT_PATH ${MLFLOW_API_IMAGE_PROCESSING_CERT_PATH:-"/etc/ssl/api-image-processing/mlflow_api-image-processing.crt"}
+ENV MLFLOW_TRACKING_INSECURE_TLS false
+ENV MLFLOW_TRACKING_SERVER_CERT_PATH ${MLFLOW_API_IMAGE_PROCESSING_CA_PATH}
+ENV MLFLOW_TRACKING_CLIENT_CERT_PATH ${MLFLOW_API_IMAGE_PROCESSING_PEM_PATH}
 
 ENV API_IMAGE_PROCESSING_SECRET_KEY=""
 ENV API_IMAGE_PROCESSING_INTERNAL_SECRET_KEY=""
-
-ENV API_IMAGE_PROCESSING_API_MINIO_SERVICE_NAME ${MINIO_SERVICE_NAME:-"api-minio"}
-ENV API_IMAGE_PROCESSING_API_MINIO_SERVICE_PORT ${MINIO_SERVICE_PORT:-"8020"}
-ENV API_IMAGE_PROCESSING_API_MINIO_PEM_PATH ${IMAGE_PROCESSING_API_MINIO_PEM_PATH:-"/etc/ssl/api-image-processing/api-minio.pem"}
-ENV API_IMAGE_PROCESSING_API_MINIO_CA_PATH ${IMAGE_PROCESSING_API_MINIO_CA_PATH:-"/etc/ssl/api-image-processing/api-minio.ca"}
-ENV API_IMAGE_PROCESSING_API_MINIO_KEY_PATH ${IMAGE_PROCESSING_API_MINIO_KEY_PATH:-"/etc/ssl/api-image-processing/api-minio.key"}
-ENV API_IMAGE_PROCESSING_API_MINIO_CERT_PATH ${IMAGE_PROCESSING_API_MINIO_CERT_PATH:-"/etc/ssl/api-image-processing/api-minio.crt"}
 
 ENV API_IMAGE_PROCESSING_HOST=https://$SERVICE_NAME
 ENV API_IMAGE_PROCESSING_INTERNAL_ENDPOINT_URL=/api/internal/
@@ -50,11 +49,11 @@ ENV NGINX_STATUS_FILE="/var/log/status"
 ENV NGINX_CONTENT_FILE="/var/log/content"
 ENV HEALTH_CHECK_FILE="/usr/local/bin/health-check.sh"
 
-# Ajouter l'utilisateur et le groupe api-minio
-RUN groupadd --gid 999 --system api-minio && \
-    useradd --uid 999 --system --gid api-minio --home-dir /home/api-minio api-minio && \
-    mkdir -p /home/api-minio && \
-    chown -R api-minio:api-minio /home/api-minio
+# Ajouter l'utilisateur et le groupe api-image-processing
+RUN groupadd --gid 999 --system api-image-processing && \
+    useradd --uid 999 --system --gid api-image-processing --home-dir /home/api-image-processing api-image-processing && \
+    mkdir -p /home/api-image-processing && \
+    chown -R api-image-processing:api-image-processing /home/api-image-processing
 
 # Mettre à jour la liste des paquets et installer wget, gpg et lsb-release
 RUN apt-get update && apt-get install -y wget gpg lsb-release curl iptables jq openssl libcap2-bin iproute2 ca-certificates dnsutils
@@ -87,9 +86,6 @@ RUN chmod +x /usr/local/bin/entrypoint.sh
 COPY vault/vault.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/vault.sh
 
-COPY test/test.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/test.sh
-
 COPY nginx/nginx-fcgiwrap.sh /usr/local/bin/nginx-fcgiwrap.sh
 RUN chmod +x /usr/local/bin/nginx-fcgiwrap.sh
 
@@ -110,6 +106,6 @@ RUN pip install --break-system-packages -r requirements.txt
 
 COPY . .
 
-EXPOSE 8030
+EXPOSE 8030 433 80
 
 ENTRYPOINT ["entrypoint.sh"]

@@ -12,7 +12,7 @@ done
 # Se connecter à Vault et récupérer un token
 export VAULT_SKIP_VERIFY="1"
 
-mkdir -p $(dirname $API_IMAGE_PROCESSING_PEM_PATH)  $(dirname $API_IMAGE_PROCESSING_CA_PATH) $(dirname $API_IMAGE_PROCESSING_API_MINIO_PEM_PATH) $(dirname $API_IMAGE_PROCESSING_API_MINIO_CA_PATH) 
+mkdir -p $(dirname $API_IMAGE_PROCESSING_PEM_PATH)  $(dirname $API_IMAGE_PROCESSING_CA_PATH) $(dirname $MLFLOW_API_IMAGE_PROCESSING_PEM_PATH) $(dirname $MLFLOW_API_IMAGE_PROCESSING_CA_PATH)
 
 until vault login -method=userpass username=$VAULT_USERNAME password=$VAULT_PASSWORD > /dev/null; do
     echo "Échec de l'authentification. Nouvelle tentative dans 1 secondes..."
@@ -23,7 +23,8 @@ done
 vault kv get -field=certificate secret/vault/ca > vault_ca.crt
 vault kv get -field=certificate secret/consul/ca > consul_ca.crt
 vault kv get -field=certificate secret/api-image-processing/ca > api-image-processing_ca.crt
-vault kv get -field=certificate secret/api-minio/ca > api-minio_ca.crt
+vault kv get -field=certificate secret/mlflow/ca > mlflow_ca.crt
+vault kv get -field=certificate secret/api-gateway/ca > api-gateway_ca.crt
 
 mkdir -p $(dirname $API_IMAGE_PROCESSING_PEM_PATH)
 mkdir -p $(dirname $API_IMAGE_PROCESSING_CA_PATH)
@@ -35,8 +36,9 @@ cp api-image-processing_ca.crt $API_IMAGE_PROCESSING_CA_PATH
 # Ajouter les CA aux magasins de certificats
 cp vault_ca.crt /usr/local/share/ca-certificates/
 cp consul_ca.crt /usr/local/share/ca-certificates/
-cp api-minio_ca.crt /usr/local/share/ca-certificates/
 cp api-image-processing_ca.crt /usr/local/share/ca-certificates/
+cp api-gateway_ca.crt /usr/local/share/ca-certificates/
+cp mlflow_ca.crt /usr/local/share/ca-certificates/
 
 update-ca-certificates
 
@@ -97,9 +99,6 @@ fi
 
 API_IMAGE_PROCESSING_INTERNAL_SECRET_KEY=$(vault kv get -field=value secret/api-image-processing/internal_keyfile)
 
-
-
-
 # Vérifier si le certificat et la clé Vault existent déjà
 if vault kv get -field=cert secret/api-image-processing/api-gateway/certs > /dev/null 2>&1 && vault kv get -field=key secret/api-image-processing/api-gateway/certs > /dev/null 2>&1; then
   echo "Le certificat mTLS api-image-processing pour le service api-gateway existe déjà"
@@ -121,63 +120,6 @@ else
   rm -f api-image-processing_api-gateway_cert.json
 fi
 
-
-
-# Vérifier si le certificat et la clé Vault existent déjà
-if vault kv get -field=cert secret/api-image-processing/api-minio/certs > /dev/null 2>&1 && vault kv get -field=key secret/api-image-processing/api-minio/certs > /dev/null 2>&1; then
-  echo "Le certificat mTLS api-minio pour le service api-image-processing existent déjà"
-else
-  # Générer le certificat et la clé
-  echo "Générer le certificat et la clé"
-  vault write -format=json pki_api-image-processing/issue/api-minio common_name="api-image-processing"   ttl="72h" > api-image-processing_api-minio_cert.json
-
-  # Extraire le certificat et la clé privée
-  API_IMAGE_PROCESSING_API_MINIO_CA=$(jq -r '.data.ca_chain[0]' api-image-processing_api-minio_cert.json)
-  API_IMAGE_PROCESSING_API_MINIO_CERT=$(jq -r '.data.certificate' api-image-processing_api-minio_cert.json)
-  API_IMAGE_PROCESSING_API_MINIO_KEY=$(jq -r '.data.private_key' api-image-processing_api-minio_cert.json)
-
-
-  # Enregistrer le certificat et la clé privée dans Vault
-  vault kv put secret/api-minio/api-minio/certs cert="$API_MINIO_API_MINIO_CERT" key="$API_MINIO_API_MINIO_KEY" ca="$API_MINIO_API_MINIO_CA"
-
-  # Nettoyage des fichiers temporaires
-  rm -f api-image-processing_api-minio_cert.json
-fi
-
-
-cat <<EOF > $API_IMAGE_PROCESSING_API_MINIO_KEY_PATH
-$(printf "%s" "$API_IMAGE_PROCESSING_API_MINIO_KEY")
-EOF
-
-cat <<EOF > $API_IMAGE_PROCESSING_API_MINIO_CERT_PATH
-$(printf "%s" "$API_IMAGE_PROCESSING_API_MINIO_CERT")
-EOF
-
-cat <<EOF > $API_IMAGE_PROCESSING_API_MINIO_PEM_PATH
-$(printf "%s" "$API_IMAGE_PROCESSING_API_MINIO_KEY")
-$(printf "%s" "$API_IMAGE_PROCESSING_API_MINIO_CERT")
-EOF
-
-cat <<EOF > $API_IMAGE_PROCESSING_API_MINIO_CA_PATH
-$(printf "%s" "$API_IMAGE_PROCESSING_API_MINIO_CA")
-EOF
-
-
-
-# Extraire le certificat et la clé privée
-IMAGE_PROCESSING_API_MINIO_CA=$(vault kv get -field=ca secret/image-processing/api-minio/certs)
-IMAGE_PROCESSING_API_MINIO_CERT=$(vault kv get -field=cert secret/image-processing/api-minio/certs)
-IMAGE_PROCESSING_API_MINIO_KEY=$(vault kv get -field=key secret/image-processing/api-minio/certs)
-
-cat <<EOF > $IMAGE_PROCESSING_API_MINIO_PEM_PATH
-$(printf "%s" "$IMAGE_PROCESSING_API_MINIO_KEY")
-$(printf "%s" "$IMAGE_PROCESSING_API_MINIO_CERT")
-EOF
-
-cat <<EOF > $IMAGE_PROCESSING_API_MINIO_CA_PATH
-$(printf "%s" "$IMAGE_PROCESSING_API_MINIO_CA")
-EOF
-
 # Ajouter les certificats pour l'API de processing générale
 if vault kv get -field=cert secret/api-image-processing/api-processing/certs > /dev/null 2>&1 && vault kv get -field=key secret/api-image-processing/api-processing/certs > /dev/null 2>&1; then
   echo "Le certificat mTLS api-image-processing pour le service api-processing existe déjà"
@@ -198,3 +140,17 @@ else
   # Nettoyage des fichiers temporaires
   rm -f api-image-processing_api-processing_cert.json
 fi
+
+# Extraire le certificat et la clé privée de MLFlow
+MLFLOW_API_IMAGE_PROCESSING_CA=$(vault kv get -field=ca secret/mlflow/api-image-processing/certs)
+MLFLOW_API_IMAGE_PROCESSING_CERT=$(vault kv get -field=cert secret/mlflow/api-image-processing/certs)
+MLFLOW_API_IMAGE_PROCESSING_KEY=$(vault kv get -field=key secret/mlflow/api-image-processing/certs)
+
+cat <<EOF > $MLFLOW_API_IMAGE_PROCESSING_PEM_PATH
+$(printf "%s" "$MLFLOW_API_IMAGE_PROCESSING_KEY")
+$(printf "%s" "$MLFLOW_API_IMAGE_PROCESSING_CERT")
+EOF
+
+cat <<EOF > $MLFLOW_API_IMAGE_PROCESSING_CA_PATH
+$(printf "%s" "$MLFLOW_API_IMAGE_PROCESSING_CA")
+EOF

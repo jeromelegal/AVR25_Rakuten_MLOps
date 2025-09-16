@@ -26,7 +26,7 @@ import warnings
 from sklearn.pipeline import Pipeline
 
 from api.config.config import get_settings
-from api.config.model_loader import get_french_words, get_translator_model
+from api.config.dependencies import get_french_words
 
 tqdm.pandas()
 
@@ -281,9 +281,12 @@ def detect_language(text, fasttext_model):
     # FR heuristic
     if any(word in FRENCH_HINTS for word in tokens):
         return ("fr", 0.6)
-    fr_words_in_text = [
-        word for word in tokens if word in get_french_words(settings=get_settings())
-    ]
+    french_words = get_french_words(settings=get_settings())
+    if french_words is None:
+        raise ValueError(
+            "Impossible to detect language since the french words reference was null"
+        )
+    fr_words_in_text = [word for word in tokens if word in french_words]
     fr_hint_count = len(fr_words_in_text)
     hint_ratio = fr_hint_count / word_count if word_count else 0
     if fr_hint_count >= 3 and hint_ratio > 0.4:
@@ -297,14 +300,6 @@ def detect_language(text, fasttext_model):
         return (ft_lang, mean_score)
     else:
         return ("fr", 0.0)
-
-
-@lru_cache
-def load_translation_model():
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    model, tokenizer = get_translator_model(settings=get_settings())
-    model = model.to(device)
-    return tokenizer, model, device
 
 
 # Hash cache
