@@ -9,82 +9,78 @@ db.createUser({
 
 db.createCollection('users');
 
-db.getSiblingDB('file_storage').createRole({
+db.getSiblingDB('db_rakuten').createRole({
   role: 'dbManager',
   privileges: [
-    { resource: { db: 'file_storage', collection: '' }, actions: ['find', 'insert', 'update', 'remove'] }
+    { resource: { db: 'db_rakuten', collection: '' }, actions: ['find', 'insert', 'update', 'remove'] }
   ],
   roles: []
 });
 
-db.getSiblingDB('file_storage').createUser({
+db.getSiblingDB('db_rakuten').createUser({
   user: 'db_manager_user',
   pwd: 'db_manager_user_password',
-  roles: [{ role: 'dbManager', db: 'file_storage' }]
+  roles: [{ role: 'dbManager', db: 'db_rakuten' }]
 });
 
 
-db.getSiblingDB('file_storage').createRole({
+db.getSiblingDB('db_rakuten').createRole({
   role: 'userManager',
   privileges: [
-    { resource: { db: 'file_storage', collection: 'users' }, actions: ['find', 'insert', 'update', 'remove'] }
+    { resource: { db: 'db_rakuten', collection: 'users' }, actions: ['find', 'insert', 'update', 'remove'] }
   ],
   roles: []
 });
 
-db.getSiblingDB('file_storage').createUser({
+db.getSiblingDB('db_rakuten').createUser({
   user: 'user_manager',
   pwd: 'usermanagerpassword',
-  roles: [{ role: 'userManager', db: 'file_storage' }]
+  roles: [{ role: 'userManager', db: 'db_rakuten' }]
 });
 
 // Create ads collection
-db.getSiblingDB('file_storage').createCollection("ads", {
-  validator: {
-      $jsonSchema: {
-        bsonType: "object",
-        required: ["designation", "description", "image_name", "bucket_name", "created_at", "created_by"],
-        properties: {
-          designation: { bsonType: "string" },
-          description: { bsonType: "string" },
-          image_name:  { bsonType: "string" },
-          bucket_name: { bsonType: "string" },
-          created_at:  { bsonType: "string" },
-          created_by:  { bsonType: "string" }
-        }
-      }
-    }
-});
-
-// Create categories collection
-db.getSiblingDB('file_storage').createCollection("categories", {
+db.getSiblingDB('db_rakuten').createCollection("ads", {
   validator: {
     $jsonSchema: {
       bsonType: "object",
-      required: ["code", "label"],
+      required: ["_id","user", "designation", "categories", "images", "created_at"],
       properties: {
-        code:      { bsonType: "int" },
-        label:     { bsonType: "string" }
+        _id: { bsonType: "int" },
+        user: {
+          bsonType: "object",
+          required: ["id","username"],
+          properties: {
+            id: { bsonType: "int" },
+            username: { bsonType: "string" }
+          }
+        },
+        designation: { bsonType: "string" },
+        description: { bsonType: "string" },
+        categories: { bsonType: "string" },
+        images:     { bsonType: "array", items: { bsonType: "string" } },
+        created_at: { bsonType: "date" }
       }
     }
   }
 });
-db.categories.createIndex({ code: 1 }, { unique: true });
 
-// Create ad_categories collection
-db.getSiblingDB('file_storage').createCollection("ad_category", {
-  validator: {
-    $jsonSchema: {
-      bsonType: "object",
-      required: ["ad_id", "category_id", "created_at", "created_by"],
-      properties: {
-        ad_id:       { bsonType: "ObjectId" },
-        category_id: { bsonType: "ObjectId" },
-        created_at:  { bsonType: "string" },
-        created_by:  { bsonType: "string" }
-      }
-    }
+// Create index
+db.getSiblingDB('db_rakuten').ads.createIndex(
+  {
+    designation: 'text',
+    description: 'text',
+    categories:  'text',
+    images:      'text',
+    'user.username': 'text'
+  },
+  {
+    weights: {
+      designation: 10,
+      description: 10,
+      categories: 5,
+      images: 1,
+      'user.username': 1,
+    },
+    name: 'ads_search'
   }
-});
-db.ad_categories.createIndex({ ad_id: 1 }, { unique: true });
-db.ad_categories.createIndex({ category_id: 1 });
+);
