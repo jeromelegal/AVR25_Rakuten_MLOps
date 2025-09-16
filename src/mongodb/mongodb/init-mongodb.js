@@ -43,7 +43,7 @@ db.getSiblingDB('file_storage').createCollection("ads", {
   validator: {
     $jsonSchema: {
       bsonType: "object",
-      required: ["_id","user", "designation", "categories", "images", "created_at"],
+      required: ["_id", "user", "designation", "category", "created_at"],
       properties: {
         _id: { bsonType: "int" },
         user: {
@@ -56,7 +56,7 @@ db.getSiblingDB('file_storage').createCollection("ads", {
         },
         designation: { bsonType: "string" },
         description: { bsonType: "string" },
-        categories: { bsonType: "string" },
+        category: { bsonType: "string" },
         images:     { bsonType: "array", items: { bsonType: "string" } },
         created_at: { bsonType: "date" }
       }
@@ -69,7 +69,7 @@ db.getSiblingDB('file_storage').ads.createIndex(
   {
     designation: 'text',
     description: 'text',
-    categories:  'text',
+    category:  'text',
     images:      'text',
     'user.username': 'text'
   },
@@ -77,7 +77,7 @@ db.getSiblingDB('file_storage').ads.createIndex(
     weights: {
       designation: 10,
       description: 10,
-      categories: 5,
+      category: 5,
       images: 1,
       'user.username': 1,
     },
