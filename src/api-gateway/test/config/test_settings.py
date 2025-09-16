@@ -1,7 +1,7 @@
 import os
 from pydantic_settings import BaseSettings
 
-class Settings(BaseSettings):
+class TestSettings(BaseSettings):
     # Configuration pour l'API Gateway
     API_GATEWAY_HOST: str = os.getenv("API_GATEWAY_HOST", "")
     INTERNAL_ENDPOINT_URL: str = os.getenv("API_GATEWAY_INTERNAL_ENDPOINT_URL", "/internal")
@@ -45,4 +45,4 @@ class Settings(BaseSettings):
             print("La variable d'environnement API_GATEWAY_INTERNAL_SECRET_KEY_PATH n'est pas définie.")
 
 # Créez une instance de TestSettings pour l'utiliser dans vos tests
-settings = Settings()
+test_settings = TestSettings()

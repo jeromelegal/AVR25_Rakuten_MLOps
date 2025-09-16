@@ -48,6 +48,9 @@ ENV NGINX_STATUS_FILE="/var/log/status"
 ENV NGINX_CONTENT_FILE="/var/log/content"
 ENV HEALTH_CHECK_FILE="/usr/local/bin/health-check.sh"
 
+ENV UVICORN_LOG_LEVEL=${UVICORN_LOG_LEVEL:-"debug"} 
+
+
 # Ajouter l'utilisateur et le groupe api-gateway
 RUN groupadd --gid 999 --system api-gateway && \
     useradd --uid 999 --system --gid api-gateway --home-dir /home/api-gateway api-gateway && \

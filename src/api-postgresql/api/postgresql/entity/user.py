@@ -60,9 +60,6 @@ async def get_user(user_id: int, current_user: dict = Depends(get_current_user),
 @router.put("/api/internal/postgresql/entity/user/{user_id}", response_model=Dict)
 async def update_user(user_id: int, user: User, current_user: dict = Depends(get_current_user), request: Request = None):
     settings: Settings = request.app.state.settings
-    print("\n"*20)
-    print(f"{current_user["id"]} != {user_id}")
-    print("\n"*20)
     if current_user["id"] != user_id and "superadmin" not in current_user.get("roles", []):
         raise HTTPException(status_code=403, detail="Not enough permissions")
 
@@ -100,9 +97,6 @@ async def update_user(user_id: int, user: User, current_user: dict = Depends(get
 @router.delete("/api/internal/postgresql/entity/user/{user_id}", response_model=dict)
 async def delete_user(user_id: int, current_user: dict = Depends(get_current_user), request: Request = None):
     settings: Settings = request.app.state.settings
-    print("\n"*20)
-    print(f"{current_user["id"]} != {user_id}")
-    print("\n"*20)
     if current_user["id"] != user_id and "superadmin" not in current_user.get("roles", []):
         raise HTTPException(status_code=403, detail="Not enough permissions")
 
