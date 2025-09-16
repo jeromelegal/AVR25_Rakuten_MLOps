@@ -30,6 +30,7 @@ ENV MINIO_API_MINIO_PEM_PATH ${MINIO_API_MINIO_PEM_PATH:-"/etc/ssl/api-minio/mon
 ENV MINIO_API_MINIO_CA_PATH ${MINIO_API_MINIO_CA_PATH:-"/etc/ssl/api-minio/mongdb_api-minio.ca"}
 ENV MINIO_API_MINIO_KEY_PATH ${MINIO_API_MINIO_KEY_PATH:-"/etc/ssl/api-minio/mongdb_api-minio.key"}
 ENV MINIO_API_MINIO_CERT_PATH ${MINIO_API_MINIO_CERT_PATH:-"/etc/ssl/api-minio/mongdb_api-minio.crt"}
+ENV AWS_CA_BUNDLE=${MINIO_API_MINIO_CA_PATH}
 
 ENV API_MINIO_API_MINIO_PEM_PATH ${API_MINIO_API_MINIO_PEM_PATH:-"/etc/ssl/api-minio/api-minio_api-minio.pem"}
 ENV API_MINIO_API_MINIO_CA_PATH ${API_MINIO_API_MINIO_CA_PATH:-"/etc/ssl/api-minio/api-minio_api-minio.ca"}
