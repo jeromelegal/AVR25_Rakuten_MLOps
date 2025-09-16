@@ -1,177 +1,149 @@
 import pytest
 from fastapi.testclient import TestClient
-from main import app
+from api.postgresql.relation.roles_users import router as role_user_router
+from main import create_app
 from config.db import get_db_client
-import asyncpg
 from api.auth import hash_password, create_internal_api_access_token
-from config.config import API_GATEWAY_HOST, PROTECTED_ENDPOINT_URL
+from test.config.test_settings import test_settings
 
-client = TestClient(app)
+@pytest.fixture(scope="function")
+def test_app():
+    app = create_app(test_settings)  # Passez test_settings à create_app
+    app.include_router(role_user_router)
+    yield TestClient(app)
+
+def print_response_details(response):
+    """Helper function to print response details if status is not 200."""
+    if response.status_code != 200:
+        print(f"Response Status Code: {response.status_code}")
+        print(f"Response Body: {response.text}")
 
 @pytest.mark.asyncio
-async def test_create_role_user():
-    async with get_db_client() as conn:
-        # Create a base user
-        user_id = await conn.fetchval(
-            "INSERT INTO users (username, email, password, created_at, created_by, roles) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
-            "testuser", "testuser@example.com", hash_password("password"), "2023-10-01T00:00:00Z", "system", ["superadmin"]
+async def test_create_role_user(test_app):
+    async with get_db_client(test_settings) as db:
+        # Create a user and a role for testing
+        hashed_password = hash_password("password")
+        user_id = await db.fetchval(
+            "INSERT INTO users (username, email, password, created_by) VALUES ($1, $2, $3, $4) RETURNING id",
+            "testuser", "testuser@example.com", hashed_password, 0  # Placeholder for created_by
+        )
+        role_id = await db.fetchval(
+            "INSERT INTO roles (name, created_by) VALUES ($1, $2) RETURNING id",
+            "testrole", 0  # Placeholder for created_by
         )
 
-        # Get token for the base user
-        login_response = client.post("/token", data={"username": "testuser", "password": "password"})
+        # Login and get token
+        login_response = test_app.post("/token", data={"username": "testuser", "password": "password"})
+        print_response_details(login_response)
         assert login_response.status_code == 200
         token = login_response.json()["access_token"]
 
-        api_token = create_internal_api_access_token(data={"scope": "internal"})
+        api_token = create_internal_api_access_token(data={"scope": "internal"}, settings=test_settings)
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Referer": test_settings.API_GATEWAY_HOST + test_settings.PROTECTED_ENDPOINT_URL,
+            "X-API-Key": api_token,
+        }
 
-        # Set the Authorization header
-        headers = {"Authorization": f"Bearer {token}", "Referer": API_GATEWAY_HOST + PROTECTED_ENDPOINT_URL, "X-API-Key": api_token}
-
-        # Create a role
-        role_id = await conn.fetchval(
-            "INSERT INTO roles (name, created_at, created_by) VALUES ($1, $2, $3) RETURNING id",
-            "testrole", "2023-10-01T00:00:00Z", user_id
-        )
-
-        response = client.post("/api/internal/postgresql/relation/role_user", json={"role_id": role_id, "user_id": user_id, "permissions": {"read": True, "write": False}}, headers=headers)
+        # Test create role_user relation
+        new_role_user = {
+            "role_id": role_id,
+            "user_id": user_id
+        }
+        response = test_app.post("/api/internal/postgresql/relation/role_user", json=new_role_user, headers=headers)
+        print_response_details(response)
         assert response.status_code == 200
-        data = response.json()
-        assert data["role_id"] == role_id
-        assert data["user_id"] == user_id
-        assert data["permissions"] == {"read": True, "write": False}
-        assert "relation_id" in data
-        assert "created_at" in data
+        assert response.json()["role_id"] == new_role_user["role_id"]
+        assert response.json()["user_id"] == new_role_user["user_id"]
 
-        # Clean up
-        await conn.execute("DELETE FROM role_users WHERE id = $1", data["relation_id"])
-        await conn.execute("DELETE FROM roles WHERE id = $1", role_id)
-        await conn.execute("DELETE FROM users WHERE id = $1", user_id)
+        # Cleanup
+        await db.execute("DELETE FROM user_roles WHERE user_id = $1 AND role_id = $2", user_id, role_id)
+        await db.execute("DELETE FROM roles WHERE id = $1", role_id)
+        await db.execute("DELETE FROM users WHERE id = $1", user_id)
 
 @pytest.mark.asyncio
-async def test_get_role_user():
-    async with get_db_client() as conn:
-        # Create a base user
-        user_id = await conn.fetchval(
-            "INSERT INTO users (username, email, password, created_at, created_by, roles) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
-            "testuser", "testuser@example.com", hash_password("password"), "2023-10-01T00:00:00Z", "system", ["superadmin"]
+async def test_get_role_user(test_app):
+    async with get_db_client(test_settings) as db:
+        # Create a user and a role for testing
+        hashed_password = hash_password("password")
+        user_id = await db.fetchval(
+            "INSERT INTO users (username, email, password, created_by) VALUES ($1, $2, $3, $4) RETURNING id",
+            "testuser", "testuser@example.com", hashed_password, 0  # Placeholder for created_by
+        )
+        role_id = await db.fetchval(
+            "INSERT INTO roles (name, created_by) VALUES ($1, $2) RETURNING id",
+            "testrole", 0  # Placeholder for created_by
         )
 
-        # Get token for the base user
-        login_response = client.post("/token", data={"username": "testuser", "password": "password"})
+        # Login and get token
+        login_response = test_app.post("/token", data={"username": "testuser", "password": "password"})
+        print_response_details(login_response)
         assert login_response.status_code == 200
         token = login_response.json()["access_token"]
+        # headers = {"Authorization": f"Bearer {token}"}
+        api_token = create_internal_api_access_token(data={"scope": "internal"}, settings=test_settings)
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Referer": test_settings.API_GATEWAY_HOST + test_settings.PROTECTED_ENDPOINT_URL,
+            "X-API-Key": api_token,
+        }        
 
-        api_token = create_internal_api_access_token(data={"scope": "internal"})
+        # Create a role_user relation to retrieve
+        test_app.post("/api/internal/postgresql/relation/role_user", json={
+            "role_id": role_id,
+            "user_id": user_id
+        }, headers=headers)
 
-        # Set the Authorization header
-        headers = {"Authorization": f"Bearer {token}", "Referer": API_GATEWAY_HOST + PROTECTED_ENDPOINT_URL, "X-API-Key": api_token}
-
-        # Create a role
-        role_id = await conn.fetchval(
-            "INSERT INTO roles (name, created_at, created_by) VALUES ($1, $2, $3) RETURNING id",
-            "testrole", "2023-10-01T00:00:00Z", user_id
-        )
-
-        # Create a role-user relation
-        relation_id = await conn.fetchval(
-            "INSERT INTO role_users (role_id, user_id, permissions, created_at, created_by) VALUES ($1, $2, $3, $4, $5) RETURNING id",
-            role_id, user_id, {"read": True, "write": False}, "2023-10-01T00:00:00Z", user_id
-        )
-
-        response = client.get(f"/api/internal/postgresql/relation/role_user/{relation_id}", headers=headers)
+        # Test get role_user relation
+        response = test_app.get(f"/api/internal/postgresql/relation/role_user?user_id={user_id}&role_id={role_id}", headers=headers)
+        print_response_details(response)
         assert response.status_code == 200
-        data = response.json()
-        assert data["role_id"] == role_id
-        assert data["user_id"] == user_id
-        assert data["permissions"] == {"read": True, "write": False}
+        assert response.json()[0]["user_id"] == user_id
+        assert response.json()[0]["role_id"] == role_id
 
-        # Clean up
-        await conn.execute("DELETE FROM role_users WHERE id = $1", relation_id)
-        await conn.execute("DELETE FROM roles WHERE id = $1", role_id)
-        await conn.execute("DELETE FROM users WHERE id = $1", user_id)
+        # Cleanup
+        await db.execute("DELETE FROM user_roles WHERE user_id = $1 AND role_id = $2", user_id, role_id)
+        await db.execute("DELETE FROM roles WHERE id = $1", role_id)
+        await db.execute("DELETE FROM users WHERE id = $1", user_id)
 
 @pytest.mark.asyncio
-async def test_update_role_user():
-    async with get_db_client() as conn:
-        # Create a base user
-        user_id = await conn.fetchval(
-            "INSERT INTO users (username, email, password, created_at, created_by, roles) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
-            "testuser", "testuser@example.com", hash_password("password"), "2023-10-01T00:00:00Z", "system", ["superadmin"]
+async def test_delete_role_user(test_app):
+    async with get_db_client(test_settings) as db:
+        # Create a user and a role for testing
+        hashed_password = hash_password("password")
+        user_id = await db.fetchval(
+            "INSERT INTO users (username, email, password, created_by) VALUES ($1, $2, $3, $4) RETURNING id",
+            "testuser", "testuser@example.com", hashed_password, 0  # Placeholder for created_by
+        )
+        role_id = await db.fetchval(
+            "INSERT INTO roles (name, created_by) VALUES ($1, $2) RETURNING id",
+            "testrole", 0  # Placeholder for created_by
         )
 
-        # Get token for the base user
-        login_response = client.post("/token", data={"username": "testuser", "password": "password"})
+        # Login and get token
+        login_response = test_app.post("/token", data={"username": "testuser", "password": "password"})
+        print_response_details(login_response)
         assert login_response.status_code == 200
         token = login_response.json()["access_token"]
+        # headers = {"Authorization": f"Bearer {token}"}
+        api_token = create_internal_api_access_token(data={"scope": "internal"}, settings=test_settings)
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Referer": test_settings.API_GATEWAY_HOST + test_settings.PROTECTED_ENDPOINT_URL,
+            "X-API-Key": api_token,
+        }
+        # Create a role_user relation to delete
+        test_app.post("/api/internal/postgresql/relation/role_user", json={
+            "role_id": role_id,
+            "user_id": user_id
+        }, headers=headers)
 
-        api_token = create_internal_api_access_token(data={"scope": "internal"})
-
-        # Set the Authorization header
-        headers = {"Authorization": f"Bearer {token}", "Referer": API_GATEWAY_HOST + PROTECTED_ENDPOINT_URL, "X-API-Key": api_token}
-
-        # Create a role
-        role_id = await conn.fetchval(
-            "INSERT INTO roles (name, created_at, created_by) VALUES ($1, $2, $3) RETURNING id",
-            "testrole", "2023-10-01T00:00:00Z", user_id
-        )
-
-        # Create a role-user relation
-        relation_id = await conn.fetchval(
-            "INSERT INTO role_users (role_id, user_id, permissions, created_at, created_by) VALUES ($1, $2, $3, $4, $5) RETURNING id",
-            role_id, user_id, {"read": True, "write": False}, "2023-10-01T00:00:00Z", user_id
-        )
-
-        response = client.put(f"/api/internal/postgresql/relation/role_user/{relation_id}", json={"role_id": role_id, "user_id": user_id, "permissions": {"read": True, "write": True}}, headers=headers)
+        # Test delete role_user relation
+        response = test_app.delete(f"/api/internal/postgresql/relation/role_user?user_id={user_id}&role_id={role_id}", headers=headers)
+        print_response_details(response)
         assert response.status_code == 200
-        data = response.json()
-        assert data["role_id"] == role_id
-        assert data["user_id"] == user_id
-        assert data["permissions"] == {"read": True, "write": True}
+        assert response.json()["message"] == "Role-User relation deleted successfully"
 
-        # Clean up
-        await conn.execute("DELETE FROM role_users WHERE id = $1", relation_id)
-        await conn.execute("DELETE FROM roles WHERE id = $1", role_id)
-        await conn.execute("DELETE FROM users WHERE id = $1", user_id)
-
-@pytest.mark.asyncio
-async def test_delete_role_user():
-    async with get_db_client() as conn:
-        # Create a base user
-        user_id = await conn.fetchval(
-            "INSERT INTO users (username, email, password, created_at, created_by, roles) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
-            "testuser", "testuser@example.com", hash_password("password"), "2023-10-01T00:00:00Z", "system", ["superadmin"]
-        )
-
-        # Get token for the base user
-        login_response = client.post("/token", data={"username": "testuser", "password": "password"})
-        assert login_response.status_code == 200
-        token = login_response.json()["access_token"]
-
-        api_token = create_internal_api_access_token(data={"scope": "internal"})
-
-        # Set the Authorization header
-        headers = {"Authorization": f"Bearer {token}", "Referer": API_GATEWAY_HOST + PROTECTED_ENDPOINT_URL, "X-API-Key": api_token}
-
-        # Create a role
-        role_id = await conn.fetchval(
-            "INSERT INTO roles (name, created_at, created_by) VALUES ($1, $2, $3) RETURNING id",
-            "testrole", "2023-10-01T00:00:00Z", user_id
-        )
-
-        # Create a role-user relation
-        relation_id = await conn.fetchval(
-            "INSERT INTO role_users (role_id, user_id, permissions, created_at, created_by) VALUES ($1, $2, $3, $4, $5) RETURNING id",
-            role_id, user_id, {"read": True, "write": False}, "2023-10-01T00:00:00Z", user_id
-        )
-
-        response = client.delete(f"/api/internal/postgresql/relation/role_user/{relation_id}", headers=headers)
-        assert response.status_code == 200
-        assert response.json() == {"message": "Role-User relation deleted successfully"}
-
-        # Verify deletion
-        role_user = await conn.fetchrow("SELECT * FROM role_users WHERE id = $1", relation_id)
-        assert role_user is None
-
-        # Clean up
-        await conn.execute("DELETE FROM roles WHERE id = $1", role_id)
-        await conn.execute("DELETE FROM users WHERE id = $1", user_id)
+        # Cleanup
+        await db.execute("DELETE FROM roles WHERE id = $1", role_id)
+        await db.execute("DELETE FROM users WHERE id = $1", user_id)

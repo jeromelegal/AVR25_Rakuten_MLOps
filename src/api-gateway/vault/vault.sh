@@ -101,6 +101,11 @@ fi
 
 API_GATEWAY_INTERNAL_SECRET_KEY=$(vault kv get -field=value secret/api-gateway/internal_keyfile)
 
+cat <<EOF > $API_GATEWAY_INTERNAL_SECRET_KEY_PATH
+$(printf "%s" "$API_GATEWAY_INTERNAL_SECRET_KEY")
+EOF
+
+
 # Vérifier si le certificat et la clé Vault existent déjà
 if vault kv get -field=cert secret/api-gateway/frontend/certs > /dev/null 2>&1 && vault kv get -field=key secret/api-gateway/frontend/certs > /dev/null 2>&1; then
   echo "Le certificat mTLS api-gateway pour le frontend existe déjà"

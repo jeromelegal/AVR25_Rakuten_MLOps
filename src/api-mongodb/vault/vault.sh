@@ -97,8 +97,9 @@ fi
 
 API_MONGODB_INTERNAL_SECRET_KEY=$(vault kv get -field=value secret/api-mongodb/internal_keyfile)
 
-
-
+cat <<EOF > $API_MONGODB_INTERNAL_SECRET_KEY_PATH
+$(printf "%s" "$API_MONGODB_INTERNAL_SECRET_KEY")
+EOF
 
 # Vérifier si le certificat et la clé Vault existent déjà
 if vault kv get -field=cert secret/api-mongodb/api-gateway/certs > /dev/null 2>&1 && vault kv get -field=key secret/api-mongodb/api-gateway/certs > /dev/null 2>&1; then

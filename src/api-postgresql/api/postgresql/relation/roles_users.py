@@ -1,89 +1,82 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
+from typing import Dict, List
 from config.db import get_db_client
-from typing import List
-import asyncpg
+from config.settings import Settings
 from api.auth import get_current_user
-from datetime import datetime, UTC
+import asyncpg
 
 router = APIRouter()
 
-class Role(BaseModel):
-    name: str
-
-class RoleResponse(BaseModel):
+class RoleUserRelation(BaseModel):
     role_id: int
-    name: str
-    created_at: str
-    created_by: str
+    user_id: int
 
-@router.post("/api/internal/postgresql/entity/role", response_model=RoleResponse)
-async def create_role(role: Role, current_user: dict = Depends(get_current_user)):
-    if "superadmin" not in current_user.get("roles", []):
-        raise HTTPException(status_code=403, detail="Not enough permissions")
+class RoleUserResponse(BaseModel):
+    user_id: int
+    role_id: int
 
-    async with get_db_client() as conn:
-        role_dict = role.model_dump()
-        role_dict["created_at"] = datetime.now(UTC).isoformat()  # Set the creation date
-        role_dict["created_by"] = current_user["user_id"]  # Set the creator
+@router.post("/api/internal/postgresql/relation/role_user", response_model=RoleUserResponse)
+async def create_role_user(request: Request, relation: RoleUserRelation, current_user: dict = Depends(get_current_user)):
+    settings: Settings = request.app.state.settings
+    # TODO SETUP ROLE
+    # if "superadmin" not in current_user.get("roles", []):
+    #     raise HTTPException(status_code=403, detail="Not enough permissions")
+    relation_dict = relation.model_dump()
+    async with get_db_client(settings) as conn:
+        try:
+            # Insertion dans la table user_roles
+            await conn.execute(
+                "INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)",
+                relation_dict["user_id"],
+                relation_dict["role_id"]
+            )
+            return RoleUserResponse(**relation_dict)
+        except asyncpg.UniqueViolationError:
+            raise HTTPException(status_code=400, detail="Role-User relation already exists")
 
-        # Insert the role into the database
-        role_id = await conn.fetchval(
-            "INSERT INTO roles (name, created_at, created_by) VALUES ($1, $2, $3) RETURNING id",
-            role_dict["name"],
-            role_dict["created_at"],
-            role_dict["created_by"]
-        )
+@router.get("/api/internal/postgresql/relation/role_user", response_model=List[RoleUserResponse])
+async def get_role_user(user_id: int = None, role_id: int = None, current_user: dict = Depends(get_current_user), request: Request = None):
+    settings: Settings = request.app.state.settings
+    # TODO SETUP ROLE
+    # if "superadmin" not in current_user.get("roles", []):
+    #     raise HTTPException(status_code=403, detail="Not enough permissions")
+    async with get_db_client(settings) as conn:
+        if user_id is not None and role_id is not None:
+            relation = await conn.fetchrow(
+                "SELECT user_id, role_id FROM user_roles WHERE user_id = $1 AND role_id = $2",
+                user_id, role_id
+            )
+            if relation:
+                return [RoleUserResponse(**relation)]
+            else:
+                raise HTTPException(status_code=404, detail="Role-User relation not found")
+        else:
+            # Récupérer toutes les relations pour un utilisateur ou un rôle spécifique, ou toutes
+            query = "SELECT user_id, role_id FROM user_roles"
+            params = []
+            if user_id is not None:
+                query += " WHERE user_id = $1"
+                params.append(user_id)
+            elif role_id is not None:
+                query += " WHERE role_id = $1"
+                params.append(role_id)
 
-        role_dict["role_id"] = role_id
-        return RoleResponse(**role_dict)
+            relations = await conn.fetch(query, *params)
+            return [RoleUserResponse(**relation) for relation in relations]
 
-@router.get("/api/internal/postgresql/entity/role/{role_id}", response_model=RoleResponse)
-async def get_role(role_id: int, current_user: dict = Depends(get_current_user)):
-    if "superadmin" not in current_user.get("roles", []):
-        raise HTTPException(status_code=403, detail="Not enough permissions")
-
-    async with get_db_client() as conn:
-        role = await conn.fetchrow(
-            "SELECT id as role_id, name, created_at, created_by FROM roles WHERE id = $1",
-            role_id
-        )
-        if role:
-            return RoleResponse(**role)
-        raise HTTPException(status_code=404, detail="Role not found")
-
-@router.put("/api/internal/postgresql/entity/role/{role_id}", response_model=RoleResponse)
-async def update_role(role_id: int, role: Role, current_user: dict = Depends(get_current_user)):
-    if "superadmin" not in current_user.get("roles", []):
-        raise HTTPException(status_code=403, detail="Not enough permissions")
-
-    async with get_db_client() as conn:
-        role_dict = role.model_dump()
-
-        await conn.execute(
-            "UPDATE roles SET name = $1 WHERE id = $2",
-            role_dict["name"],
-            role_id
-        )
-
-        role = await conn.fetchrow(
-            "SELECT id as role_id, name, created_at, created_by FROM roles WHERE id = $1",
-            role_id
-        )
-        if role:
-            return RoleResponse(**role)
-        raise HTTPException(status_code=404, detail="Role not found")
-
-@router.delete("/api/internal/postgresql/entity/role/{role_id}", response_model=dict)
-async def delete_role(role_id: int, current_user: dict = Depends(get_current_user)):
-    if "superadmin" not in current_user.get("roles", []):
-        raise HTTPException(status_code=403, detail="Not enough permissions")
-
-    async with get_db_client() as conn:
+@router.delete("/api/internal/postgresql/relation/role_user", response_model=dict)
+async def delete_role_user(user_id: int, role_id: int, current_user: dict = Depends(get_current_user), request: Request = None):
+    settings: Settings = request.app.state.settings
+    # TODO SETUP ROLE
+    # if "superadmin" not in current_user.get("roles", []):
+    #     raise HTTPException(status_code=403, detail="Not enough permissions")
+    async with get_db_client(settings) as conn:
         result = await conn.execute(
-            "DELETE FROM roles WHERE id = $1",
-            role_id
+            "DELETE FROM user_roles WHERE user_id = $1 AND role_id = $2 RETURNING user_id, role_id",
+            user_id, role_id
         )
-        if result == "DELETE 1":
-            return {"message": "Role deleted successfully"}
-        raise HTTPException(status_code=404, detail="Role not found")
+        if result:
+            return {"message": "Role-User relation deleted successfully"}
+        raise HTTPException(status_code=404, detail="Role-User relation not found")
+

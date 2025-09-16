@@ -17,6 +17,8 @@ ENV API_GATEWAY_CERT_PATH=${API_GATEWAY_CERT_PATH:-"/etc/ssl/api-gateway/api-gat
 
 ENV API_GATEWAY_SECRET_KEY=""
 ENV API_GATEWAY_INTERNAL_SECRET_KEY=""
+ENV API_GATEWAY_INTERNAL_SECRET_KEY_PATH="/etc/ssl/api-gateway/internal.key"
+ENV API_GATEWAY_ALGORITHM=HS256
 
 ENV API_MONGODB_SERVICE_NAME=${API_MONGODB_SERVICE_NAME:-"api-mongodb"}
 ENV API_MONGODB_SERVICE_PORT=${API_MONGODB_SERVICE_PORT:-"8000"}
@@ -52,6 +54,9 @@ ENV NGINX_CONFIG_FILE="/etc/nginx/nginx.conf"
 ENV NGINX_STATUS_FILE="/var/log/status"
 ENV NGINX_CONTENT_FILE="/var/log/content"
 ENV HEALTH_CHECK_FILE="/usr/local/bin/health-check.sh"
+
+ENV UVICORN_LOG_LEVEL=${UVICORN_LOG_LEVEL:-"debug"} 
+
 
 # Ajouter l'utilisateur et le groupe api-gateway
 RUN groupadd --gid 999 --system api-gateway && \

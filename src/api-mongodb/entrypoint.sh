@@ -9,27 +9,18 @@ until [ $HTTP_CODE -eq 200 ]; do
     sleep 1
 done
 
-#export MONGODB_IP=$(nslookup $MONGODB_SERVICE_NAME | awk '/^Address: / { print $2 }' | tail -n 1)
-
 vault.sh
+
+API_MONGODB_INTERNAL_SECRET_KEY=$(cat $API_MONGODB_INTERNAL_SECRET_KEY_PATH)
 
 set -m
 
 exec uvicorn main:app --host 0.0.0.0 --port 8000 --ssl-keyfile $API_MONGODB_KEY_PATH --ssl-certfile $API_MONGODB_CERT_PATH  --ssl-ca-certs $API_MONGODB_CA_PATH --ssl-cert-reqs 2 &
-
-#exec uvicorn main:app --host 0.0.0.0 --port 8000 --ssl-keyfile $API_MONGODB_API_MONGODB_KEY_PATH --ssl-certfile $API_MONGODB_API_MONGODB_CERT_PATH  --ssl-ca-certs $API_MONGODB_API_MONGODB_CA_PATH &
-
 
 jobs
 
 nginx-fcgiwrap.sh
 
 nginx-conf.sh
-
-# curl --cert $API_MONGODB_API_MONGODB_CERT_PATH  \
-#       --key $API_MONGODB_API_MONGODB_KEY_PATH  \
-#       --cacert $API_MONGODB_API_MONGODB_CA_PATH\
-#       https://$SERVICE_NAME:8000
-
 
 fg %1

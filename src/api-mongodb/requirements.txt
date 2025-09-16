@@ -14,3 +14,4 @@ pytest-tornasync
 pytest-trio
 pytest-twisted
 twisted
+pydantic-settings
