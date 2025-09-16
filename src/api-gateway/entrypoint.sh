@@ -24,8 +24,17 @@ API_GATEWAY_INTERNAL_SECRET_KEY=$(cat $API_GATEWAY_INTERNAL_SECRET_KEY_PATH)
 
 set -m
 
-# Démarrer Uvicorn avec les certificats
-exec uvicorn main:app --host 0.0.0.0 --port $SERVICE_PORT --ssl-keyfile $API_GATEWAY_KEY_PATH --ssl-certfile $API_GATEWAY_CERT_PATH --ssl-ca-certs $API_GATEWAY_CA_PATH --ssl-cert-reqs 2 &
+
+uvicorn main:app \
+  --host 0.0.0.0 \
+  --port $SERVICE_PORT \
+  --ssl-keyfile $API_GATEWAY_KEY_PATH \
+  --ssl-certfile $API_GATEWAY_CERT_PATH \
+  --ssl-ca-certs $API_GATEWAY_CA_PATH \
+  --ssl-cert-reqs 2 \
+  --log-level $UVICORN_LOG_LEVEL &
+
+
 
 jobs
 
