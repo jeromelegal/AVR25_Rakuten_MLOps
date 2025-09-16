@@ -7,7 +7,7 @@ from fastapi import Depends
 def get_client(settings: Annotated[Settings, Depends(get_settings)]):
     s3 = boto3.client(
         "s3",
-        endpoint_url=f"https://{settings.MINIO_SERVICE_NAME}",
+        endpoint_url=f"https://{settings.MINIO_SERVICE_NAME}:{settings.MINIO_SERVICE_PORT}",
         aws_access_key_id=settings.MINIO_USER,
         aws_secret_access_key=settings.MINIO_PASSWORD,
     )
