@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from api.auth.authenticator import create_backend_authenticator
 from api.auth.token.manager import create_token_manager
-from api.config.settings import Settings
+from config.settings import Settings
 
 # Configurer le logger pour ce module
 logger = logging.getLogger(__name__)

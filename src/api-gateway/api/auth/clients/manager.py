@@ -1,5 +1,5 @@
 import logging
-from api.config.settings import Settings
+from config.settings import Settings
 from api.auth.clients.postgresql import PostgreSQLClient
 from api.auth.clients.mongodb import MongoDBClient
 

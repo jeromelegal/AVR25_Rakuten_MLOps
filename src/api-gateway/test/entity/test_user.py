@@ -1,13 +1,17 @@
+# /app/test/entity/test_user.py
 import sys
 import os
 from fastapi.testclient import TestClient
 import random
 from main import app
-from config.config import config  # Importer le fichier de configuration
-from config.test_settings import test_settings
 
-# Ajouter le chemin absolu de l'application
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "/app")))
+# Configuration propre du PYTHONPATH (une seule fois, au début du fichier)
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+from test.config.config import config
+from test.config.test_settings import test_settings
+
+
 
 # Générer un entier aléatoire entre config.RANDOM_RANGE_START et config.RANDOM_RANGE_END
 nombre_aleatoire = random.randint(config.RANDOM_RANGE_START, config.RANDOM_RANGE_END)

@@ -4,7 +4,7 @@ from requests import Session, HTTPError
 from urllib3.util.ssl_ import create_urllib3_context
 from requests.adapters import HTTPAdapter
 from typing import Optional, Dict, Any
-from api.config.settings import Settings
+from config.settings import Settings
 
 # Configurer le logger pour ce module
 logger = logging.getLogger(__name__)

@@ -3,8 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from api import hello as hello_router, auth as auth_router
 from api.postgresql.entity import user, role
 from api.postgresql.relation import roles_users
-from middleware.auth_middleware import create_auth_middleware
-from middleware.log_middleware import create_log_middleware
+from middleware.auth import create_auth_middleware
+from middleware.logging import create_logging_middleware
 from config.settings import Settings
 
 def create_app(settings: Settings):
@@ -21,7 +21,7 @@ def create_app(settings: Settings):
     )
 
     # Ajoutez les middlewares
-    log_middleware = create_log_middleware()
+    log_middleware = create_logging_middleware()
     auth_middleware = create_auth_middleware(settings)
     app.add_middleware(log_middleware)
     app.add_middleware(auth_middleware)

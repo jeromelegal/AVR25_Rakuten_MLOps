@@ -10,8 +10,8 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.DEBUG)  # Configurez le niveau de logging approprié
 
 PUBLIC_ENDPOINTS = {
-    ("POST", "/signup"): True,
-    ("POST", "/login"): True,
+    ("POST", "/api/internal/postgresql/entity/user"): True,
+    ("POST", "/token"): True,
 }
 
 def create_auth_middleware(settings: Settings) -> DispatchFunction:
@@ -39,7 +39,7 @@ def create_auth_middleware(settings: Settings) -> DispatchFunction:
                 if not referer or not referer.startswith(self.settings.API_GATEWAY_HOST):
                     logger.warning("Forbidden origin detected")
                     return JSONResponse(status_code=403, content={"detail": "Forbidden origin"})
-
+                
                 api_key = request.headers.get("X-API-Key")
                 if not api_key:
                     logger.warning("API key is missing")

@@ -2,7 +2,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Header
 from typing import Dict
 from api.auth.clients.manager import ClientManager, create_client_manager
-from api.config.settings import Settings
+from config.settings import Settings
 from api.auth.token.manager import TokenManager, create_token_manager
 
 # Configuration du logging

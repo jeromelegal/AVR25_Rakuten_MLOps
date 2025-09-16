@@ -1,7 +1,7 @@
 import logging
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from pydantic import BaseModel
-from api.config.settings import Settings
+from config.settings import Settings
 from api.auth.clients.manager import ClientManager, create_client_manager
 
 # Configurer le logger pour ce module

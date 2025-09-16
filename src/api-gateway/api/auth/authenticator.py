@@ -1,7 +1,7 @@
 import logging
 from typing import Dict, Tuple
 from api.auth.clients.manager import ClientManager, create_client_manager
-from api.config.settings import Settings
+from config.settings import Settings
 
 # Configurer le logger pour ce module
 logger = logging.getLogger(__name__)

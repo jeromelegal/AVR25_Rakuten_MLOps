@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException, status, Header
 from jose import jwt, JWTError, ExpiredSignatureError
 from typing import Dict, Optional
-from api.config.settings import Settings
+from config.settings import Settings
 
 # Configurer le logger pour ce module
 logger = logging.getLogger(__name__)

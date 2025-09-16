@@ -10,8 +10,8 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.DEBUG)  # Configurez le niveau de logging approprié
 
 PUBLIC_ENDPOINTS = {
-    ("POST", "/signup"): True,
-    ("POST", "/login"): True,
+    ("POST", "/api/internal/mongodb/entity/user"): True,
+    ("POST", "/token"): True,
 }
 
 def create_auth_middleware(settings: Settings) -> DispatchFunction:

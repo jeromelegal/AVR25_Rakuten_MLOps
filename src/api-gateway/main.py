@@ -5,7 +5,7 @@ from api.middlewares.logging import LoggingMiddleware
 from api.routes.user.login import router as login_router
 from api.routes.user.signup import router as signup_router
 from api.routes.user.delete import router as delete_router
-from api.config.settings import Settings
+from config.settings import Settings
 import logging
 
 # Configurer le logging
