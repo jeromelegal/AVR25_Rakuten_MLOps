@@ -3,7 +3,7 @@ from typing import Annotated, Dict, Optional
 from fastapi import APIRouter, Depends, File, HTTPException
 from pydantic import BaseModel
 from api.config.config import Settings, get_settings
-from api.config.model_loader import get_classifier
+from api.config.dependencies import get_classifier
 from api.processing.classifier import ImageTextClassifier
 
 router = APIRouter()
@@ -41,7 +41,6 @@ async def get_categories(
             description=ad.description, designation=ad.designation, files=[ad.file]
         )
         return Prediction(**prediction)
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Impossible to process the ad. {e}"
-        )
+    except Exception as exc:
+        error_msg = f"Impossible to process the ad. {exc}"
+        raise HTTPException(status_code=500, detail=error_msg) from exc
