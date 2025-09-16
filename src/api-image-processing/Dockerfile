@@ -106,6 +106,6 @@ RUN pip install --break-system-packages -r requirements.txt
 
 COPY . .
 
-EXPOSE 8030
+EXPOSE 8030 433 80
 
 ENTRYPOINT ["entrypoint.sh"]

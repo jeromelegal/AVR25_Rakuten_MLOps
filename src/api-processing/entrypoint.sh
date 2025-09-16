@@ -1,7 +1,7 @@
 #!/bin/bash
 # Check if text API service is up
 echo "Checking if text API service is up..."
-HEALTH_URL=http://$API_TEXT_PROCESSING_SERVICE_NAME:$API_TEXT_PROCESSING_SERVICE_PORT/
+HEALTH_URL=https://$API_TEXT_PROCESSING_SERVICE_NAME/health
 echo "HEALTH_URL: $HEALTH_URL"
 HTTP_CODE=$(curl -k -o /dev/null -s -w "%{http_code}\n" $HEALTH_URL)
 until [ $HTTP_CODE -eq 200 ]; do
@@ -13,7 +13,7 @@ echo "Text API service is up"
 
 # Check if image API service is up
 echo "Checking if image API service is up..."
-HEALTH_URL=http://$API_IMAGE_PROCESSING_SERVICE_NAME:$API_IMAGE_PROCESSING_SERVICE_PORT/
+HEALTH_URL=https://$API_IMAGE_PROCESSING_SERVICE_NAME/health
 echo "HEALTH_URL: $HEALTH_URL"
 HTTP_CODE=$(curl -k -o /dev/null -s -w "%{http_code}\n" $HEALTH_URL)
 until [ $HTTP_CODE -eq 200 ]; do
