@@ -9,37 +9,37 @@ db.createUser({
 
 db.createCollection('users');
 
-db.getSiblingDB('db_rakuten').createRole({
+db.getSiblingDB('file_storage').createRole({
   role: 'dbManager',
   privileges: [
-    { resource: { db: 'db_rakuten', collection: '' }, actions: ['find', 'insert', 'update', 'remove'] }
+    { resource: { db: 'file_storage', collection: '' }, actions: ['find', 'insert', 'update', 'remove'] }
   ],
   roles: []
 });
 
-db.getSiblingDB('db_rakuten').createUser({
+db.getSiblingDB('file_storage').createUser({
   user: 'db_manager_user',
   pwd: 'db_manager_user_password',
-  roles: [{ role: 'dbManager', db: 'db_rakuten' }]
+  roles: [{ role: 'dbManager', db: 'file_storage' }]
 });
 
 
-db.getSiblingDB('db_rakuten').createRole({
+db.getSiblingDB('file_storage').createRole({
   role: 'userManager',
   privileges: [
-    { resource: { db: 'db_rakuten', collection: 'users' }, actions: ['find', 'insert', 'update', 'remove'] }
+    { resource: { db: 'file_storage', collection: 'users' }, actions: ['find', 'insert', 'update', 'remove'] }
   ],
   roles: []
 });
 
-db.getSiblingDB('db_rakuten').createUser({
+db.getSiblingDB('file_storage').createUser({
   user: 'user_manager',
   pwd: 'usermanagerpassword',
-  roles: [{ role: 'userManager', db: 'db_rakuten' }]
+  roles: [{ role: 'userManager', db: 'file_storage' }]
 });
 
 // Create ads collection
-db.getSiblingDB('db_rakuten').createCollection("ads", {
+db.getSiblingDB('file_storage').createCollection("ads", {
   validator: {
     $jsonSchema: {
       bsonType: "object",
@@ -65,7 +65,7 @@ db.getSiblingDB('db_rakuten').createCollection("ads", {
 });
 
 // Create index
-db.getSiblingDB('db_rakuten').ads.createIndex(
+db.getSiblingDB('file_storage').ads.createIndex(
   {
     designation: 'text',
     description: 'text',
