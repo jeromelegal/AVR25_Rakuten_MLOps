@@ -41,15 +41,22 @@ ENV AIRFLOW_AIRFLOW_KEY_PATH=${AIRFLOW_AIRFLOW_KEY_PATH:-"/etc/ssl/airflow/airfl
 ENV AIRFLOW_AIRFLOW_CERT_PATH=${AIRFLOW_AIRFLOW_CERT_PATH:-"/etc/ssl/airflow/airflow_airflow.crt"}
 ENV AIRFLOW_AIRFLOW_CA_PATH=${AIRFLOW_AIRFLOW_CA_PATH:-"/etc/ssl/airflow/airflow_airflow_ca.crt"}
 
-ENV POSTGRESQL_AIRFLOW_PEM_PATH=${POSTGRESQL_AIRFLOW_PEM_PATH:-"/etc/ssl/postgresql/postgresql_airflow.pem"}
-ENV POSTGRESQL_AIRFLOW_KEY_PATH=${POSTGRESQL_AIRFLOW_KEY_PATH:-"/etc/ssl/postgresql/postgresql_airflow.key"}
-ENV POSTGRESQL_AIRFLOW_CERT_PATH=${POSTGRESQL_AIRFLOW_CERT_PATH:-"/etc/ssl/postgresql/postgresql_airflow.crt"}
-ENV POSTGRESQL_AIRFLOW_CA_PATH=${POSTGRESQL_AIRFLOW_CA_PATH:-"/etc/ssl/postgresql/postgresql_airflow_ca.crt"}
+ENV POSTGRESQL_AIRFLOW_PEM_PATH=${POSTGRESQL_AIRFLOW_PEM_PATH:-"/etc/ssl/airflow/postgresql_airflow.pem"}
+ENV POSTGRESQL_AIRFLOW_KEY_PATH=${POSTGRESQL_AIRFLOW_KEY_PATH:-"/etc/ssl/airflow/postgresql_airflow.key"}
+ENV POSTGRESQL_AIRFLOW_CERT_PATH=${POSTGRESQL_AIRFLOW_CERT_PATH:-"/etc/ssl/airflow/postgresql_airflow.crt"}
+ENV POSTGRESQL_AIRFLOW_CA_PATH=${POSTGRESQL_AIRFLOW_CA_PATH:-"/etc/ssl/airflow/postgresql_airflow_ca.crt"}
 
-ENV MINIO_AIRFLOW_PEM_PATH=${MINIO_AIRFLOW_PEM_PATH:-"/etc/ssl/minio/minio_airflow.pem"}
-ENV MINIO_AIRFLOW_KEY_PATH=${MINIO_AIRFLOW_KEY_PATH:-"/etc/ssl/minio/minio_airflow.key"}
-ENV MINIO_AIRFLOW_CERT_PATH=${MINIO_AIRFLOW_CERT_PATH:-"/etc/ssl/minio/minio_airflow.crt"}
-ENV MINIO_AIRFLOW_CA_PATH=${MINIO_AIRFLOW_CA_PATH:-"/etc/ssl/minio/minio_airflow_ca.crt"}
+ENV MINIO_AIRFLOW_PEM_PATH=${MINIO_AIRFLOW_PEM_PATH:-"/etc/ssl/airflow/minio_airflow.pem"}
+ENV MINIO_AIRFLOW_KEY_PATH=${MINIO_AIRFLOW_KEY_PATH:-"/etc/ssl/airflow/minio_airflow.key"}
+ENV MINIO_AIRFLOW_CERT_PATH=${MINIO_AIRFLOW_CERT_PATH:-"/etc/ssl/airflow/minio_airflow.crt"}
+ENV MINIO_AIRFLOW_CA_PATH=${MINIO_AIRFLOW_CA_PATH:-"/etc/ssl/airflow/minio_airflow_ca.crt"}
+
+ENV MINIO_SERVICE_NAME ${MINIO_SERVICE_NAME:-"minio"}
+ENV MINIO_SERVICE_PORT ${MINIO_SERVICE_PORT:-"9010"}
+ENV MINIO_AIRFLOW_USER ${MINIO_AIRFLOW_USER:-"minio-user"}
+ENV MINIO_DEFAULT_AIRFLOW_ARTIFACT_BUCKET ${MINIO_DEFAULT_AIRFLOW_ARTIFACT_BUCKET:-"models"}
+ENV MINIO_AIRFLOW_PASSWORD ${MINIO_AIRFLOW_PASSWORD:-"minio-password"}
+
 
 ENV AUTHORIZATION=${AUTHORIZATION:-"enabled"}
 ENV SERVICE_NAME=${SERVICE_NAME:-"airflow"}
@@ -85,7 +92,10 @@ RUN pip install --upgrade pip && \
     apache-airflow-providers-http \
     apache-airflow-providers-slack \
     requests \
+    psycopg2-binary \
     && rm -rf /root/.cache/pip
+#psycopg[sqlalchemy,binary] \
+#psycopg-pool \
 
 # Mettre à jour la liste des paquets et installer wget, gpg et lsb-release
 RUN apt-get update && apt-get install -y wget gpg lsb-release curl iptables jq openssl libcap2-bin iproute2 ca-certificates dnsutils

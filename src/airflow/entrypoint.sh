@@ -2,7 +2,7 @@
 set -e
 
 echo "Starting entrypoint script..."
-
+export AIRFLOW__DATABASE__SQL_ALCHEMY_CONN="postgresql+psycopg2://airflow_user:airflow_user_password@postgresql:5432/airflow_db"
 
 #HTTP_CODE=$(curl -k -o /dev/null -s -w "%{http_code}\n" https://$AIRFLOW_SERVICE_NAME/health)
 # Vous pouvez ajouter une logique conditionnelle ici
@@ -26,7 +26,12 @@ set -m
 #     --serve-artifacts \
 #     --gunicorn-opts "--keyfile /path/to/private.key --certfile /path/to/certificate.crt" &
 
-exec airflow webserver
+echo "EXEC AIRFLOW db migrate..."
+exec airflow db migrate
+echo "EXEC AIRFLOW db init..."
+exec airflow db init
+echo "EXEC AIRFLOW scheduler..."
+exec airflow scheduler
 jobs
 
 nginx-fcgiwrap.sh

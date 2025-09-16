@@ -48,6 +48,8 @@ ENV MINIO_MINIO_PEM_PATH=${MINIO_MINIO_PEM_PATH:-"/etc/ssl/minio/minio_minio.pem
 ENV MINIO_MINIO_CA_PATH=${MINIO_MINIO_CA_PATH:-"/etc/ssl/minio/minio_minio.ca"}
 ENV MINIO_MLFLOW_PEM_PATH=${MINIO_MLFLOW_PEM_PATH:-"/etc/ssl/minio/minio_mlflow.pem"}
 ENV MINIO_MLFLOW_CA_PATH=${MINIO_MLFLOW_CA_PATH:-"/etc/ssl/minio/minio_mlflow.ca"}
+ENV MINIO_AIRFLOW_PEM_PATH=${MINIO_AIRFLOW_PEM_PATH:-"/etc/ssl/minio/minio_airflow.pem"}
+ENV MINIO_AIRFLOW_CA_PATH=${MINIO_AIRFLOW_CA_PATH:-"/etc/ssl/minio/minio_airflow.ca"}
 ENV AUTHORIZATION=${AUTHORIZATION:-"enabled"}
 ENV SERVICE_NAME=${SERVICE_NAME:-"minio"}
 ENV VAULT_SERVICE_NAME=${VAULT_SERVICE_NAME:-"vault"}
@@ -68,7 +70,7 @@ RUN apt-get update && apt-get install -y \
     cron \
     ca-certificates \
     fcgiwrap \
-	libcap2-bin \
+    libcap2-bin \
     nginx && \
     rm -rf /var/lib/apt/lists/*
 

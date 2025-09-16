@@ -173,6 +173,7 @@ chown airflow:airflow $AIRFLOW_AIRFLOW_KEY_PATH
 chmod 600 $AIRFLOW_AIRFLOW_KEY_PATH
 
 # Extraire le certificat et la clé privée de PostGreSQL
+POSTGRESQL_AIRFLOW_CA_PATH=${POSTGRESQL_AIRFLOW_CA_PATH:-"/etc/ssl/postgresql/postgresql_airflow_ca.crt"}
 POSTGRESQL_AIRFLOW_CA=$(vault kv get -field=ca secret/postgresql/airflow/certs)
 POSTGRESQL_AIRFLOW_CERT=$(vault kv get -field=cert secret/postgresql/airflow/certs)
 POSTGRESQL_AIRFLOW_KEY=$(vault kv get -field=key secret/postgresql/airflow/certs)

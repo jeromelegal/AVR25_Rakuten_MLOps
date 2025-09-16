@@ -161,6 +161,29 @@ else
   rm -f vault_service_cert.json
 fi
 
+# Vérifier si le certificat et la clé Vault existent déjà
+if vault kv get -field=cert secret/minio/airflow/certs > /dev/null 2>&1 && vault kv get -field=key secret/minio/airflow/certs > /dev/null 2>&1; then
+  echo "Le certificat mTLS minio pour le service airflow existe déjà"
+  MINIO_AIRFLOW_CA=$(vault kv get -field=ca secret/minio/airflow/certs)
+  MINIO_AIRFLOW_CERT=$(vault kv get -field=cert secret/minio/airflow/certs)
+  MINIO_AIRFLOW_KEY=$(vault kv get -field=key secret/minio/airflow/certs)
+else
+  # Générer le certificat et la clé pour Vault
+  echo "Générer le certificat et la clé pour Vault"
+  vault write -format=json pki_minio/issue/minio common_name="minio"   ttl="72h" > minio_airflow_cert.json
+  # TODO: Define certificate duration as an env variable
+
+  # Extraire le certificat et la clé privée
+  MINIO_AIRFLOW_CA=$(jq -r '.data.ca_chain[0]' minio_airflow_cert.json)
+  MINIO_AIRFLOW_CERT=$(jq -r '.data.certificate' minio_airflow_cert.json)
+  MINIO_AIRFLOW_KEY=$(jq -r '.data.private_key' minio_airflow_cert.json)
+
+  # Enregistrer le certificat et la clé privée dans Vault
+  vault kv put secret/minio/airflow/certs cert="$MINIO_AIRFLOW_CERT" key="$MINIO_AIRFLOW_KEY" ca="$MINIO_AIRFLOW_CA"
+  # Nettoyage des fichiers temporaires
+  rm -f vault_service_cert.json
+fi
+
 cat <<EOF > $MINIO_MLFLOW_PEM_PATH
 $(printf "%s" "$MINIO_MLFLOW_KEY")
 $(printf "%s" "$MINIO_MLFLOW_CERT")
