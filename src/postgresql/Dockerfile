@@ -44,6 +44,9 @@ ENV POSTGRESQL_MLFLOW_PEM_PATH=${POSTGRESQL_MLFLOW_PEM_PATH:-"/etc/ssl/postgresq
 ENV POSTGRESQL_MLFLOW_KEY_PATH=${POSTGRESQL_MLFLOW_KEY_PATH:-"/etc/ssl/postgresql/postgresql_mlflow.key"}
 ENV POSTGRESQL_MLFLOW_CERT_PATH=${POSTGRESQL_MLFLOW_CERT_PATH:-"/etc/ssl/postgresql/postgresql_mlflow.crt"}
 ENV POSTGRESQL_MLFLOW_CA_PATH=${POSTGRESQL_MLFLOW_CA_PATH:-"/etc/ssl/postgresql/postgresql_mlflow_ca.crt"}
+ENV AIRFLOW_DATABASE=${AIRFLOW_DATABASE:-"airflow"}
+ENV AIRFLOW_USER=${AIRFLOW_USER:-"airflow_user"}
+ENV AIRFLOW_USER_PASSWORD=${AIRFLOW_USER_PASSWORD:-"airflow_user_password"}
 
 RUN mkdir -p $DB_PATH
 RUN chown -R postgresql:postgresql $DB_PATH

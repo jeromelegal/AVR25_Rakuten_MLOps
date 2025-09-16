@@ -20,7 +20,7 @@ until vault login -method=userpass username=$VAULT_USERNAME password=$VAULT_PASS
 done
 
 
-services=("${SERVICE_NAME}" "vault" "consul" "postgresql")
+services=("${SERVICE_NAME}" "vault" "consul")
 
 # Boucle sur chaque service
 for service_name in "${services[@]}"; do
@@ -89,7 +89,7 @@ chmod 600 /etc/ssl/${SERVICE_NAME}/${SERVICE_NAME}-keyfile
 
 
 #Liste des services pour lesquels générer les certificats
-services=("${SERVICE_NAME}" "api-postgresql" "mlflow")
+services=("${SERVICE_NAME}" "api-postgresql" "mlflow" "airflow")
 
 # Boucle sur chaque service
 for service_name in "${services[@]}"; do
@@ -109,8 +109,9 @@ for service_name in "${services[@]}"; do
     if [[ "$service_name" == "api-postgresql" ]]; then
         vault write -format=json pki_${SERVICE_NAME}/issue/${SERVICE_NAME} common_name="db_manager_user" ttl="72h" > "${SERVICE_NAME}_${service_name}_cert.json"
     elif [[ "$service_name" == "mlflow" ]]; then
-        echo "vault write -format=json pki_${SERVICE_NAME}/issue/${SERVICE_NAME} common_name=\"${MLFLOW_USER}\" ttl=\"72h\" > \"${SERVICE_NAME}_${service_name}_cert.json\""
         vault write -format=json pki_${SERVICE_NAME}/issue/${SERVICE_NAME} common_name="${MLFLOW_USER}" ttl="72h" > "${SERVICE_NAME}_${service_name}_cert.json"
+    elif [[ "$service_name" == "airflow" ]]; then
+        vault write -format=json pki_${SERVICE_NAME}/issue/${SERVICE_NAME} common_name="${AIRFLOW_USER}" ttl="72h" > "${SERVICE_NAME}_${service_name}_cert.json"
     else
         vault write -format=json pki_${SERVICE_NAME}/issue/${SERVICE_NAME} common_name="${service_name}" ttl="72h" > "${SERVICE_NAME}_${service_name}_cert.json"
     fi
