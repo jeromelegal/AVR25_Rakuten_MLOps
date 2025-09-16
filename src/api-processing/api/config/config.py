@@ -3,7 +3,6 @@ import os
 from pydantic_settings import BaseSettings
 
 DEFAULT_TOKEN_DURATION_IN_MINUTES = 60
-DEFAULT_MLFLOW_IMAGE_CLASSIFIER_MODEL_VERSION = 1
 
 
 class Settings(BaseSettings):

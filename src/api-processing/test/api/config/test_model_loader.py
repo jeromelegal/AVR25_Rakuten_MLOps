@@ -1,24 +1,22 @@
 from unittest.mock import patch, Mock
-from api.config.model_loader import get_classifier
+from api.config.model_loader import load_classifier
 
 
 class TestModelLoader:
 
     @patch("api.config.model_loader.ImageTextClassifier")
-    def test_get_classifier_model(self, classifier_class_mock: Mock):
+    def test_load_classifier(self, classifier_class_mock: Mock):
         clf_mock = Mock()
-        settings = Mock()
-        settings.API_TEXT_PROCESSING_SERVICE_NAME = "service-text"
-        settings.API_TEXT_PROCESSING_SERVICE_PORT = 80
-        settings.API_IMAGE_PROCESSING_SERVICE_NAME = "service-image"
-        settings.API_IMAGE_PROCESSING_SERVICE_PORT = 81
-
+        expected_text_api_url = "my-text_api_url"
+        expected_image_api_url = "my-image_api_url"
         classifier_class_mock.return_value = clf_mock
 
-        model = get_classifier(settings=settings)
+        model = load_classifier(
+            text_api_url=expected_text_api_url, image_api_url=expected_image_api_url
+        )
 
         assert model == clf_mock
         classifier_class_mock.assert_called_once_with(
-            text_api_url="https://service-text:80",
-            image_api_url="https://service-image:81",
+            text_api_url=expected_text_api_url,
+            image_api_url=expected_image_api_url,
         )
