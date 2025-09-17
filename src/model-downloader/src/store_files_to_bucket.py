@@ -22,6 +22,7 @@ FILES_TO_BE_UPLOADED = [
     "models/nllb-200/special_tokens_map.json",
     "models/nllb-200/tokenizer_config.json",
     "models/nllb-200/tokenizer.json",
+    "combined_trained_model_no_output.keras",
 ]
 
 
@@ -36,8 +37,9 @@ def main(dir_path: str):
     logging.info("Getting Minio client")
     client = get_client(settings=settings)
 
-    logging.info(f"Uploading files from {dir_path}")
+    logging.info(f"Uploading files from {dir_path}:")
     for file_path in FILES_TO_BE_UPLOADED:
+        logging.info(f"\tUploading {file_path}")
         path = f"{dir_path}/{file_path}"
         client.upload_file(
             path,
