@@ -1,11 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from pydantic import BaseModel
 from config.db import get_db_client
-from typing import Optional
-from datetime import datetime, timezone, timedelta, UTC
+from datetime import datetime, timezone
 from config.settings import Settings
-from api.auth import get_current_user, hash_password, create_access_token
-import asyncpg
+from api.auth import get_current_user
 from typing import Dict
 
 router = APIRouter()
@@ -22,11 +20,16 @@ class CategoryResponse(BaseModel):
     created_by: int
 
 @router.post("/api/internal/postgresql/entity/category", response_model=CategoryResponse)
-async def create_category(request: Request, data: Category):
+async def create_category(request: Request, data: Category, current_user: dict = Depends(get_current_user)):
     settings: Settings = request.app.state.settings
+
+    #TODO SETUP ROLE
+    # if "superadmin" not in current_user.get("roles", []):
+    #     raise HTTPException(status_code=403, detail="Not enough permissions")
+
     data_dict = data.model_dump()
     data_dict["created_at"] = datetime.now(timezone.utc).replace(tzinfo=None)
-    data_dict["created_by"] = 0  # Assuming the system creates the user
+    data_dict["created_by"] = current_user["id"]
 
     async with get_db_client(settings) as conn:
         category_id = await conn.fetchval(
@@ -40,28 +43,29 @@ async def create_category(request: Request, data: Category):
         return CategoryResponse(**data_dict)
 
 @router.get("/api/internal/postgresql/entity/category/{category_id}", response_model=CategoryResponse)
-async def get_category(category_id: int, current_user: dict = Depends(get_current_user), request: Request = None):
+async def get_category(category_id: int, current_user: Dict = Depends(get_current_user), request: Request = None):
     settings: Settings = request.app.state.settings
-    # if current_user["id"] != user_id and "superadmin" not in current_user.get("roles", []):
+    
+    #TODO SETUP ROLE
+    # if "superadmin" not in current_user.get("roles", []):
     #     raise HTTPException(status_code=403, detail="Not enough permissions")
 
     async with get_db_client(settings) as conn:
         category = await conn.fetchrow(
             "SELECT id as category_id, code, label, created_at, created_by FROM categories WHERE id = $1",
-            int(category_id)
+            category_id
         )
         if category:
             return CategoryResponse(**category)
         raise HTTPException(status_code=404, detail="Category not found")
 
-@router.put("/api/internal/postgresql/entity/category/{category_id}", response_model=dict)
-async def update_category(category_id: int, data: Category, current_user: dict = Depends(get_current_user), request: Request = None):
+@router.put("/api/internal/postgresql/entity/category/{category_id}", response_model=Dict)
+async def update_category(category_id: int, data: Category, current_user: Dict = Depends(get_current_user), request: Request = None):
     settings: Settings = request.app.state.settings
-    # print("\n"*20)
-    # print(f"{current_user["id"]} != {user_id}")
-    # print("\n"*20)
-    if "superadmin" not in current_user.get("roles", []):
-        raise HTTPException(status_code=403, detail="Not enough permissions")
+    
+    #TODO SETUP ROLE
+    # if "superadmin" not in current_user.get("roles", []):
+    #     raise HTTPException(status_code=403, detail="Not enough permissions")
 
     data_dict = data.model_dump()
     async with get_db_client(settings) as conn:
@@ -84,19 +88,18 @@ async def update_category(category_id: int, data: Category, current_user: dict =
             raise HTTPException(status_code=500, detail="Error during update 'code'")
         raise HTTPException(status_code=404, detail="Category not found to update")
 
-@router.delete("/api/internal/postgresql/entity/category/{category_id}", response_model=dict)
-async def delete_category(category_id: int, current_user: dict = Depends(get_current_user), request: Request = None):
+@router.delete("/api/internal/postgresql/entity/category/{category_id}", response_model=Dict)
+async def delete_category(category_id: int, current_user: Dict = Depends(get_current_user), request: Request = None):
     settings: Settings = request.app.state.settings
-    # print("\n"*20)
-    # print(f"{current_user["id"]} != {user_id}")
-    # print("\n"*20)
-    if "superadmin" not in current_user.get("roles", []):
-        raise HTTPException(status_code=403, detail="Not enough permissions")
-
+    
+    #TODO SETUP ROLE
+    # if "superadmin" not in current_user.get("roles", []):
+    #     raise HTTPException(status_code=403, detail="Not enough permissions")
+    
     async with get_db_client(settings) as conn:
         result = await conn.execute(
             "DELETE FROM categories WHERE id = $1",
-            int(category_id)
+            category_id
         )
         if result == "DELETE 1":
             return {"message": "Category deleted successfully"}

@@ -1,14 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
+from typing import Dict, List
 from config.db import get_db_client
-from typing import List
-import asyncpg
+from config.settings import Settings
 from api.auth import get_current_user
+import asyncpg
 
 
 router = APIRouter()
 
-class UserAd(BaseModel):
+class UserAdRelation(BaseModel):
     user_id: str
     ad_id: str
 
@@ -16,66 +17,66 @@ class UserAdResponse(BaseModel):
     user_id: str
     ad_id: str
 
-class GetAdUserResponse(BaseModel):
-    user_id: str
-
 @router.post("/api/internal/postgresql/relation/user_ad", response_model=UserAdResponse)
-async def create_user_ad(user_ad: UserAd, current_user: dict = Depends(get_current_user)):
-    if "superadmin" not in current_user.get("user_ads", []):
-        raise HTTPException(status_code=403, detail="Not enough permissions")
-
-    async with get_db_client() as conn:
-        user_ad_dict = user_ad.model_dump()
-
-        # Insert the user_ad into the database
-        relation = await conn.fetchval(
-            "INSERT INTO user_ads (user_id, ad_id) VALUES ($1, $2) ON CONFLICT (user_id, ad_id) DO NOTHING RETURNING user_id, ad_id",
-            user_ad_dict["user_id"],
-            user_ad_dict["ad_id"]
-        )
-        if relation is None:
-            # Already exists
-            raise HTTPException(status_code=409, detail="Relation already exists")
-        return UserAdResponse(**user_ad_dict)
-
-@router.get("/api/internal/postgresql/relation/user_ad/{user_id}", response_model=List[UserAdResponse])
-async def get_user_ads(user_id: int, current_user: dict = Depends(get_current_user)):
+async def create_user_ad(request: Request, relation: UserAdRelation, current_user: dict = Depends(get_current_user)):
+    settings: Settings = request.app.state.settings
+    # TODO SETUP ROLE
     # if "superadmin" not in current_user.get("roles", []):
     #     raise HTTPException(status_code=403, detail="Not enough permissions")
+    relation_dict = relation.model_dump()
+    async with get_db_client(settings) as conn:
+        try:
+            # Insertion dans la table user_ads
+            await conn.execute(
+                "INSERT INTO user_ads (user_id, ad_id) VALUES ($1, $2) ON CONFLICT (user_id, ad_id) DO NOTHING RETURNING user_id, ad_id",
+                relation_dict["user_id"],
+                relation_dict["ad_id"]
+            )
+            return UserAdResponse(**relation_dict)
+        except asyncpg.UniqueViolationError:
+            raise HTTPException(status_code=400, detail="User-Ad relation already exists")
 
-    async with get_db_client() as conn:
-        relations = await conn.fetchrow(
-            "SELECT user_id, ad_id FROM user_ads WHERE user_id = $1",
-            user_id
-        )
-        if relations:
-            return [UserAdResponse(user_id=r["user_id"], ad_id=r["ad_id"]) for r in relations]
-        raise HTTPException(status_code=404, detail=f"Relations from user_id:{user_id} not found")
-    
-@router.get("/api/internal/postgresql/relation/ad_user/{ad_id}", response_model=GetAdUserResponse)
-async def get_ad_user(ad_id: int, current_user: dict = Depends(get_current_user)):
+@router.get("/api/internal/postgresql/relation/user_ad", response_model=List[UserAdResponse])
+async def get_user_ad(user_id: int=None, ad_id: int=None, current_user: dict = Depends(get_current_user), request: Request = None):
+    settings: Settings = request.app.state.settings
+    # TODO SETUP ROLE
     # if "superadmin" not in current_user.get("roles", []):
     #     raise HTTPException(status_code=403, detail="Not enough permissions")
+    async with get_db_client(settings) as conn:
+        if user_id is not None and ad_id is not None:
+            relation = await conn.fetchrow(
+                "SELECT user_id, ad_id FROM user_ads WHERE user_id = $1 AND ad_id = $2",
+                user_id, ad_id
+            )
+            if relation:
+                return [UserAdResponse(**relation)]
+            else:
+                raise HTTPException(status_code=404, detail="User-Ad relation not found")
+        else:
+            # Récupérer toutes les relations pour un utilisateur ou une annonce spécifique, ou toutes
+            query = "SELECT user_id, ad_id FROM user_ads"
+            params = []
+            if user_id is not None:
+                query += " WHERE user_id = $1"
+                params.append(user_id)
+            elif ad_id is not None:
+                query += " WHERE ad_id = $1"
+                params.append(ad_id)
 
-    async with get_db_client() as conn:
-        relation = await conn.fetchrow(
-            "SELECT user_id FROM user_ads WHERE ad_id = $1",
-            ad_id
-        )
-        if relation:
-            return GetAdUserResponse(**relation)
-        raise HTTPException(status_code=404, detail="relation not found")
+            relations = await conn.fetch(query, *params)
+            return [UserAdResponse(**relation) for relation in relations]
 
-@router.delete("/api/internal/postgresql/relation/user_ad/{user_id}/{ad_id}", response_model=dict)
-async def delete_user_ad(user_id: int, ad_id: int, current_user: dict = Depends(get_current_user)):
-    if "superadmin" not in current_user.get("user_ads", []):
-        raise HTTPException(status_code=403, detail="Not enough permissions")
-
-    async with get_db_client() as conn:
+@router.delete("/api/internal/postgresql/relation/user_ad", response_model=Dict)
+async def delete_user_ad(user_id: int, ad_id: int, current_user: dict = Depends(get_current_user), request: Request = None):
+    settings: Settings = request.app.state.settings
+    # TODO SETUP ROLE
+    # if "superadmin" not in current_user.get("roles", []):
+    #     raise HTTPException(status_code=403, detail="Not enough permissions")
+    async with get_db_client(settings) as conn:
         result = await conn.execute(
-            "DELETE FROM user_ads WHERE (user_id, ad_id) VALUES ($1, $2)",
+            "DELETE FROM user_ads WHERE user_id = $1 AND ad_id = $2 RETURNING user_id, ad_id",
             user_id, ad_id
         )
-        if result == "DELETE 1":
-            return {"message": "Relation deleted successfully"}
-        raise HTTPException(status_code=404, detail=f"Relation user_id:{user_id} / ad_id:{ad_id} not found")
+        if result:
+            return {"message": "User-Ad relation deleted successfully"}
+        raise HTTPException(status_code=404, detail="User-Ad relation not found")

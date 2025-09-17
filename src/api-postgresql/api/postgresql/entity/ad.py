@@ -1,11 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from config.db import get_db_client
 from typing import Optional
-from datetime import datetime, timezone, timedelta, UTC
+from datetime import datetime, timezone
 from config.settings import Settings
-from api.auth import get_current_user, hash_password, create_access_token
-import asyncpg
+from api.auth import get_current_user
 from typing import Dict
 
 router = APIRouter()
@@ -22,11 +21,17 @@ class AdResponse(BaseModel):
     created_by: int
 
 @router.post("/api/internal/postgresql/entity/ad", response_model=AdResponse)
-async def create_ad(request: Request, data: Ad):
+async def create_ad(request: Request, data: Ad, current_user: dict = Depends(get_current_user)):
     settings: Settings = request.app.state.settings
+
+    #TODO SETUP ROLE
+    # if "superadmin" not in current_user.get("roles", []):
+    #     raise HTTPException(status_code=403, detail="Not enough permissions")
+
+
     data_dict = data.model_dump()
     data_dict["created_at"] = datetime.now(timezone.utc).replace(tzinfo=None)
-    data_dict["created_by"] = 0  # Assuming the system creates the user
+    data_dict["created_by"] = current_user["id"]
 
     async with get_db_client(settings) as conn:
         ad_id = await conn.fetchval(
@@ -40,27 +45,28 @@ async def create_ad(request: Request, data: Ad):
         return AdResponse(**data_dict)
 
 @router.get("/api/internal/postgresql/entity/ad/{ad_id}", response_model=AdResponse)
-async def get_ad(ad_id: int, current_user: dict = Depends(get_current_user), request: Request = None):
+async def get_ad(ad_id: int, current_user: Dict = Depends(get_current_user), request: Request = None):
     settings: Settings = request.app.state.settings
-    # if current_user["id"] != user_id and "superadmin" not in current_user.get("roles", []):
+    
+    #TODO SETUP ROLE
+    # if "superadmin" not in current_user.get("roles", []):
     #     raise HTTPException(status_code=403, detail="Not enough permissions")
 
     async with get_db_client(settings) as conn:
         ad = await conn.fetchrow(
             "SELECT id as ad_id, designation, description, created_at, created_by FROM ads WHERE id = $1",
-            int(ad_id)
+            ad_id
         )
         if ad:
             return AdResponse(**ad)
         raise HTTPException(status_code=404, detail="Ad not found")
 
-@router.put("/api/internal/postgresql/entity/ad/{ad_id}", response_model=dict)
-async def update_ad(ad_id: int, data: Ad, current_user: dict = Depends(get_current_user), request: Request = None):
+@router.put("/api/internal/postgresql/entity/ad/{ad_id}", response_model=Dict)
+async def update_ad(ad_id: int, data: Ad, current_user: Dict = Depends(get_current_user), request: Request = None):
     settings: Settings = request.app.state.settings
-    # print("\n"*20)
-    # print(f"{current_user["id"]} != {user_id}")
-    # print("\n"*20)
-    # if current_user["id"] != user_id and "superadmin" not in current_user.get("roles", []):
+    
+    #TODO SETUP ROLE
+    # if "superadmin" not in current_user.get("roles", []):
     #     raise HTTPException(status_code=403, detail="Not enough permissions")
 
     data_dict = data.model_dump()
@@ -84,19 +90,18 @@ async def update_ad(ad_id: int, data: Ad, current_user: dict = Depends(get_curre
             raise HTTPException(status_code=500, detail="Error during update 'designation'")
         raise HTTPException(status_code=404, detail="Ad not found to update")
 
-@router.delete("/api/internal/postgresql/entity/ad/{ad_id}", response_model=dict)
-async def delete_ad(ad_id: int, current_user: dict = Depends(get_current_user), request: Request = None):
+@router.delete("/api/internal/postgresql/entity/ad/{ad_id}", response_model=Dict)
+async def delete_ad(ad_id: int, current_user: Dict = Depends(get_current_user), request: Request = None):
     settings: Settings = request.app.state.settings
-    # print("\n"*20)
-    # print(f"{current_user["id"]} != {user_id}")
-    # print("\n"*20)
-    # if current_user["id"] != user_id and "superadmin" not in current_user.get("roles", []):
+
+    #TODO SETUP ROLE
+    # if "superadmin" not in current_user.get("roles", []):
     #     raise HTTPException(status_code=403, detail="Not enough permissions")
 
     async with get_db_client(settings) as conn:
         result = await conn.execute(
             "DELETE FROM ads WHERE id = $1",
-            int(ad_id)
+            ad_id
         )
         if result == "DELETE 1":
             return {"message": "Ad deleted successfully"}

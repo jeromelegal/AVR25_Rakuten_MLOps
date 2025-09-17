@@ -1,14 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
+from typing import Dict, List
 from config.db import get_db_client
-from typing import List
-import asyncpg
+from config.settings import Settings
 from api.auth import get_current_user
+import asyncpg
 
 
 router = APIRouter()
 
-class AdImage(BaseModel):
+class AdImageRelation(BaseModel):
     ad_id: str
     image_id: str
 
@@ -16,66 +17,67 @@ class AdImageResponse(BaseModel):
     ad_id: str
     image_id: str
 
-class GetImageAdResponse(BaseModel):
-    ad_id: str
-
-@router.post("/api/internal/postgresql/relation/user_ad", response_model=AdImageResponse)
-async def create_user_ad(user_ad: AdImage, current_user: dict = Depends(get_current_user)):
-    if "superadmin" not in current_user.get("ad_images", []):
-        raise HTTPException(status_code=403, detail="Not enough permissions")
-
-    async with get_db_client() as conn:
-        user_ad_dict = user_ad.model_dump()
-
-        # Insert the user_ad into the database
-        relation = await conn.fetchval(
-            "INSERT INTO ad_images (ad_id, image_id) VALUES ($1, $2) ON CONFLICT (ad_id, image_id) DO NOTHING RETURNING ad_id, image_id",
-            user_ad_dict["ad_id"],
-            user_ad_dict["image_id"]
-        )
-        if relation is None:
-            # Already exists
-            raise HTTPException(status_code=409, detail="Relation already exists")
-        return AdImageResponse(**user_ad_dict)
-
-@router.get("/api/internal/postgresql/relation/user_ad/{ad_id}", response_model=List[AdImageResponse])
-async def get_ad_images(ad_id: int, current_user: dict = Depends(get_current_user)):
+@router.post("/api/internal/postgresql/relation/ad_image", response_model=AdImageResponse)
+async def create_ad_image(request: Request, relation: AdImageRelation, current_user: dict = Depends(get_current_user)):
+    settings: Settings = request.app.state.settings
+    # TODO SETUP ROLE
     # if "superadmin" not in current_user.get("roles", []):
     #     raise HTTPException(status_code=403, detail="Not enough permissions")
+    relation_dict = relation.model_dump()
+    async with get_db_client(settings) as conn:
+        try:
+            # Insertion dans la table ad_images
+            await conn.execute(
+                "INSERT INTO ad_images (ad_id, image_id) VALUES ($1, $2) ON CONFLICT (ad_id, image_id) DO NOTHING RETURNING ad_id, image_id",
+                relation_dict["ad_id"],
+                relation_dict["image_id"]
+            )
+            return AdImageResponse(**relation_dict)
+        except asyncpg.UniqueViolationError:
+            raise HTTPException(status_code=400, detail="Ad-Image relation already exists")
 
-    async with get_db_client() as conn:
-        relations = await conn.fetchrow(
-            "SELECT ad_id, image_id FROM ad_images WHERE ad_id = $1",
-            ad_id
-        )
-        if relations:
-            return [AdImageResponse(ad_id=r["ad_id"], image_id=r["image_id"]) for r in relations]
-        raise HTTPException(status_code=404, detail=f"Relations from ad_id:{ad_id} not found")
-    
-@router.get("/api/internal/postgresql/relation/image_ad/{image_id}", response_model=GetImageAdResponse)
-async def get_image_ad(image_id: int, current_user: dict = Depends(get_current_user)):
+
+@router.get("/api/internal/postgresql/relation/ad_image", response_model=List[AdImageResponse])
+async def get_ad_image(ad_id: int=None, image_id: int=None, current_user: dict = Depends(get_current_user), request: Request = None):
+    settings: Settings = request.app.state.settings
+    # TODO SETUP ROLE
     # if "superadmin" not in current_user.get("roles", []):
     #     raise HTTPException(status_code=403, detail="Not enough permissions")
+    async with get_db_client(settings) as conn:
+        if ad_id is not None and image_id is not None:
+            relation = await conn.fetchrow(
+                "SELECT ad_id, image_id FROM ad_images WHERE ad_id = $1 AND image_id = $2",
+                ad_id, image_id
+            )
+            if relation:
+                return [AdImageResponse(**relation)]
+            else:
+                raise HTTPException(status_code=404, detail="Ad-Image relation not found")
+        else:
+            # Récupérer toutes les relations pour un utilisateur ou une annonce spécifique, ou toutes
+            query = "SELECT ad_id, image_id FROM ad_images"
+            params = []
+            if ad_id is not None:
+                query += " WHERE user_id = $1"
+                params.append(ad_id)
+            elif image_id is not None:
+                query += " WHERE ad_id = $1"
+                params.append(image_id)
 
-    async with get_db_client() as conn:
-        relation = await conn.fetchrow(
-            "SELECT ad_id FROM ad_images WHERE image_id = $1",
-            image_id
-        )
-        if relation:
-            return GetImageAdResponse(**relation)
-        raise HTTPException(status_code=404, detail="relation not found")
+            relations = await conn.fetch(query, *params)
+            return [AdImageResponse(**relation) for relation in relations]
 
-@router.delete("/api/internal/postgresql/relation/user_ad/{ad_id}/{image_id}", response_model=dict)
-async def delete_user_ad(ad_id: int, image_id: int, current_user: dict = Depends(get_current_user)):
-    if "superadmin" not in current_user.get("ad_images", []):
-        raise HTTPException(status_code=403, detail="Not enough permissions")
-
-    async with get_db_client() as conn:
+@router.delete("/api/internal/postgresql/relation/ad_image", response_model=Dict)
+async def delete_ad_image(ad_id: int, image_id: int, current_user: dict = Depends(get_current_user), request: Request = None):
+    settings: Settings = request.app.state.settings
+    # TODO SETUP ROLE
+    # if "superadmin" not in current_user.get("roles", []):
+    #     raise HTTPException(status_code=403, detail="Not enough permissions")
+    async with get_db_client(settings) as conn:
         result = await conn.execute(
-            "DELETE FROM ad_images WHERE (ad_id, image_id) VALUES ($1, $2)",
+            "DELETE FROM ad_images WHERE ad_id = $1 AND image_id = $2 RETURNING ad_id, image_id",
             ad_id, image_id
         )
-        if result == "DELETE 1":
-            return {"message": "Relation deleted successfully"}
-        raise HTTPException(status_code=404, detail=f"Relation ad_id:{ad_id} / image_id:{image_id} not found")
+        if result:
+            return {"message": "Ad-Image relation deleted successfully"}
+        raise HTTPException(status_code=404, detail="User-Ad relation not found")
