@@ -39,23 +39,40 @@ async def test_create_ad():
             "X-API-Key": api_token
         }
 
+<<<<<<< HEAD
         payload = {
             "designation": "newtitle",
             "description": "vinyl",
             "image_name": "00_image_1234.jpg",
             "bucket_name": "raw-images"
         }
+=======
+        payload = {"user": {"id": 1000, "username": "duck"},
+                   "designation": "newtitle", 
+                   "description": "vinyl", 
+                   "category": "musique",
+                   "images": ["00_image_1234.jpg", "01_image_456.jpg"], 
+                   "created_at": "2023-10-01T00:00:00Z",
+                   }
+>>>>>>> e4d0804 (Add CRUD on api-mongodb and api-postgresql)
 
         response = client.post("/api/internal/mongodb/entity/ad", json=payload, headers=headers)
         assert response.status_code == 200
         data = response.json()
+        assert data["user"]["id"] == 1000
+        assert data["user"]["username"] == "duck"
         assert data["designation"] == "newtitle"
         assert data["description"] == "vinyl"
+<<<<<<< HEAD
         assert data["image_name"] == "00_image_1234.jpg"
         assert data["bucket_name"] == "raw-images"
         assert "ad_id" in data
+=======
+        assert data["category"] == "musique"
+        assert data["image_name"] == ["00_image_1234.jpg", "01_image_456.jpg"]
+        assert "ad_id" in data 
+>>>>>>> e4d0804 (Add CRUD on api-mongodb and api-postgresql)
         assert "created_at" in data
-        assert "created_by" in data
 
         # Clean up
         await db.ads.delete_one({"_id": ObjectId(data["ad_id"])})
@@ -93,23 +110,28 @@ async def test_get_ad():
 
         # Create an ad
         ad_id = ObjectId()
-        await db.ads.insert_one({
-            "_id": ad_id,
-            "designation": "newtitle",
-            "description": "vinyl",
-            "image_name": "00_image_1234.jpg",
-            "bucket_name": "raw-images",
+        payload = {"_id": ad_id,
+            "user": {"id": 1000, "username": "duck"},
+            "designation": "newtitle", 
+            "description": "vinyl", 
+            "category": "musique",
+            "images": ["00_image_1234.jpg", "01_image_456.jpg"], 
             "created_at": "2023-10-01T00:00:00Z",
-            "created_by": user_id
-        })
+            }
+        
+        await db.ads.insert_one(payload)
 
         response = client.get(f"/api/internal/mongodb/entity/ad/{str(ad_id)}", headers=headers)
         assert response.status_code == 200
         data = response.json()
+        assert data["user"]["id"] == 1000
+        assert data["user"]["username"] == "duck"
         assert data["designation"] == "newtitle"
         assert data["description"] == "vinyl"
-        assert data["image_name"] == "00_image_1234.jpg"
-        assert data["bucket_name"] == "raw-images"
+        assert data["category"] == "musique"
+        assert data["image_name"] == ["00_image_1234.jpg", "01_image_456.jpg"]
+        assert "ad_id" in data 
+        assert "created_at" in data
 
         # Clean up
         await db.ads.delete_one({"_id": ad_id})
@@ -147,16 +169,18 @@ async def test_update_ad():
 
         # Create an ad
         ad_id = ObjectId()
-        await db.ads.insert_one({
-            "_id": ad_id,
-            "designation": "newtitle",
-            "description": "vinyl",
-            "image_name": "00_image_1234.jpg",
-            "bucket_name": "raw-images",
+        payload = {"_id": ad_id,
+            "user": {"id": 1000, "username": "duck"},
+            "designation": "newtitle", 
+            "description": "vinyl", 
+            "category": "musique",
+            "images": ["00_image_1234.jpg", "01_image_456.jpg"], 
             "created_at": "2023-10-01T00:00:00Z",
-            "created_by": user_id
-        })
+            }
+        
+        await db.ads.insert_one(payload)
 
+<<<<<<< HEAD
         payload = {
             "designation": "updatedtitle",
             "description": "newvinyl",
@@ -165,12 +189,27 @@ async def test_update_ad():
         }
 
         response = client.put(f"/api/internal/mongodb/entity/ad/{str(ad_id)}", json=payload, headers=headers)
+=======
+        payload_updated = {
+            "user": {"id": 1000, "username": "duckyduck"},
+            "designation": "newalbum", 
+            "description": "cd", 
+            "category": "musique_cd",
+            "images": ["10_image_1234.jpg", "11_image_456.jpg"], 
+            "created_at": "2024-10-01T00:00:00Z",
+            }
+        response = client.put(f"/api/internal/mongodb/entity/ad/{str(ad_id)}", json=payload_updated, headers=headers)
+>>>>>>> e4d0804 (Add CRUD on api-mongodb and api-postgresql)
         assert response.status_code == 200
         data = response.json()
-        assert data["designation"] == "updatedtitle"
-        assert data["description"] == "newvinyl"
-        assert data["image_name"] == "00_image_456.jpg"
-        assert data["bucket_name"] == "images-raw"
+        assert data["user"]["id"] == 1000
+        assert data["user"]["username"] == "duckyduck"
+        assert data["designation"] == "newalbum"
+        assert data["description"] == "cd"
+        assert data["category"] == "musique_cd"
+        assert data["image_name"] == ["10_image_1234.jpg", "11_image_456.jpg"]
+        assert "ad_id" in data 
+        assert "created_at" in data
 
         # Clean up
         await db.ads.delete_one({"_id": ad_id})
@@ -208,15 +247,16 @@ async def test_delete_ad():
 
         # Create an ad
         ad_id = ObjectId()
-        await db.ads.insert_one({
-            "_id": ad_id,
-            "designation": "newtitle",
-            "description": "vinyl",
-            "image_name": "00_image_1234.jpg",
-            "bucket_name": "raw-images",
+        payload = {"_id": ad_id,
+            "user": {"id": 1000, "username": "duck"},
+            "designation": "newtitle", 
+            "description": "vinyl", 
+            "category": "musique",
+            "images": ["00_image_1234.jpg", "01_image_456.jpg"], 
             "created_at": "2023-10-01T00:00:00Z",
-            "created_by": user_id
-        })
+            }
+        
+        await db.ads.insert_one(payload)
 
         response = client.delete(f"/api/internal/mongodb/entity/ad/{str(ad_id)}", headers=headers)
         assert response.status_code == 200

@@ -1,7 +1,12 @@
+<<<<<<< HEAD
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from pydantic import BaseModel, Field
+=======
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
+>>>>>>> e4d0804 (Add CRUD on api-mongodb and api-postgresql)
 from config.db import get_db_client
-from typing import List
+from typing import List, Optional
 from motor.motor_asyncio import AsyncIOMotorClient
 from api.auth import get_current_user
 from bson import ObjectId
@@ -11,19 +16,21 @@ from config.settings import Settings
 router = APIRouter()
 
 class Ad(BaseModel):
+    user: dict[int, str]
     designation: str
-    description: str
-    image_name: str
-    bucket_name: str = Field(default="default-bucket")
+    description: Optional[str]
+    categories: str
+    images: Optional[List]
+    created_at: datetime
 
 class AdResponse(BaseModel):
     ad_id: str
+    user: dict[int, str]
     designation: str
-    description: str
-    image_name: str
-    bucket_name: str
-    created_at: str
-    created_by: str
+    description: Optional[str]
+    categories: str
+    images: Optional[List]
+    created_at: datetime
 
 def get_settings(request: Request) -> Settings:
     return request.app.state.settings
@@ -33,8 +40,12 @@ async def create_ad(request: Request, ad: Ad, current_user: dict = Depends(get_c
     settings = get_settings(request)
     async with get_db_client(settings) as db:
         ad_dict = ad.model_dump()
+<<<<<<< HEAD
         ad_dict["created_at"] = datetime.now(UTC).isoformat()  # Set the creation date
         ad_dict["created_by"] = current_user["user_id"]  # Set the creator
+=======
+        ad_dict["created_at"] = datetime.now(UTC).isoformat() # Set the creation date
+>>>>>>> e4d0804 (Add CRUD on api-mongodb and api-postgresql)
         res = await db.ads.insert_one(ad_dict)
         ad_dict["ad_id"] = str(res.inserted_id)
         return AdResponse(**ad_dict)
