@@ -70,6 +70,7 @@ echo "MLFlow table and user created."
 echo "Setting up Airflow table and user..."
 su - postgresql -c "psql \"host=$SERVICE_NAME port=5432 user=postgresql dbname=postgres sslmode=verify-full sslcert=$POSTGRESQL_POSTGRESQL_CERT_PATH sslkey=$POSTGRESQL_POSTGRESQL_KEY_PATH sslrootcert=$POSTGRESQL_POSTGRESQL_CA_PATH\" \
                           --set=airflow_db='$AIRFLOW_DATABASE' \
+                          --set=airflow_schema='$AIRFLOW_SCHEMA' \
                           --set=airflow_user='$AIRFLOW_USER' \
                           --set=airflow_user_password='$AIRFLOW_USER_PASSWORD' \
                           -f /usr/local/bin/init-postgresql-airflow.sql"
