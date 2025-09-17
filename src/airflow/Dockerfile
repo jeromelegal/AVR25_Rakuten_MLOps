@@ -11,7 +11,7 @@ RUN groupadd --gid 999 airflow && \
 ENV AIRFLOW_HOME=/opt/airflow
 ENV PATH="/opt/airflow_venv/bin:$PATH"
 ENV AIRFLOW__CORE__EXECUTOR=LocalExecutor
-ENV AIRFLOW__CORE__PARALLELISM=0
+ENV AIRFLOW__CORE__PARALLELISM=8
 #ENV AIRFLOW__CORE__EXECUTOR=KubernetesExecutor
 ENV AIRFLOW__CORE__DAGS_FOLDER=/opt/airflow/dags
 ENV AIRFLOW__CORE__LOAD_EXAMPLES=False
@@ -34,13 +34,21 @@ ENV AIRFLOW_CA_PATH=${AIRFLOW_CA_PATH:-"/etc/ssl/airflow/airflow.ca"}
 ENV AIRFLOW_KEY_PATH=${AIRFLOW_KEY_PATH:-"/etc/ssl/airflow/airflow.key"}
 ENV AIRFLOW_CERT_PATH=${AIRFLOW_CERT_PATH:-"/etc/ssl/airflow/airflow_ca.crt"}
 ENV AIRFLOW_PEM_PATH=${AIRFLOW_PEM_PATH:-"/etc/ssl/airflow/airflow_airflow.pem"}
-#ENV AIRFLOW_FERNET_KEY_PATH=${AIRFLOW_FERNET_KEY_PATH:-"/etc/ssl/airflow/airflow_fernet_key.txt"}
 
 ENV AIRFLOW_AIRFLOW_PEM_PATH=${AIRFLOW_AIRFLOW_PEM_PATH:-"/etc/ssl/airflow/airflow_airflow.pem"}
 ENV AIRFLOW_AIRFLOW_KEY_PATH=${AIRFLOW_AIRFLOW_KEY_PATH:-"/etc/ssl/airflow/airflow_airflow.key"}
 ENV AIRFLOW_AIRFLOW_CERT_PATH=${AIRFLOW_AIRFLOW_CERT_PATH:-"/etc/ssl/airflow/airflow_airflow.crt"}
 ENV AIRFLOW_AIRFLOW_CA_PATH=${AIRFLOW_AIRFLOW_CA_PATH:-"/etc/ssl/airflow/airflow_airflow_ca.crt"}
 
+ENV AIRFLOW__DATABASE__SQL_ALCHEMY_CONN="postgresql+psycopg2://airflow_user:airflow_user_password@postgresql:5432/airflow?sslmode=verify-full&sslcert=/etc/ssl/airflow/postgresql_airflow.crt&sslkey=/etc/ssl/airflow/postgresql_airflow.key&sslrootcert=/etc/ssl/airflow/postgresql_airflow_ca.crt"
+ENV AIRFLOW__DATABASE__SQL_ALCHEMY_SCHEMA="${POSTGRESQL_AIRFLOW_SCHEMA}"
+
+ENV POSTGRESQL_SERVICE_NAME ${POSTGRESQL_SERVICE_NAME:-"postgresql"}
+ENV POSTGRESQL_SERVICE_PORT ${POSTGRESQL_SERVICE_PORT:-"5432"}
+ENV POSTGRESQL_AIRFLOW_USER ${POSTGRESQL_AIRFLOW_USER:-"airflow_user"}
+ENV POSTGRESQL_AIRFLOW_SCHEMA=${POSTGRESQL_AIRFLOW_SCHEMA:-"airflow_schema"}
+ENV POSTGRESQL_AIRFLOW_PASSWORD ${POSTGRESQL_AIRFLOW_PASSWORD:-"airflow_user_password"}
+ENV POSTGRESQL_AIRFLOW_DATABASE ${POSTGRESQL_AIRFLOW_DATABASE:-"airflow"}
 ENV POSTGRESQL_AIRFLOW_PEM_PATH=${POSTGRESQL_AIRFLOW_PEM_PATH:-"/etc/ssl/airflow/postgresql_airflow.pem"}
 ENV POSTGRESQL_AIRFLOW_KEY_PATH=${POSTGRESQL_AIRFLOW_KEY_PATH:-"/etc/ssl/airflow/postgresql_airflow.key"}
 ENV POSTGRESQL_AIRFLOW_CERT_PATH=${POSTGRESQL_AIRFLOW_CERT_PATH:-"/etc/ssl/airflow/postgresql_airflow.crt"}
@@ -93,6 +101,7 @@ RUN pip install --upgrade pip && \
     apache-airflow-providers-slack \
     requests \
     psycopg2-binary \
+    asyncpg \
     && rm -rf /root/.cache/pip
 #psycopg[sqlalchemy,binary] \
 #psycopg-pool \
