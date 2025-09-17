@@ -3,9 +3,6 @@ set -e
 
 echo "Starting entrypoint script..."
 
-export AIRFLOW__DATABASE__SQL_ALCHEMY_CONN="postgresql+psycopg2://airflow_user:airflow_user_password@postgresql:5432/airflow?sslmode=verify-full&sslcert=/etc/ssl/airflow/postgresql_airflow.crt&sslkey=/etc/ssl/airflow/postgresql_airflow.key&sslrootcert=/etc/ssl/airflow/postgresql_airflow_ca.crt"
-export AIRFLOW__DATABASE__SQL_ALCHEMY_SCHEMA="$POSTGRESQL_AIRFLOW_SCHEMA"
-
 HTTP_CODE=$(curl -k -o /dev/null -s -w "%{http_code}\n" https://$POSTGRESQL_SERVICE_NAME/health)
 until [ $HTTP_CODE -eq 200 ]; do
     HTTP_CODE=$(curl -k -o /dev/null -s -w "%{http_code}\n" https://$POSTGRESQL_SERVICE_NAME/health)
@@ -32,7 +29,7 @@ airflow db migrate
 echo "EXEC AIRFLOW db check..."
 airflow db check
 echo "EXEC AIRFLOW scheduler..."
-airflow scheduler &
+airflow scheduler
 jobs
 
 nginx-fcgiwrap.sh
