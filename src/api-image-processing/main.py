@@ -1,4 +1,4 @@
-from fastapi import APIRouter, FastAPI
+from fastapi import FastAPI
 from api import main
 from api.image_processing import processing
 from fastapi.middleware.cors import CORSMiddleware
@@ -6,7 +6,8 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 import logging
 from api.config.config import settings
-from api.config.model_loader import get_image_classifier_model
+from api.config.model_loader import load_image_classifier_model
+from mlflow.exceptions import RestException
 
 from jose import JWTError, jwt
 
@@ -62,8 +63,21 @@ class LoggingMiddleware(BaseHTTPMiddleware):
 
 def load_models_and_artifacts_in_cache():
     logging.info("Loading models and artifacts in cache...")
-    get_image_classifier_model(settings=settings)
-    logging.info("Models and artifacts loaded successfully.")
+    try:
+        model = load_image_classifier_model(
+            model_name=settings.MLFLOW_IMAGE_CLASSIFIER_MODEL_NAME,
+            model_version=settings.MLFLOW_IMAGE_CLASSIFIER_MODEL_VERSION,
+            mlflow_addr=settings.MLFLOW_ADDR,
+        )
+        if not model is None:
+            logging.info(f"model: {model}")
+            logging.info("Models and artifacts loaded successfully.")
+            return
+        raise ValueError("The model was not loaded successfully")
+    except (RestException, ValueError) as exc:
+        error_msg = f"Impossible to load the models: {exc}"
+        logging.error(error_msg)
+        load_image_classifier_model.cache_clear()
 
 
 app = FastAPI()

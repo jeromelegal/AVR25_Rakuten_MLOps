@@ -1,35 +1,51 @@
+import sys
+import os
 import pytest
 from fastapi.testclient import TestClient
-from main import app
-from config.db import get_db
-import asyncpg
-from api.auth import hash_password, create_internal_api_access_token
-from config.config import API_GATEWAY_HOST, PROTECTED_ENDPOINT_URL
+from api.auth import hash_password
 from datetime import datetime
 
+# Ajouter le chemin absolu de l'application
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../app')))
+from main import create_app
+from test.config.test_settings import test_settings
+from config.db import get_db_client  # Assurez-vous que cela correspond à votre configuration PostgreSQL
 
+# Créer une application avec les paramètres de test
+app = create_app(test_settings)
 client = TestClient(app)
 
 @pytest.mark.asyncio
 async def test_login_for_access_token():
-    db = await get_db()
+    # Utiliser les paramètres de test pour obtenir la base de données
+    async with get_db_client(test_settings) as db:
+        # Créer un utilisateur pour le test
+        hashed_password = hash_password("test_auth_password")
+        user_id = await db.fetchval(
+            "INSERT INTO users (username, email, password, created_at, created_by) VALUES ($1, $2, $3, $4, $5) RETURNING id",
+            "test_auth", "test_auth@example.com", hashed_password, datetime.now(), 0
+        )
 
-    api_token = create_internal_api_access_token(data={"scope": "internal"})
-    headers = {"Referer": API_GATEWAY_HOST + PROTECTED_ENDPOINT_URL, "X-API-Key": api_token}
-    response = client.post("/api/internal/postgresql/entity/user", json={"username": "testuser", "email": "testuser@example.com", "password": "password"}, headers=headers)
-    print( "response", response)
-    
-    data = response.json()
-    print("data ", data)
-    user_id = data["user_id"]
-
-    response = client.post("/token", data={"username": "testuser", "password": "password"})
+    # Effectuer le test
+    response = client.post("/token", data={"username": "test_auth", "password": "test_auth_password"})
     assert response.status_code == 200
-    assert "access_token" in response.json()
-    assert response.json()["token_type"] == "bearer"
+    data = response.json()
+    assert "access_token" in data
+    assert data["token_type"] == "bearer"
 
-    await db.execute("DELETE FROM users WHERE id = $1", user_id)
-    # Supprimer l'utilisateur et le rôle après le test
-    # await db.execute("DELETE FROM user_roles WHERE user_id = $1", user_id)
-    # await db.execute("DELETE FROM roles WHERE id = $1", role_id)
-    # await db.execute("DELETE FROM users WHERE id = $1", user_id)
+    # Si nécessaire, convertir user_id en chaîne (bien que ce soit fait du côté serveur habituellement)
+    assert isinstance(data.get("user_id"), str)  # Assurez-vous que `user_id` est une chaîne
+
+    # Supprimer l'utilisateur après le test
+    async with get_db_client(test_settings) as db:
+        await db.execute(
+            "DELETE FROM users WHERE username = $1",
+            "test_auth"
+        )
+
+@pytest.mark.asyncio
+async def test_invalid_login():
+    # Essayer de se connecter avec des informations d'identification incorrectes
+    response = client.post("/token", data={"username": "test_auth", "password": "wrongpassword"})
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Incorrect username or password"

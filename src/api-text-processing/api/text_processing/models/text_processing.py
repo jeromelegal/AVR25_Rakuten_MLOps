@@ -1,7 +1,7 @@
 from fastapi import Depends, FastAPI, HTTPException
 import pandas as pd
 from api.config.config import get_settings, Settings
-from api.config.model_loader import (
+from api.config.dependencies import (
     get_text_classifier_model,
     get_language_detector_model,
     get_translator_model,
@@ -85,6 +85,16 @@ def get_text_categories(
     text_classifier, classifier_tokenizer = get_text_classifier_model(settings=settings)
     language_detector = get_language_detector_model(settings=settings)
     translator, translator_tokenizer = get_translator_model(settings=settings)
+    if None in (
+        text_classifier,
+        classifier_tokenizer,
+        language_detector,
+        translator,
+        translator_tokenizer,
+    ):
+        raise ValueError(
+            "Impossible to get text category since at least one model could not be loaded"
+        )
     result = inference(
         df=df,
         language_detector=language_detector,

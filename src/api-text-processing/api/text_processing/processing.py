@@ -27,6 +27,8 @@ def get_categories(
 ) -> Results:
     try:
         return get_text_categories(request=inputs, settings=settings)
-    except Exception as e:
-        error_message = f"Impossible to process images. {e}"
-        raise HTTPException(status_code=500, detail=error_message) from e
+    except HTTPException as exc:
+        raise exc
+    except Exception as exc:
+        error_message = f"Impossible to process texts. {exc}"
+        raise HTTPException(status_code=500, detail=error_message) from exc

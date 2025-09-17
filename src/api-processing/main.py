@@ -6,7 +6,7 @@ from starlette.responses import JSONResponse
 import logging
 from api.config.config import settings
 from api.processing import processing
-from api.config.model_loader import get_classifier
+from api.config.model_loader import load_classifier
 
 from jose import JWTError, jwt
 
@@ -62,8 +62,25 @@ class LoggingMiddleware(BaseHTTPMiddleware):
 
 def load_models_and_artifacts_in_cache():
     logging.info("Loading models and artifacts in cache...")
-    get_classifier(settings=settings)
-    logging.info("Models and artifacts loaded successfully.")
+    try:
+        text_api_url = (
+            f"https://{settings.API_TEXT_PROCESSING_SERVICE_NAME}:"
+            f"{settings.API_TEXT_PROCESSING_SERVICE_PORT}"
+        )
+        image_api_url = (
+            f"https://{settings.API_IMAGE_PROCESSING_SERVICE_NAME}:"
+            f"{settings.API_IMAGE_PROCESSING_SERVICE_PORT}"
+        )
+        model = load_classifier(text_api_url=text_api_url, image_api_url=image_api_url)
+        if not model is None:
+            logging.info(f"model: {model}")
+            logging.info("Models and artifacts loaded successfully.")
+            return
+        raise ValueError("The model was not loaded successfully")
+    except ValueError as exc:
+        error_msg = f"Impossible to load the models: {exc}"
+        logging.error(error_msg)
+        load_classifier.cache_clear()
 
 
 app = FastAPI()
