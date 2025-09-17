@@ -23,13 +23,11 @@ set -m
 #     --serve-artifacts \
 #     --gunicorn-opts "--keyfile /path/to/private.key --certfile /path/to/certificate.crt" &
 echo "$POSTGRESQL_AIRFLOW_SCHEMA"
-tail -f /dev/null
 echo "EXEC AIRFLOW db migrate..."
 airflow db migrate
-echo "EXEC AIRFLOW db check..."
-airflow db check
 echo "EXEC AIRFLOW scheduler..."
 airflow scheduler
+
 jobs
 
 nginx-fcgiwrap.sh

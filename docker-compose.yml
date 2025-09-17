@@ -167,8 +167,9 @@ services:
       dockerfile: Dockerfile
     container_name: airflow
     ports:
-      - "9300:9300"
+      - "8793:8793"
     environment:
+      AIRFLOW__WEBSERVER__AUTHENTICATE: "False"
       #AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://root:example@postgresql:5432/mydb
       #AIRFLOW__CORE__FERNET_KEY: 
       #AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth'

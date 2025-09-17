@@ -134,7 +134,7 @@ COPY vault/vault.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/vault.sh
 
 # Ports exposés (webserver)
-EXPOSE 9300
+EXPOSE 8793
 
 # Point d’entrée
 ENTRYPOINT ["entrypoint.sh"]
