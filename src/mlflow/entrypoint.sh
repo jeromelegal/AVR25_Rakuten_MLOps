@@ -45,7 +45,7 @@ params = { \
 }; \
 print(urllib.parse.urlencode(params))" \
 )
-BACKEND_DSN="postgresql+psycopg:///?${qs}"
+BACKEND_DSN="postgresql+psycopg2:///?${qs}"
 
 su mlflow -c "mlflow server \
     --host 0.0.0.0 \
@@ -56,6 +56,10 @@ su mlflow -c "mlflow server \
     --uvicorn-opts \"--ssl-keyfile $MLFLOW_KEY_PATH --ssl-certfile $MLFLOW_CERT_PATH\"" &
 # We could have enabled mTLS using this options instead:
 # --uvicorn-opts \"--ssl-keyfile $MLFLOW_KEY_PATH --ssl-certfile $MLFLOW_CERT_PATH --ssl-ca-certs $MLFLOW_CA_PATH --ssl-cert-reqs 2\"" &
+
+echo "Initializing models..."
+su mlflow -c "python3 init/init_mlflow.py" &
+echo "Models initialized successfully."
 
 jobs
 

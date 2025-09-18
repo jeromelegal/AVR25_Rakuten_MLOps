@@ -1,7 +1,7 @@
 #!/bin/bash
 # Check if Minio service is up
 echo "Checking if Minio service is up..."
-HEALTH_URL=http://$MINIO_SERVICE_NAME:$MINIO_SERVICE_PORT/minio/health/live
+HEALTH_URL=https://$MINIO_SERVICE_NAME:$MINIO_SERVICE_PORT/minio/health/live
 echo "HEALTH_URL: $HEALTH_URL"
 HTTP_CODE=$(curl -k -o /dev/null -s -w "%{http_code}\n" $HEALTH_URL)
 until [ $HTTP_CODE -eq 200 ]; do
@@ -20,6 +20,7 @@ set -m
 echo "Downloading model files from GDrive to '$LOCAL_MODEL_DIRECTORY_PATH'..."
 mkdir -p $LOCAL_MODEL_DIRECTORY_PATH
 gdown https://drive.google.com/drive/folders/1Z-v77XxjHGYbpxcAUmza3LyCjt9bLf_J -O $LOCAL_MODEL_DIRECTORY_PATH --folder
+gdown https://drive.google.com/drive/folders/1DkbRPLyVNRMQF_D-aghVN-3xVHp5KvOe -O $LOCAL_MODEL_DIRECTORY_PATH --folder
 echo "File downloaded successfully!"
 
 echo "Storing files in Minio $MINIO_MODEL_BUCKET_NAME bucket..."

@@ -145,9 +145,7 @@ services:
       VAULT_USERNAME: "model-downloader"
       VAULT_PASSWORD: "model-downloader"
     profiles: [setup]
-    depends_on:
-      minio:
-        condition: service_healthy
+    depends_on: [minio]
     volumes:
       - model-downloader-volume:/app/data
 

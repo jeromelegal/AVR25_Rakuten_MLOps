@@ -37,6 +37,7 @@ ENV MINIO_MLFLOW_PEM_PATH ${MINIO_MLFLOW_PEM_PATH:-"/etc/ssl/mlflow/minio_mlflow
 ENV MINIO_MLFLOW_CA_PATH ${MINIO_MLFLOW_CA_PATH:-"/etc/ssl/mlflow/minio_mlflow.ca"}
 ENV MINIO_MLFLOW_KEY_PATH ${MINIO_MLFLOW_KEY_PATH:-"/etc/ssl/mlflow/minio_mlflow.key"}
 ENV MINIO_MLFLOW_CERT_PATH ${MINIO_MLFLOW_CERT_PATH:-"/etc/ssl/mlflow/minio_mlflow.crt"}
+ENV MINIO_RAW_MODEL_BUCKET_NAME ${MINIO_RAW_MODEL_BUCKET_NAME:-"raw-models"}
 
 ENV MLFLOW_HOST=https://$SERVICE_NAME
 ENV MLFLOW_USERNAME=${MLFLOW_USERNAME:-"mlflow-user"}
@@ -45,6 +46,28 @@ ENV MLFLOW_MLFLOW_PEM_PATH ${MLFLOW_MLFLOW_PEM_PATH:-"/etc/ssl/mlflow/mlflow_mlf
 ENV MLFLOW_MLFLOW_CA_PATH ${MLFLOW_MLFLOW_CA_PATH:-"/etc/ssl/mlflow/mlflow_mlflow.ca"}
 ENV MLFLOW_MLFLOW_KEY_PATH ${MLFLOW_MLFLOW_KEY_PATH:-"/etc/ssl/mlflow/mlflow_mlflow.key"}
 ENV MLFLOW_MLFLOW_CERT_PATH ${MLFLOW_MLFLOW_CERT_PATH:-"/etc/ssl/mlflow/mlflow_mlflow.crt"}
+
+ENV MLFLOW_TRACKING_URI="https://${SERVICE_NAME}:${SERVICE_PORT}"
+ENV MLFLOW_IMAGE_CLASSIFIER_MODEL_NAME=${MLFLOW_IMAGE_CLASSIFIER_MODEL_NAME:-"image_classifier_model"}
+#TODO: A better way to define metrics should be to evaluate model on a given dataset
+ENV MLFLOW_IMAGE_CLASSIFIER_INITIAL_F1SCORE_NAME=${MLFLOW_IMAGE_CLASSIFIER_INITIAL_F1SCORE_NAME:-"f1_score"}
+ENV MLFLOW_IMAGE_CLASSIFIER_INITIAL_F1SCORE_VALUE=${MLFLOW_IMAGE_CLASSIFIER_INITIAL_F1SCORE_VALUE:-"0.59"}
+ENV MLFLOW_IMAGE_CLASSIFIER_EXPERIMENT_NAME=${MLFLOW_IMAGE_CLASSIFIER_EXPERIMENT_NAME:-"Train image processing model"}
+ENV MLFLOW_IMAGE_RUN_NAME=${MLFLOW_IMAGE_RUN_NAME:-"initial_run"}
+ENV MLFLOW_TEXT_CLASSIFIER_MODEL_NAME=${MLFLOW_TEXT_CLASSIFIER_MODEL_NAME:-"text-classifier"}
+#TODO: A better way to define metrics should be to evaluate model on a given dataset 
+ENV MLFLOW_TEXT_CLASSIFIER_INITIAL_F1SCORE_NAME=${MLFLOW_TEXT_CLASSIFIER_INITIAL_F1SCORE_NAME:-"f1_score"}
+ENV MLFLOW_TEXT_CLASSIFIER_INITIAL_F1SCORE_VALUE=${MLFLOW_TEXT_CLASSIFIER_INITIAL_F1SCORE_VALUE:-"0.81"}
+ENV MLFLOW_TEXT_TRANSLATOR_MODEL_NAME=${MLFLOW_TEXT_TRANSLATOR_MODEL_NAME:-"text-translator"}
+ENV MLFLOW_TEXT_LANGUAGE_DETECTOR_MODEL_NAME=${MLFLOW_TEXT_LANGUAGE_DETECTOR_MODEL_NAME:-"text-language-detector"}
+ENV MLFLOW_TEXT_CLASSIFIER_EXPERIMENT_NAME=${MLFLOW_TEXT_CLASSIFIER_EXPERIMENT_NAME:-"Train text processing model"}
+ENV MLFLOW_TEXT_RUN_NAME=${MLFLOW_TEXT_RUN_NAME:-"initial_run"}
+ENV MLFLOW_DELAY_BETWEEN_RETRIES_IN_SECONDS=${DELAY_BETWEEN_RETRIES_IN_SECONDS:-"10"}
+ENV MLFLOW_DATA_DIRECTORY=${DATA_DIRECTORY:-"/app/data"}
+ENV MLFLOW_IMAGE_MODEL_DATA_DIRECTORY=${IMAGE_MODEL_DATA_DIRECTORY:-"image_model"}
+ENV MLFLOW_TEXT_CLASSIFIER_MODEL_DATA_DIRECTORY=${TEXT_CLASSIFIER_MODEL_DATA_DIRECTORY:-"text_classifier_model"}
+ENV MLFLOW_TEXT_TRANSLATOR_MODEL_DATA_DIRECTORY=${TEXT_TRANSLATOR_MODEL_DATA_DIRECTORY:-"text_translator_model"}
+ENV MLFLOW_TEXT_LANGUAGE_DETECTOR_MODEL_DATA_DIRECTORY=${TEXT_LANGUAGE_DETECTOR_MODEL_DATA_DIRECTORY:-"text_language_detector_model"}
 
 ENV MLFLOW_INTERNAL_SECRET_KEY=internal_secret_key
 ENV MLFLOW_ALGORITHM=HS256
@@ -89,6 +112,13 @@ COPY requirements.txt requirements.txt
 
 # Installer les dépendances en contournant la restriction
 RUN pip install --break-system-packages -r requirements.txt
+
+# Give rights to the mlruns directory that seems to be used by mlflow as a buffer
+RUN mkdir mlruns && chown mlflow:mlflow mlruns
+
+# Give rights to /app/data use to store files from Minio
+RUN mkdir data && chown mlflow:mlflow data && chown mlflow:mlflow .
+
 
 # Defining Minio related env. variables and certificates here to not mess with pip certificates
 ENV MLFLOW_S3_ENDPOINT_URL=https://${MINIO_SERVICE_NAME}:${MINIO_SERVICE_PORT}

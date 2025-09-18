@@ -1,3 +1,11 @@
 mlflow[extras]
 boto3
-psycopg[binary]
+# Note: important to use psycopg2 since there seems to be an issue with the integration of postgresql in mlflow (see. https://github.com/mlflow/mlflow/pull/9156#issuecomment-3000706061)
+psycopg2-binary==2.9.10
+tensorflow
+pydantic>=2.7.0,<3.0.0
+transformers
+torch
+torchvision
+torchaudio
+fasttext

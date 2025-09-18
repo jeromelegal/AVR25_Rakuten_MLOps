@@ -97,7 +97,7 @@ fi
 
 MODEL_DOWNLOADER_INTERNAL_SECRET_KEY=$(vault kv get -field=value secret/model-downloader/internal_keyfile)
 
-# Extraire le certificat et la clé privée
+# Extraire le certificat et la clé privée pour Minio
 MINIO_MODEL_DOWNLOADER_CA=$(vault kv get -field=ca secret/minio/model-downloader/certs)
 MINIO_MODEL_DOWNLOADER_CERT=$(vault kv get -field=cert secret/minio/model-downloader/certs)
 MINIO_MODEL_DOWNLOADER_KEY=$(vault kv get -field=key secret/minio/model-downloader/certs)
