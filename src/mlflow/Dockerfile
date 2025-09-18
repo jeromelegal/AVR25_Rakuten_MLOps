@@ -37,6 +37,7 @@ ENV MINIO_MLFLOW_PEM_PATH ${MINIO_MLFLOW_PEM_PATH:-"/etc/ssl/mlflow/minio_mlflow
 ENV MINIO_MLFLOW_CA_PATH ${MINIO_MLFLOW_CA_PATH:-"/etc/ssl/mlflow/minio_mlflow.ca"}
 ENV MINIO_MLFLOW_KEY_PATH ${MINIO_MLFLOW_KEY_PATH:-"/etc/ssl/mlflow/minio_mlflow.key"}
 ENV MINIO_MLFLOW_CERT_PATH ${MINIO_MLFLOW_CERT_PATH:-"/etc/ssl/mlflow/minio_mlflow.crt"}
+ENV MINIO_RAW_MODEL_BUCKET_NAME ${MINIO_RAW_MODEL_BUCKET_NAME:-"raw-models"}
 
 ENV MLFLOW_HOST=https://$SERVICE_NAME
 ENV MLFLOW_USERNAME=${MLFLOW_USERNAME:-"mlflow-user"}
@@ -89,6 +90,9 @@ COPY requirements.txt requirements.txt
 
 # Installer les dépendances en contournant la restriction
 RUN pip install --break-system-packages -r requirements.txt
+
+# Give rights to the mlruns directory that seems to be used by mlflow as a buffer
+RUN mkdir mlruns && chown mlflow:mlflow mlruns
 
 # Defining Minio related env. variables and certificates here to not mess with pip certificates
 ENV MLFLOW_S3_ENDPOINT_URL=https://${MINIO_SERVICE_NAME}:${MINIO_SERVICE_PORT}

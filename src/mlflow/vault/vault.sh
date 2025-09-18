@@ -173,7 +173,10 @@ fi
 
 # Vérifier si le certificat et la clé Vault existent déjà pour MLFlow
 if vault kv get -field=cert secret/mlflow/mlflow/certs > /dev/null 2>&1 && vault kv get -field=key secret/mlflow/mlflow/certs > /dev/null 2>&1; then
-  echo "Le certificat mTLS mlflow pour le mlflow existent déjà"
+  echo "Le certificat mTLS mlflow pour le mlflow existe déjà"
+  MLFLOW_MLFLOW_CA=$(vault kv get -field=ca secret/mlflow/mlflow/certs)
+  MLFLOW_MLFLOW_CERT=$(vault kv get -field=cert secret/mlflow/mlflow/certs)
+  MLFLOW_MLFLOW_KEY=$(vault kv get -field=key secret/mlflow/mlflow/certs)
 else
   # Générer le certificat et la clé
   echo "Générer le certificat et la clé"

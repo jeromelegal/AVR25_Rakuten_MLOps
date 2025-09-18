@@ -45,7 +45,7 @@ params = { \
 }; \
 print(urllib.parse.urlencode(params))" \
 )
-BACKEND_DSN="postgresql+psycopg:///?${qs}"
+BACKEND_DSN="postgresql+psycopg2:///?${qs}"
 
 su mlflow -c "mlflow server \
     --host 0.0.0.0 \
