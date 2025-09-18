@@ -168,6 +168,7 @@ services:
     container_name: airflow
     ports:
       - "8793:8793"
+      - "8795:8795"
     environment:
       AIRFLOW__WEBSERVER__AUTHENTICATE: "False"
       #AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://root:example@postgresql:5432/mydb

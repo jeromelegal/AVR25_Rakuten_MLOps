@@ -1,0 +1,13 @@
+from airflow import DAG
+from airflow.operators.python import PythonOperator
+from datetime import datetime
+import sys
+
+# Add your project directory to sys.path so imports work
+# PROJECT_DIR = "/opt/airflow/src"
+# sys.path.append(PROJECT_DIR)
+
+default_args = {
+    "owner": "airflow",
+    "retries": 1,
+}

@@ -15,23 +15,30 @@ echo "Call vault.sh to retrieve certificates and private key..."
 vault.sh
 
 set -m
-# su - postgresql -c "mlflow server \
-#     --backend-store-uri sqlite:///mlflow.db \
-#     --default-artifact-root ./artifacts \
-#     --host 0.0.0.0 \
-#     --port $SERVICE_PORT \
-#     --serve-artifacts \
-#     --gunicorn-opts "--keyfile /path/to/private.key --certfile /path/to/certificate.crt" &
+
+if [ -n "$AIRFLOW__API__SECRET_KEY" ]; then
+    echo "Using Airflow API secret key from environment variable."
+else
+    echo "Using Vault key to retrieve Airflow API secret key."
+    export AIRFLOW__API__SECRET_KEY=$(cat $AIRFLOW_INTERNAL_SECRET_KEY_PATH)
+fi
+
+echo "------------ $AIRFLOW__API__SECRET_KEY ---------------"
+
 echo "$POSTGRESQL_AIRFLOW_SCHEMA"
 echo "EXEC AIRFLOW db migrate..."
 airflow db migrate
+
 echo "EXEC AIRFLOW scheduler..."
-airflow scheduler
+airflow scheduler > sheduler.log & 
+
+echo "EXEC AIRFLOW API server..."
+airflow api-server -p 8795 > api-server.log &
 
 jobs
 
-nginx-fcgiwrap.sh
+#nginx-fcgiwrap.sh
 
-nginx-conf.sh
+#nginx-conf.sh
 
 fg %1

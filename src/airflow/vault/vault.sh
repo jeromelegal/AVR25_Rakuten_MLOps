@@ -104,7 +104,9 @@ fi
 
 AIRFLOW_INTERNAL_SECRET_KEY=$(vault kv get -field=value secret/airflow/internal_keyfile)
 
-
+cat <<EOF > $AIRFLOW_INTERNAL_SECRET_KEY_PATH
+$(printf "%s" "$AIRFLOW_INTERNAL_SECRET_KEY")
+EOF
 
 
 # Vérifier si le certificat et la clé Vault pour API-Gateway existent déjà ou les créer
