@@ -1,0 +1,30 @@
+<network>
+  <name>{{ network.name }}</name>
+  <bridge name="{{ network.get('bridge_name', 'virbr' + network.name[-3:]) }}" />
+  {% if network.type == 'nat' %}
+  <forward mode='nat'>
+    <nat>
+      <port start='1024' end='65535'/>
+    </nat>
+  </forward>
+  {% elif network.type == 'bridge' %}
+  <forward mode='bridge'/>
+  {% endif %}
+  <ip address='{{ network.subnet.split("/")[0] }}' netmask='{{ netmask(network.subnet) }}'>
+    {% if network.dhcp %}
+    <dhcp>
+      <range start='{{ network.dhcp.start }}' end='{{ network.dhcp.end }}'/>
+    </dhcp>
+    {% endif %}
+  </ip>
+  {% if network.dns and network.dns.enabled %}
+  <dns>
+      {% for server in network.dns.servers %}
+      <forwarder addr='{{ server }}'/>
+      {% endfor %}
+      {% if network.dns.domain %}
+      <domain name='{{ network.dns.domain }}'/>
+      {% endif %}
+  </dns>
+  {% endif %}
+</network>

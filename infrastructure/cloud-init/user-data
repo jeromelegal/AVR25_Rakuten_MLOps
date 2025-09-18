@@ -1,0 +1,13 @@
+#cloud-config
+autoinstall:
+  version: 1
+  identity:
+    hostname: test-cpu
+    username: ubuntu
+    password: "$6$XanRXtK0W2bUVhJc$PUWpdK.POqJdRtrnov6rDz1.CbeZNHmVY4/.gbL4ZkEYyeyNIRErqK8dOvQCyFCcDlxE9MJvtPfj.AcRuKF431"
+  ssh:
+    install-server: true
+    allow-pw: true
+  storage:
+    layout:
+      name: lvm

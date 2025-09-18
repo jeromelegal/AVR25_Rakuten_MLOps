@@ -1,0 +1,101 @@
+version: "1.0"
+name: "infra-webapp"
+description: "Infrastructure pour une application web avec base de données"
+
+defaults:
+  vm:
+    cpu: 2
+    ram: 2048
+    disk_size: 20
+    user: "ubuntu"
+  network:
+    type: "nat"
+    subnet: "192.168.100.0/24"
+
+networks:
+  - name: "app-net"
+    description: "Réseau pour l'application"
+    type: "nat"
+    subnet: "192.168.100.0/24"
+    dhcp:
+      start: "192.168.100.10"
+      end: "192.168.100.200"
+    dns:
+      enabled: true
+      domain: "app.local"
+      servers: ["8.8.8.8"]
+
+vms:
+  - name: "frontend"
+    description: "Serveur frontend React"
+    cpu: 2
+    ram: 4096
+    iso: "ubuntu-24.04.1-live-server-amd64.iso"
+    networks:
+      - name: "app-net"
+        ip: "192.168.100.10"
+    cloud_init:
+      user: "deploy"
+      ssh_keys: ["ssh-rsa AAAAB3NzaC1yc2E..."]
+      packages: ["nginx", "nodejs", "npm"]
+      runcmd:
+        - "git clone https://github.com/mon-projet/frontend /var/www/frontend"
+        - "cd /var/www/frontend && npm install && npm run build"
+        - "ln -s /var/www/frontend/build /var/www/html"
+      write_files:
+        - path: "/etc/nginx/sites-available/default"
+          content: |
+            server {
+              listen 80;
+              server_name _;
+              root /var/www/html;
+              index index.html;
+            }
+
+  - name: "backend"
+    description: "Serveur backend API"
+    cpu: 4
+    ram: 8192
+    iso: "ubuntu-24.04.1-live-server-amd64.iso"
+    networks:
+      - name: "app-net"
+        ip: "192.168.100.11"
+    cloud_init:
+      user: "api"
+      packages: ["postgresql-client", "python3-pip"]
+      runcmd:
+        - "pip3 install fastapi uvicorn"
+        - "git clone https://github.com/mon-projet/backend /opt/backend"
+        - "cd /opt/backend && pip3 install -r requirements.txt"
+      write_files:
+        - path: "/etc/systemd/system/backend.service"
+          content: |
+            [Unit]
+            Description=Backend API
+            After=network.target
+            [Service]
+            User=api
+            WorkingDirectory=/opt/backend
+            ExecStart=/usr/local/bin/uvicorn main:app --host 0.0.0.0 --port 8000
+            Restart=always
+            [Install]
+            WantedBy=multi-user.target
+        - path: "/opt/backend/config.py"
+          content: |
+            DB_HOST = "192.168.100.12"
+            DB_NAME = "appdb"
+            DB_USER = "api"
+            DB_PASSWORD = "dbpassword"
+
+firewall:
+  rules:
+    - vm: "frontend"
+      port: 80
+      protocol: "tcp"
+      action: "allow"
+      source: "0.0.0.0/0"
+    - vm: "backend"
+      port: 8000
+      protocol: "tcp"
+      action: "allow"
+      source: "192.168.100.0/24"
