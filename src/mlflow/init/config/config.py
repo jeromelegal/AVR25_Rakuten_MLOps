@@ -4,6 +4,7 @@ from pydantic_settings import BaseSettings
 
 DEFAULT_DELAY_BETWEEN_RETRIES_IN_SECONDS = 10
 DEFAULT_TOKEN_DURATION_IN_MINUTES = 60
+DEFAULT_DATA_DIRECTORY = "/app/data"
 
 
 class Settings(BaseSettings):
@@ -16,11 +17,11 @@ class Settings(BaseSettings):
         default="9010",
     )
     MINIO_USER: str = os.getenv(
-        "MINIO_USER",
+        "MINIO_MLFLOW_USER",
         default="minio-user",
     )
     MINIO_PASSWORD: str = os.getenv(
-        "MINIO_PASSWORD",
+        "MINIO_MLFLOW_PASSWORD",
         default="minio-password",
     )
     MINIO_RAW_MODEL_BUCKET_NAME: str = os.getenv(
@@ -50,8 +51,8 @@ class Settings(BaseSettings):
         "MLFLOW_IMAGE_CLASSIFIER_EXPERIMENT_NAME",
         default="Train image processing model",
     )
-    MLFLOW_IMAGE_RUN_ID: str = os.getenv(
-        "MLFLOW_IMAGE_RUN_ID",
+    MLFLOW_IMAGE_RUN_NAME: str = os.getenv(
+        "MLFLOW_IMAGE_RUN_NAME",
         default="initial_run",
     )
     MLFLOW_TEXT_CLASSIFIER_MODEL_NAME: str = os.getenv(
@@ -81,14 +82,30 @@ class Settings(BaseSettings):
         "MLFLOW_TEXT_CLASSIFIER_EXPERIMENT_NAME",
         default="Train text processing model",
     )
-    MLFLOW_TEXT_RUN_ID: str = os.getenv(
-        "MLFLOW_TEXT_RUN_ID",
+    MLFLOW_TEXT_RUN_NAME: str = os.getenv(
+        "MLFLOW_TEXT_RUN_NAME",
         default="initial_run",
     )
     DELAY_BETWEEN_RETRIES_IN_SECONDS: int = (
-        int(os.getenv("DELAY_BETWEEN_RETRIES_IN_SECONDS"))
-        if os.getenv("DELAY_BETWEEN_RETRIES_IN_SECONDS")
+        int(os.getenv("MLFLOW_DELAY_BETWEEN_RETRIES_IN_SECONDS"))
+        if os.getenv("MLFLOW_DELAY_BETWEEN_RETRIES_IN_SECONDS")
         else DEFAULT_DELAY_BETWEEN_RETRIES_IN_SECONDS
+    )
+    DATA_DIRECTORY: str = os.getenv(
+        "MLFLOW_DATA_DIRECTORY", default=DEFAULT_DATA_DIRECTORY
+    )
+    IMAGE_MODEL_DATA_DIRECTORY: str = os.getenv(
+        "MLFLOW_IMAGE_MODEL_DATA_DIRECTORY", default="image_model"
+    )
+    TEXT_CLASSIFIER_MODEL_DATA_DIRECTORY: str = os.getenv(
+        "MLFLOW_TEXT_CLASSIFIER_MODEL_DATA_DIRECTORY", default="text_classifier_model"
+    )
+    TEXT_TRANSLATOR_MODEL_DATA_DIRECTORY: str = os.getenv(
+        "MLFLOW_TEXT_TRANSLATOR_MODEL_DATA_DIRECTORY", default="text_translator_model"
+    )
+    TEXT_LANGUAGE_DETECTOR_MODEL_DATA_DIRECTORY: str = os.getenv(
+        "MLFLOW_TEXT_LANGUAGE_DETECTOR_MODEL_DATA_DIRECTORY",
+        default="text_language_detector_model",
     )
 
 
