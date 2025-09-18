@@ -113,9 +113,9 @@ class ModelToProcess:
     def get_last_mlflow_version(self, client: MlflowClient):
         try:
             mlflow_model: RegisteredModel = client.get_registered_model(self.name)
-        except RestException as exc:
-            error_msg = f"Impossible to get model {self.name}: {exc}"
-            logging.error(error_msg)
+        except RestException:
+            info_msg = f"Impossible to get model {self.name}. It will be retried later."
+            logging.info(info_msg)
             return None
         return mlflow_model.latest_versions
 
@@ -373,6 +373,7 @@ def register_language_detector_model(
         logging.info("\tVersion: %s", mv.version)
 
 
+# TODO (refacto): Define S3FileToDownload generators to put in common some of the codes
 def get_models_to_upload(settings: Settings):
     models_to_upload: List[ModelToProcess] = [
         ModelToProcess(
@@ -669,11 +670,11 @@ def main(settings: Settings):
     while initialize_models(
         mlflow_client=mlflow_client, s3_client=s3_client, models=models_to_upload
     ):
-        error_msg = (
-            "An error occurred while trying to initialize the MLFlow models. "
+        retry_msg = (
+            "Impossible to initialize the MLFlow models. "
             f"Retrying in {settings.DELAY_BETWEEN_RETRIES_IN_SECONDS} second(s)."
         )
-        logging.error(error_msg)
+        logging.info(retry_msg)
         time.sleep(settings.DELAY_BETWEEN_RETRIES_IN_SECONDS)
     logger.info("MLFlow models initialization successfully done.")
 
