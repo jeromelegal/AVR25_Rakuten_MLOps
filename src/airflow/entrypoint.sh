@@ -29,11 +29,21 @@ echo "$POSTGRESQL_AIRFLOW_SCHEMA"
 echo "EXEC AIRFLOW db migrate..."
 airflow db migrate
 
-echo "EXEC AIRFLOW scheduler..."
-airflow scheduler > sheduler.log & 
-
 echo "EXEC AIRFLOW API server..."
 airflow api-server -p 8795 > api-server.log &
+
+tail -f /dev/null 
+
+echo "EXEC AIRFLOW scheduler..."
+airflow scheduler > scheduler.log & 
+
+echo "EXEC AIRFLOW dag-processor..."
+airflow dag-processor > dag-processor.log &
+
+
+echo "EXEC AIRFLOW triggerer..."
+airflow triggerer > triggerer.log &
+
 
 jobs
 

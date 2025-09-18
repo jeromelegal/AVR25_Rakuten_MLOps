@@ -64,6 +64,10 @@ ENV AIRFLOW__DATABASE__SQL_ALCHEMY_CONN="postgresql+psycopg2://airflow_user:airf
 ENV AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS="admin:admin"
 ENV AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS='{"admin": "admin"}'
 #ENV AIRFLOW__WEBSERVER__EXPOSE_CONFIG=True
+ENV AIRFLOW__API__AUTH_MANAGER="airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager"
+ENV AIRFLOW__API__AUTH_BACKEND="airflow.providers.fab.auth_manager.api.auth.backend.basic_auth" 
+
+
 
 ENV MINIO_AIRFLOW_PEM_PATH=${MINIO_AIRFLOW_PEM_PATH:-"/etc/ssl/airflow/minio_airflow.pem"}
 ENV MINIO_AIRFLOW_KEY_PATH=${MINIO_AIRFLOW_KEY_PATH:-"/etc/ssl/airflow/minio_airflow.key"}
