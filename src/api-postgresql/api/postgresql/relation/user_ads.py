@@ -10,12 +10,12 @@ import asyncpg
 router = APIRouter()
 
 class UserAdRelation(BaseModel):
-    user_id: str
-    ad_id: str
+    user_id: int
+    ad_id: int
 
 class UserAdResponse(BaseModel):
-    user_id: str
-    ad_id: str
+    user_id: int
+    ad_id: int
 
 @router.post("/api/internal/postgresql/relation/user_ad", response_model=UserAdResponse)
 async def create_user_ad(request: Request, relation: UserAdRelation, current_user: dict = Depends(get_current_user)):

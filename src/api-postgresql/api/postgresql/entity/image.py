@@ -9,13 +9,13 @@ from typing import Dict
 router = APIRouter()
 
 class Image(BaseModel):
-    imagename: str
-    bucketname: str
+    image_name: str
+    bucket_name: str
 
 class ImageResponse(BaseModel):
     id: int
-    imagename: str
-    bucketname: str
+    image_name: str
+    bucket_name: str
     created_at: datetime
     created_by: int
 
@@ -34,9 +34,9 @@ async def create_image(request: Request, data: Image, current_user: Dict = Depen
 
     async with get_db_client(settings) as conn:
         image_id = await conn.fetchval(
-            "INSERT INTO ads (designation, bucketname, created_at, created_by) VALUES ($1, $2, $3, $4) RETURNING id",
-            data_dict["imagename"],
-            data_dict["bucketname"],
+            "INSERT INTO images (image_name, bucket_name, created_at, created_by) VALUES ($1, $2, $3, $4) RETURNING id",
+            data_dict["image_name"],
+            data_dict["bucket_name"],
             data_dict["created_at"],
             data_dict["created_by"]
         )
@@ -53,14 +53,14 @@ async def get_image(image_id: int, current_user: Dict = Depends(get_current_user
 
     async with get_db_client(settings) as conn:
         image = await conn.fetchrow(
-            "SELECT id as image_id, imagename, bucketname, created_at, created_by FROM images WHERE id = $1",
+            "SELECT id, image_name, bucket_name, created_at, created_by FROM images WHERE id = $1",
             image_id
         )
         if image:
             return ImageResponse(**image)
         raise HTTPException(status_code=404, detail="Image not found")
 
-@router.put("/api/internal/postgresql/entity/image/{image_id}", response_model=Dict)
+@router.put("/api/internal/postgresql/entity/image/{image_id}", response_model=ImageResponse)
 async def update_image(image_id: int, data: Image, current_user: Dict = Depends(get_current_user), request: Request = None):
     settings: Settings = request.app.state.settings
 
@@ -71,22 +71,22 @@ async def update_image(image_id: int, data: Image, current_user: Dict = Depends(
     data_dict = data.model_dump()
     async with get_db_client(settings) as conn:
         await conn.execute(
-            "UPDATE images SET imagename = $1, bucketname = $2 WHERE id = $3",
-            data_dict["imagename"],
-            data_dict["bucketname"],
+            "UPDATE images SET image_name = $1, bucket_name = $2 WHERE id = $3",
+            data_dict["image_name"],
+            data_dict["bucket_name"],
             image_id
         )
-        updated_ad = await conn.fetchrow(
-            "SELECT id as image_id, imagename, bucketname, created_at, created_by "
+        updated_image = await conn.fetchrow(
+            "SELECT id, image_name, bucket_name, created_at, created_by "
             "FROM images WHERE id = $1",
             image_id
         )
-        if updated_ad:
-            if updated_ad["imagename"] == data_dict["imagename"]:
-                if updated_ad["bucketname"] == data_dict["bucketname"]:
-                    return {"message": "Image updated successfully"}
-                raise HTTPException(status_code=500, detail="Error during update 'bucketname'")
-            raise HTTPException(status_code=500, detail="Error during update 'imagename'")
+        if updated_image:
+            if updated_image["image_name"] == data_dict["image_name"]:
+                if updated_image["bucket_name"] == data_dict["bucket_name"]:
+                    return ImageResponse(**updated_image)
+                raise HTTPException(status_code=500, detail="Error during update 'bucket_name'")
+            raise HTTPException(status_code=500, detail="Error during update 'image_name'")
         raise HTTPException(status_code=404, detail="Image not found to update")
 
 @router.delete("/api/internal/postgresql/entity/image/{image_id}", response_model=Dict)

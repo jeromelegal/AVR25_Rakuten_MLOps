@@ -9,12 +9,12 @@ from typing import Dict
 router = APIRouter()
 
 class Category(BaseModel):
-    code: str
+    code: int
     label: str
 
 class CategoryResponse(BaseModel):
     id: int
-    code: str
+    code: int
     label: str
     created_at: datetime
     created_by: int
@@ -33,7 +33,7 @@ async def create_category(request: Request, data: Category, current_user: dict =
 
     async with get_db_client(settings) as conn:
         category_id = await conn.fetchval(
-            "INSERT INTO ads (designation, label, created_at, created_by) VALUES ($1, $2, $3, $4) RETURNING id",
+            "INSERT INTO categories (code, label, created_at, created_by) VALUES ($1, $2, $3, $4) RETURNING id",
             data_dict["code"],
             data_dict["label"],
             data_dict["created_at"],
@@ -52,14 +52,14 @@ async def get_category(category_id: int, current_user: Dict = Depends(get_curren
 
     async with get_db_client(settings) as conn:
         category = await conn.fetchrow(
-            "SELECT id as category_id, code, label, created_at, created_by FROM categories WHERE id = $1",
+            "SELECT id, code, label, created_at, created_by FROM categories WHERE id = $1",
             category_id
         )
         if category:
             return CategoryResponse(**category)
         raise HTTPException(status_code=404, detail="Category not found")
 
-@router.put("/api/internal/postgresql/entity/category/{category_id}", response_model=Dict)
+@router.put("/api/internal/postgresql/entity/category/{category_id}", response_model=CategoryResponse)
 async def update_category(category_id: int, data: Category, current_user: Dict = Depends(get_current_user), request: Request = None):
     settings: Settings = request.app.state.settings
     
@@ -76,14 +76,14 @@ async def update_category(category_id: int, data: Category, current_user: Dict =
             category_id
         )
         updated_ad = await conn.fetchrow(
-            "SELECT id as category_id, code, label, created_at, created_by "
+            "SELECT id, code, label, created_at, created_by "
             "FROM categories WHERE id = $1",
             category_id
         )
         if updated_ad:
             if updated_ad["code"] == data_dict["code"]:
                 if updated_ad["label"] == data_dict["label"]:
-                    return {"message": "Category updated successfully"}
+                    return CategoryResponse(**updated_ad)
                 raise HTTPException(status_code=500, detail="Error during update 'label'")
             raise HTTPException(status_code=500, detail="Error during update 'code'")
         raise HTTPException(status_code=404, detail="Category not found to update")

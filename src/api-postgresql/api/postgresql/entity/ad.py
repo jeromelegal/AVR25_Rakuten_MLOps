@@ -54,14 +54,14 @@ async def get_ad(ad_id: int, current_user: Dict = Depends(get_current_user), req
 
     async with get_db_client(settings) as conn:
         ad = await conn.fetchrow(
-            "SELECT id as ad_id, designation, description, created_at, created_by FROM ads WHERE id = $1",
+            "SELECT id, designation, description, created_at, created_by FROM ads WHERE id = $1",
             ad_id
         )
         if ad:
             return AdResponse(**ad)
         raise HTTPException(status_code=404, detail="Ad not found")
 
-@router.put("/api/internal/postgresql/entity/ad/{ad_id}", response_model=Dict)
+@router.put("/api/internal/postgresql/entity/ad/{ad_id}", response_model=AdResponse)
 async def update_ad(ad_id: int, data: Ad, current_user: Dict = Depends(get_current_user), request: Request = None):
     settings: Settings = request.app.state.settings
     
@@ -78,14 +78,14 @@ async def update_ad(ad_id: int, data: Ad, current_user: Dict = Depends(get_curre
             ad_id
         )
         updated_ad = await conn.fetchrow(
-            "SELECT id as ad_id, designation, description, created_at, created_by "
+            "SELECT id, designation, description, created_at, created_by "
             "FROM ads WHERE id = $1",
             ad_id
         )
         if updated_ad:
             if updated_ad["designation"] == data_dict["designation"]:
                 if updated_ad["description"] == data_dict["description"]:
-                    return {"message": "Ad updated successfully"}
+                    return AdResponse(**updated_ad)
                 raise HTTPException(status_code=500, detail="Error during update 'description'")
             raise HTTPException(status_code=500, detail="Error during update 'designation'")
         raise HTTPException(status_code=404, detail="Ad not found to update")

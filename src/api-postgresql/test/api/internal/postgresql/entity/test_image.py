@@ -2,7 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 from main import create_app
 from config.db import get_db_client
-from api.auth import create_internal_api_access_token, hash_password
+from api.auth import create_internal_api_access_token
 from test.config.test_settings import test_settings
 
 def print_response_details(response):
@@ -16,199 +16,96 @@ async def test_create_image():
     app = create_app(test_settings)
     client = TestClient(app)
 
-    # Setup: create a user and get token
+    # Step 1: Create a new image
     api_token = create_internal_api_access_token(data={"scope": "internal"}, settings=test_settings)
     headers = {
         "Referer": test_settings.API_GATEWAY_HOST + test_settings.PROTECTED_ENDPOINT_URL,
         "X-API-Key": api_token,
     }
+    response = client.post(
+        "/api/internal/postgresql/entity/user",
+        json={
+            "username": "testuser",
+            "email": "testuser@example.com",
+            "password": "testpassword",
+        },
+        headers=headers,
+    )
+    print_response_details(response)
+    assert response.status_code == 200
+    data = response.json()
+    user_id = data["user_id"]  # Get the user_id from the response
 
-    hashed_password = hash_password("password")
-    async with get_db_client(test_settings) as db:
-        # Insert a test user with created_by set to a dummy value
-        user_id = await db.fetchval(
-            "INSERT INTO users (username, email, password, created_by) VALUES ($1, $2, $3, $4) RETURNING id",
-            "testuser", "testuser@example.com", hashed_password, 0  # Assuming 0 as a dummy value for created_by
-        )
+    # Step 2: Get the access token for the created user
+    login_response = client.post(
+        "/token", data={"username": "testuser", "password": "testpassword"}
+    )
+    print_response_details(login_response)
+    assert login_response.status_code == 200
+    token = login_response.json()["access_token"]
 
-        # Get token for the user
-        login_response = client.post(
-            "/token", data={"username": "testuser", "password": "password"}
-        )
-        print_response_details(login_response)
-        assert login_response.status_code == 200
-        token = login_response.json()["access_token"]
-        headers["Authorization"] = f"Bearer {token}"
-
-        # Test create image
-        image_payload = {
-            "imagename": "00_image_1234.jpg",
-            "bucketname": "image-raw"
-            }
-        create_response = client.post(
-            "/api/internal/postgresql/entity/image",
-            json=image_payload,
-            headers=headers
-        )
-        print_response_details(create_response)
-        assert create_response.status_code == 200
-        image_data = create_response.json()
-        assert image_data["imagename"] == "00_image_1234.jpg"
-        assert image_data["bucketname"] == "image-raw"
-        image_id = image_data["image_id"]
-
-        # Cleanup
-        await db.execute("DELETE FROM images WHERE id = $1", image_id)
-        await db.execute("DELETE FROM users WHERE id = $1", user_id)
-
-@pytest.mark.asyncio
-async def test_get_image():
-    app = create_app(test_settings)
-    client = TestClient(app)
-
-    # Setup: create a user and get token
-    api_token = create_internal_api_access_token(data={"scope": "internal"}, settings=test_settings)
+    # Prepare headers with the access token
     headers = {
+        "Authorization": f"Bearer {token}",
         "Referer": test_settings.API_GATEWAY_HOST + test_settings.PROTECTED_ENDPOINT_URL,
         "X-API-Key": api_token,
     }
 
-    hashed_password = hash_password("password")
+    # Test create image
+    image_payload = {
+        "image_name": "00_image_1234.jpg",
+        "bucket_name": "image-raw"
+        }
+    create_response = client.post(
+        "/api/internal/postgresql/entity/image",
+        json=image_payload,
+        headers=headers
+    )
+    print_response_details(create_response)
+    assert create_response.status_code == 200
+    image_data = create_response.json()
+    assert image_data["image_name"] == "00_image_1234.jpg"
+    assert image_data["bucket_name"] == "image-raw"
+    image_id = image_data["id"]
+
+    # Test get image
+    response = client.get(
+        f"/api/internal/postgresql/entity/image/{image_id}",
+        headers=headers
+    )
+    print_response_details(response)
+    assert response.status_code == 200
+    image_data = response.json()
+    assert image_data["image_name"] == "00_image_1234.jpg"
+    assert image_data["bucket_name"] == "image-raw"
+
+    # Test update image
+    update_payload = {
+        "image_name": "10_image_456.jpg",
+        "bucket_name": "image-augmented"
+        }
+    update_response = client.put(
+        f"/api/internal/postgresql/entity/image/{image_id}",
+        json=update_payload,
+        headers=headers
+    )
+    print_response_details(update_response)
+    assert update_response.status_code == 200
+    update_data = update_response.json()
+    assert update_data["image_name"] == "10_image_456.jpg"
+    assert update_data["bucket_name"] == "image-augmented"
+
+    # Test delete image
+    delete_response = client.delete(
+        f"/api/internal/postgresql/entity/image/{image_id}",
+        headers=headers
+    )
+    print_response_details(delete_response)
+    assert delete_response.status_code == 200
+    assert delete_response.json() == {"message": "Image deleted successfully"}
+
+    # Verify image deletion
     async with get_db_client(test_settings) as db:
-        # Insert a test user with created_by set to a dummy value
-        user_id = await db.fetchval(
-            "INSERT INTO users (username, email, password, created_by) VALUES ($1, $2, $3, $4) RETURNING id",
-            "testuser", "testuser@example.com", hashed_password, 0  # Assuming 0 as a dummy value for created_by
-        )
-
-        # Get token for the user
-        login_response = client.post(
-            "/token", data={"username": "testuser", "password": "password"}
-        )
-        print_response_details(login_response)
-        assert login_response.status_code == 200
-        token = login_response.json()["access_token"]
-        headers["Authorization"] = f"Bearer {token}"
-
-        # Pre-insert a image for the GET test
-        image_id = await db.fetchval(
-            "INSERT INTO images (imagename, bucketname, create_at, create_by) VALUES ($1, $2, $3, $4) RETURNING id",
-            "00_image_1234.jpg", "image-raw", "2023-10-01T00:00:00Z", user_id
-        )
-
-        # Test get image
-        response = client.get(
-            f"/api/internal/postgresql/entity/image/{image_id}",
-            headers=headers
-        )
-        print_response_details(response)
-        assert response.status_code == 200
-        image_data = response.json()
-        assert image_data["imagename"] == "00_image_1234.jpg"
-        assert image_data["bucketname"] == "image-raw"
-        assert image_data["created_at"] == "2023-10-01T00:00:00Z"
-        assert image_data["image_id"] == image_id
-
-        # Cleanup
-        await db.execute("DELETE FROM images WHERE id = $1", image_id)
-        await db.execute("DELETE FROM users WHERE id = $1", user_id)
-
-@pytest.mark.asyncio
-async def test_update_image():
-    app = create_app(test_settings)
-    client = TestClient(app)
-
-    # Setup: create a user and get token
-    api_token = create_internal_api_access_token(data={"scope": "internal"}, settings=test_settings)
-    headers = {
-        "Referer": test_settings.API_GATEWAY_HOST + test_settings.PROTECTED_ENDPOINT_URL,
-        "X-API-Key": api_token,
-    }
-
-    hashed_password = hash_password("password")
-    async with get_db_client(test_settings) as db:
-        # Insert a test user with created_by set to a dummy value
-        user_id = await db.fetchval(
-            "INSERT INTO users (username, email, password, created_by) VALUES ($1, $2, $3, $4) RETURNING id",
-            "testuser", "testuser@example.com", hashed_password, 0  # Assuming 0 as a dummy value for created_by
-        )
-
-        # Get token for the user
-        login_response = client.post(
-            "/token", data={"username": "testuser", "password": "password"}
-        )
-        print_response_details(login_response)
-        assert login_response.status_code == 200
-        token = login_response.json()["access_token"]
-        headers["Authorization"] = f"Bearer {token}"
-
-        # Pre-insert a image for the UPDATE test
-        image_id = await db.fetchval(
-            "INSERT INTO images (imagename, bucketname, create_at, create_by) VALUES ($1, $2, $3, $4) RETURNING id",
-            "00_image_1234.jpg", "image-raw", "2023-10-01T00:00:00Z", user_id
-        )
-
-        # Test update image
-        update_payload = {"imagename": "toto.png"}
-        update_response = client.put(
-            f"/api/internal/postgresql/entity/image/{image_id}",
-            json=update_payload,
-            headers=headers
-        )
-        print_response_details(update_response)
-        assert update_response.status_code == 200
-        image_data = update_response.json()
-        assert image_data["imagename"] == "toto.png"
-
-        # Cleanup
-        await db.execute("DELETE FROM images WHERE id = $1", image_id)
-        await db.execute("DELETE FROM users WHERE id = $1", user_id)
-
-@pytest.mark.asyncio
-async def test_delete_image():
-    app = create_app(test_settings)
-    client = TestClient(app)
-
-    # Setup: create a user and get token
-    api_token = create_internal_api_access_token(data={"scope": "internal"}, settings=test_settings)
-    headers = {
-        "Referer": test_settings.API_GATEWAY_HOST + test_settings.PROTECTED_ENDPOINT_URL,
-        "X-API-Key": api_token,
-    }
-
-    hashed_password = hash_password("password")
-    async with get_db_client(test_settings) as db:
-        # Insert a test user with created_by set to a dummy value
-        user_id = await db.fetchval(
-            "INSERT INTO users (username, email, password, created_by) VALUES ($1, $2, $3, $4) RETURNING id",
-            "testuser", "testuser@example.com", hashed_password, 0  # Assuming 0 as a dummy value for created_by
-        )
-
-        # Get token for the user
-        login_response = client.post(
-            "/token", data={"username": "testuser", "password": "password"}
-        )
-        print_response_details(login_response)
-        assert login_response.status_code == 200
-        token = login_response.json()["access_token"]
-        headers["Authorization"] = f"Bearer {token}"
-
-        # Pre-insert a image for the DELETE test
-        image_id = await db.fetchval(
-            "INSERT INTO images (imagename, bucketname, create_at, create_by) VALUES ($1, $2, $3, $4) RETURNING id",
-            "toto.png", "image-raw", "2023-10-01T00:00:00Z", user_id
-        )
-
-        # Test delete image
-        delete_response = client.delete(
-            f"/api/internal/postgresql/entity/image/{image_id}",
-            headers=headers
-        )
-        print_response_details(delete_response)
-        assert delete_response.status_code == 200
-        assert delete_response.json() == {"message": "Image deleted successfully"}
-
-        # Verify image deletion
         deleted_image_in_db = await db.fetchrow("SELECT * FROM images WHERE id = $1", image_id)
         assert deleted_image_in_db is None, "Image was not deleted from the database"
 

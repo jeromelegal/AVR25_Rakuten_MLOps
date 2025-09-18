@@ -10,12 +10,12 @@ import asyncpg
 router = APIRouter()
 
 class AdCatRelation(BaseModel):
-    ad_id: str
-    cat_id: str
+    ad_id: int
+    cat_id: int
 
 class AdCatResponse(BaseModel):
-    ad_id: str
-    cat_id: str
+    ad_id: int
+    cat_id: int
 
 @router.post("/api/internal/postgresql/relation/ad_cat", response_model=AdCatResponse)
 async def create_ad_cat(request: Request, relation: AdCatRelation, current_user: dict = Depends(get_current_user)):

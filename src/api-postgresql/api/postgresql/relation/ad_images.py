@@ -10,12 +10,12 @@ import asyncpg
 router = APIRouter()
 
 class AdImageRelation(BaseModel):
-    ad_id: str
-    image_id: str
+    ad_id: int
+    image_id: int
 
 class AdImageResponse(BaseModel):
-    ad_id: str
-    image_id: str
+    ad_id: int
+    image_id: int
 
 @router.post("/api/internal/postgresql/relation/ad_image", response_model=AdImageResponse)
 async def create_ad_image(request: Request, relation: AdImageRelation, current_user: dict = Depends(get_current_user)):

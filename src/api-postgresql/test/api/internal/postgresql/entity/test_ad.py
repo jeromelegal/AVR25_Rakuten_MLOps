@@ -2,7 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 from main import create_app
 from config.db import get_db_client
-from api.auth import create_internal_api_access_token, hash_password
+from api.auth import create_internal_api_access_token
 from test.config.test_settings import test_settings
 
 def print_response_details(response):
@@ -16,199 +16,96 @@ async def test_create_ad():
     app = create_app(test_settings)
     client = TestClient(app)
 
-    # Setup: create a user and get token
+    # Step 1: Create a new ad
     api_token = create_internal_api_access_token(data={"scope": "internal"}, settings=test_settings)
     headers = {
         "Referer": test_settings.API_GATEWAY_HOST + test_settings.PROTECTED_ENDPOINT_URL,
         "X-API-Key": api_token,
     }
+    response = client.post(
+        "/api/internal/postgresql/entity/user",
+        json={
+            "username": "testuser",
+            "email": "testuser@example.com",
+            "password": "testpassword",
+        },
+        headers=headers,
+    )
+    print_response_details(response)
+    assert response.status_code == 200
+    data = response.json()
+    user_id = data["user_id"]  # Get the user_id from the response
 
-    hashed_password = hash_password("password")
-    async with get_db_client(test_settings) as db:
-        # Insert a test user with created_by set to a dummy value
-        user_id = await db.fetchval(
-            "INSERT INTO users (username, email, password, created_by) VALUES ($1, $2, $3, $4) RETURNING id",
-            "testuser", "testuser@example.com", hashed_password, 0  # Assuming 0 as a dummy value for created_by
-        )
+    # Step 2: Get the access token for the created user
+    login_response = client.post(
+        "/token", data={"username": "testuser", "password": "testpassword"}
+    )
+    print_response_details(login_response)
+    assert login_response.status_code == 200
+    token = login_response.json()["access_token"]
 
-        # Get token for the user
-        login_response = client.post(
-            "/token", data={"username": "testuser", "password": "password"}
-        )
-        print_response_details(login_response)
-        assert login_response.status_code == 200
-        token = login_response.json()["access_token"]
-        headers["Authorization"] = f"Bearer {token}"
-
-        # Test create ad
-        ad_payload = {
-            "designation": "Vinyl GRIMA",
-            "description": "Album 'The Nightside'"
-            }
-        create_response = client.post(
-            "/api/internal/postgresql/entity/ad",
-            json=ad_payload,
-            headers=headers
-        )
-        print_response_details(create_response)
-        assert create_response.status_code == 200
-        ad_data = create_response.json()
-        assert ad_data["designation"] == "Vinyl GRIMA"
-        assert ad_data["description"] == "Album 'The Nightside'"
-        ad_id = ad_data["ad_id"]
-
-        # Cleanup
-        await db.execute("DELETE FROM ads WHERE id = $1", ad_id)
-        await db.execute("DELETE FROM users WHERE id = $1", user_id)
-
-@pytest.mark.asyncio
-async def test_get_ad():
-    app = create_app(test_settings)
-    client = TestClient(app)
-
-    # Setup: create a user and get token
-    api_token = create_internal_api_access_token(data={"scope": "internal"}, settings=test_settings)
+    # Prepare headers with the access token
     headers = {
+        "Authorization": f"Bearer {token}",
         "Referer": test_settings.API_GATEWAY_HOST + test_settings.PROTECTED_ENDPOINT_URL,
         "X-API-Key": api_token,
     }
 
-    hashed_password = hash_password("password")
+    # Test create ad
+    ad_payload = {
+        "designation": "Vinyl GRIMA",
+        "description": "Album 'The Nightside'"
+        }
+    create_response = client.post(
+        "/api/internal/postgresql/entity/ad",
+        json=ad_payload,
+        headers=headers
+    )
+    print_response_details(create_response)
+    assert create_response.status_code == 200
+    ad_data = create_response.json()
+    assert ad_data["designation"] == "Vinyl GRIMA"
+    assert ad_data["description"] == "Album 'The Nightside'"
+    ad_id = ad_data["id"]
+
+    # Test get ad
+    response = client.get(
+        f"/api/internal/postgresql/entity/ad/{ad_id}",
+        headers=headers
+    )
+    print_response_details(response)
+    assert response.status_code == 200
+    ad_data = response.json()
+    assert ad_data["designation"] == "Vinyl GRIMA"
+    assert ad_data["description"] == "Album 'The Nightside'"
+
+    # Test update ad
+    update_payload = {
+        "designation": "Vinyl Sleep Token",
+        "description": "Album 'Sundowning'"
+        }
+    update_response = client.put(
+        f"/api/internal/postgresql/entity/ad/{ad_id}",
+        json=update_payload,
+        headers=headers
+    )
+    print_response_details(update_response)
+    assert update_response.status_code == 200
+    update_data = update_response.json()
+    assert update_data["designation"] == "Vinyl Sleep Token"
+    assert update_data["description"] == "Album 'Sundowning'"
+
+    # Test delete ad
+    delete_response = client.delete(
+        f"/api/internal/postgresql/entity/ad/{ad_id}",
+        headers=headers
+    )
+    print_response_details(delete_response)
+    assert delete_response.status_code == 200
+    assert delete_response.json() == {"message": "Ad deleted successfully"}
+
+    # Verify ad deletion
     async with get_db_client(test_settings) as db:
-        # Insert a test user with created_by set to a dummy value
-        user_id = await db.fetchval(
-            "INSERT INTO users (username, email, password, created_by) VALUES ($1, $2, $3, $4) RETURNING id",
-            "testuser", "testuser@example.com", hashed_password, 0  # Assuming 0 as a dummy value for created_by
-        )
-
-        # Get token for the user
-        login_response = client.post(
-            "/token", data={"username": "testuser", "password": "password"}
-        )
-        print_response_details(login_response)
-        assert login_response.status_code == 200
-        token = login_response.json()["access_token"]
-        headers["Authorization"] = f"Bearer {token}"
-
-        # Pre-insert a ad for the GET test
-        ad_id = await db.fetchval(
-            "INSERT INTO ads (designation, description, create_at, create_by) VALUES ($1, $2, $3, $4) RETURNING id",
-            "testdesign", "testdesc", "2023-10-01T00:00:00Z", user_id
-        )
-
-        # Test get ad
-        response = client.get(
-            f"/api/internal/postgresql/entity/ad/{ad_id}",
-            headers=headers
-        )
-        print_response_details(response)
-        assert response.status_code == 200
-        ad_data = response.json()
-        assert ad_data["designation"] == "testdesign"
-        assert ad_data["description"] == "testdesc"
-        assert ad_data["created_at"] == "2023-10-01T00:00:00Z"
-        assert ad_data["ad_id"] == ad_id
-
-        # Cleanup
-        await db.execute("DELETE FROM ads WHERE id = $1", ad_id)
-        await db.execute("DELETE FROM users WHERE id = $1", user_id)
-
-@pytest.mark.asyncio
-async def test_update_ad():
-    app = create_app(test_settings)
-    client = TestClient(app)
-
-    # Setup: create a user and get token
-    api_token = create_internal_api_access_token(data={"scope": "internal"}, settings=test_settings)
-    headers = {
-        "Referer": test_settings.API_GATEWAY_HOST + test_settings.PROTECTED_ENDPOINT_URL,
-        "X-API-Key": api_token,
-    }
-
-    hashed_password = hash_password("password")
-    async with get_db_client(test_settings) as db:
-        # Insert a test user with created_by set to a dummy value
-        user_id = await db.fetchval(
-            "INSERT INTO users (username, email, password, created_by) VALUES ($1, $2, $3, $4) RETURNING id",
-            "testuser", "testuser@example.com", hashed_password, 0  # Assuming 0 as a dummy value for created_by
-        )
-
-        # Get token for the user
-        login_response = client.post(
-            "/token", data={"username": "testuser", "password": "password"}
-        )
-        print_response_details(login_response)
-        assert login_response.status_code == 200
-        token = login_response.json()["access_token"]
-        headers["Authorization"] = f"Bearer {token}"
-
-        # Pre-insert a ad for the UPDATE test
-        ad_id = await db.fetchval(
-            "INSERT INTO ads (designation, description, create_at, create_by) VALUES ($1, $2, $3, $4) RETURNING id",
-            "testdesign", "testdesc", "2023-10-01T00:00:00Z", user_id
-        )
-
-        # Test update ad
-        update_payload = {"designation": "updated_testad"}
-        update_response = client.put(
-            f"/api/internal/postgresql/entity/ad/{ad_id}",
-            json=update_payload,
-            headers=headers
-        )
-        print_response_details(update_response)
-        assert update_response.status_code == 200
-        ad_data = update_response.json()
-        assert ad_data["designation"] == "updated_testad"
-
-        # Cleanup
-        await db.execute("DELETE FROM ads WHERE id = $1", ad_id)
-        await db.execute("DELETE FROM users WHERE id = $1", user_id)
-
-@pytest.mark.asyncio
-async def test_delete_ad():
-    app = create_app(test_settings)
-    client = TestClient(app)
-
-    # Setup: create a user and get token
-    api_token = create_internal_api_access_token(data={"scope": "internal"}, settings=test_settings)
-    headers = {
-        "Referer": test_settings.API_GATEWAY_HOST + test_settings.PROTECTED_ENDPOINT_URL,
-        "X-API-Key": api_token,
-    }
-
-    hashed_password = hash_password("password")
-    async with get_db_client(test_settings) as db:
-        # Insert a test user with created_by set to a dummy value
-        user_id = await db.fetchval(
-            "INSERT INTO users (username, email, password, created_by) VALUES ($1, $2, $3, $4) RETURNING id",
-            "testuser", "testuser@example.com", hashed_password, 0  # Assuming 0 as a dummy value for created_by
-        )
-
-        # Get token for the user
-        login_response = client.post(
-            "/token", data={"username": "testuser", "password": "password"}
-        )
-        print_response_details(login_response)
-        assert login_response.status_code == 200
-        token = login_response.json()["access_token"]
-        headers["Authorization"] = f"Bearer {token}"
-
-        # Pre-insert a ad for the DELETE test
-        ad_id = await db.fetchval(
-            "INSERT INTO ads (designation, description, create_at, create_by) VALUES ($1, $2, $3, $4) RETURNING id",
-            "testdesign", "testdesc", "2023-10-01T00:00:00Z", user_id
-        )
-
-        # Test delete ad
-        delete_response = client.delete(
-            f"/api/internal/postgresql/entity/ad/{ad_id}",
-            headers=headers
-        )
-        print_response_details(delete_response)
-        assert delete_response.status_code == 200
-        assert delete_response.json() == {"message": "Ad deleted successfully"}
-
-        # Verify ad deletion
         deleted_ad_in_db = await db.fetchrow("SELECT * FROM ads WHERE id = $1", ad_id)
         assert deleted_ad_in_db is None, "Ad was not deleted from the database"
 
