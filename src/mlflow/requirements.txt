@@ -9,4 +9,3 @@ torch
 torchvision
 torchaudio
 fasttext
-tf-keras
