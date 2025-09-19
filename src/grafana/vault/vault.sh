@@ -23,7 +23,7 @@ done
 vault kv get -field=certificate secret/vault/ca > vault_ca.crt
 vault kv get -field=certificate secret/consul/ca > consul_ca.crt
 vault kv get -field=certificate secret/grafana/ca > grafana_ca.crt
-vault kv get -field=certificate secret/minio/ca > minio_ca.crt
+vault kv get -field=certificate secret/prometheus/ca > prometheus_ca.crt
 
 mkdir -p $(dirname $GRAFANA_PEM_PATH)
 mkdir -p $(dirname $GRAFANA_CA_PATH)
@@ -36,6 +36,7 @@ cp grafana_ca.crt $GRAFANA_CA_PATH
 cp vault_ca.crt /usr/local/share/ca-certificates/
 cp consul_ca.crt /usr/local/share/ca-certificates/
 cp grafana_ca.crt /usr/local/share/ca-certificates/
+cp prometheus_ca.crt /usr/local/share/ca-certificates/
 
 update-ca-certificates
 
@@ -158,4 +159,12 @@ EOF
 
 cat <<EOF > $PROMETHEUS_GRAFANA_CA_PATH
 $(printf "%s" "$PROMETHEUS_GRAFANA_CA")
+EOF
+
+cat <<EOF > $PROMETHEUS_GRAFANA_KEY_PATH
+$(printf "%s" "$PROMETHEUS_GRAFANA_KEY")
+EOF
+
+cat <<EOF > $PROMETHEUS_GRAFANA_CERT_PATH
+$(printf "%s" "$PROMETHEUS_GRAFANA_CERT")
 EOF

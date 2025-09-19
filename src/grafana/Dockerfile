@@ -20,10 +20,15 @@ ENV GRAFANA_KEY_PATH=${GRAFANA_KEY_PATH:-"/etc/ssl/grafana/grafana.key"}
 ENV GRAFANA_CERT_PATH=${GRAFANA_CERT_PATH:-"/etc/ssl/grafana/grafana.crt"}
 ENV GRAFANA_RETENTION_TIME=${GRAFANA_RETENTION_TIME:-"1w"}
 ENV GRAFANA_RETENTION_SIZE=${GRAFANA_RETENTION_SIZE:-"1GB"}
+ENV GRAFANA_PROVISIONING_DIR=${GRAFANA_PROVISIONING_DIR:-"/app/provisioning"}
 ENV GRAFANA_GRAFANA_PEM_PATH=${GRAFANA_GRAFANA_PEM_PATH:-"/etc/ssl/grafana/grafana_grafana.pem"}
 ENV GRAFANA_GRAFANA_CA_PATH=${GRAFANA_GRAFANA_CA_PATH:-"/etc/ssl/grafana/grafana_grafana.ca"}
 ENV GRAFANA_GRAFANA_KEY_PATH=${GRAFANA_GRAFANA_KEY_PATH:-"/etc/ssl/grafana/grafana_grafana.key"}
 ENV GRAFANA_GRAFANA_CERT_PATH=${GRAFANA_GRAFANA_CERT_PATH:-"/etc/ssl/grafana/grafana_grafana.crt"}
+ENV PROMETHEUS_SERVICE_NAME=${PROMETHEUS_SERVICE_NAME:-"prometheus"}
+ENV PROMETHEUS_SERVICE_PORT=${PROMETHEUS_SERVICE_PORT:-"9090"}
+ENV PROMETHEUS_USER_NAME=${PROMETHEUS_USER_NAME:-"prometheus-user"}
+ENV PROMETHEUS_USER_PASSWORD=${PROMETHEUS_USER_PASSWORD:-"prometheus-password"}
 ENV PROMETHEUS_GRAFANA_PEM_PATH=${PROMETHEUS_GRAFANA_PEM_PATH:-"/etc/ssl/grafana/prometheus_grafana.pem"}
 ENV PROMETHEUS_GRAFANA_CA_PATH=${PROMETHEUS_GRAFANA_CA_PATH:-"/etc/ssl/grafana/prometheus_grafana.ca"}
 ENV PROMETHEUS_GRAFANA_KEY_PATH=${PROMETHEUS_GRAFANA_KEY_PATH:-"/etc/ssl/grafana/prometheus_grafana.key"}
@@ -87,6 +92,20 @@ COPY vault/vault.sh /usr/local/bin/vault.sh
 
 # Rendre les scripts exécutables
 RUN chmod +x /usr/local/bin/*.sh
+
+# Créer le dossier de provisioning et y copier tous les fichiers initiaux
+RUN mkdir -p ${GRAFANA_PROVISIONING_DIR} && chown grafana:grafana ${GRAFANA_PROVISIONING_DIR} && \
+    mkdir -p ${GRAFANA_PROVISIONING_DIR}/dashboards && chown grafana:grafana ${GRAFANA_PROVISIONING_DIR}/dashboards && \
+    mkdir -p ${GRAFANA_PROVISIONING_DIR}/dashboards && chown grafana:grafana ${GRAFANA_PROVISIONING_DIR}/dashboards && \
+    mkdir -p ${GRAFANA_PROVISIONING_DIR}/access-control && chown grafana:grafana ${GRAFANA_PROVISIONING_DIR}/access-control && \
+    mkdir -p ${GRAFANA_PROVISIONING_DIR}/alerting && chown grafana:grafana ${GRAFANA_PROVISIONING_DIR}/alerting && \
+    mkdir -p ${GRAFANA_PROVISIONING_DIR}/plugins && chown grafana:grafana ${GRAFANA_PROVISIONING_DIR}/plugins
+        
+COPY grafana/dashboards/ ${GRAFANA_PROVISIONING_DIR}/dashboards/
+COPY grafana/datasources/ ${GRAFANA_PROVISIONING_DIR}/datasources/
+COPY grafana/grafana.ini /etc/grafana/grafana.ini
+RUN chmod 644 ${GRAFANA_PROVISIONING_DIR}/datasources/* && \
+    chmod 644 ${GRAFANA_PROVISIONING_DIR}/dashboards/*
 
 # Définir le point d'entrée et exposer le port
 EXPOSE 3030 80 443
