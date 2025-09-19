@@ -302,3 +302,22 @@ services:
       VAULT_SERVICE_NAME: vault
       VAULT_USERNAME: api-image-processing
       VAULT_PASSWORD: api-image-processing
+  prometheus:
+    expose_ports:
+      - 9090
+      - 80
+      - 443
+    network-alias:
+      - prometheus
+    health_check:
+      urls:
+        - url: https://prometheus/health
+          expected_code: 200
+    env_vars:
+      SERVICE_NAME: prometheus
+      SERVICE_PORT: 8030
+      VAULT_ADDR: https://vault:8200
+      VAULT_SERVICE_NAME: vault
+      VAULT_USERNAME: prometheus
+      VAULT_PASSWORD: prometheus
+  
