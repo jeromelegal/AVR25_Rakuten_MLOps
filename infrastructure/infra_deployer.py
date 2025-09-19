@@ -73,25 +73,7 @@ class InfraDeployer:
         """Charge et valide le fichier YAML."""
         with open(self.yaml_file, 'r') as f:
             self.infra = yaml.safe_load(f)
-        self._apply_defaults()
         self.validate()
-
-    def _apply_defaults(self):
-        """Applique les valeurs par défaut."""
-        defaults = self.infra.get('defaults', {})
-        # Defaults pour les VMs
-        vm_defaults = defaults.get('vm', {})
-        for vm in self.infra['vms']:
-            for key, value in vm_defaults.items():
-                if key not in vm:
-                    vm[key] = value
-            # Appliquer les defaults pour cloud_init
-            if 'cloud_init' not in vm:
-                vm['cloud_init'] = {}
-            cloud_init_defaults = defaults.get('cloud_init', {})
-            for key, value in cloud_init_defaults.items():
-                if key not in vm['cloud_init']:
-                    vm['cloud_init'][key] = value
 
     def validate(self):
         """Valide le fichier YAML."""
@@ -250,17 +232,9 @@ class InfraDeployer:
             '/tmp/meta-data', '/tmp/user-data'
         ], check=True)
 
-
         # Nettoyer les fichiers temporaires
         os.remove("/tmp/meta-data")
         os.remove("/tmp/user-data")
-
-        # Appliquer les bonnes permissions
-        os.chmod(iso_path, 0o644)
-        uid = pwd.getpwnam("libvirt-qemu").pw_uid
-        gid = grp.getgrnam("libvirt-qemu").gr_gid
-        # The user belong to the libvirt group
-        # os.chown(iso_path, uid, gid)
 
         print(f"  ✓ ISO cloud-init générée: {iso_path}")
         return iso_path
@@ -286,41 +260,65 @@ class InfraDeployer:
     def _clean_vm(self, vm: Dict):
         """Supprime une VM et ses ressources."""
         print(f"Suppression de la VM {vm['name']}...")
-        try:
-            domain = self.conn.lookupByName(vm['name'])
-            if domain.isActive():
-                domain.destroy()
-            domain.undefine()
-            print(f"  ✓ VM {vm['name']} supprimée")
-        except libvirt.libvirtError as e:
-            print(f"  ! VM {vm['name']} non trouvée: {e}")
+
+        # Vérifier si la VM existe
+        if not self.vm_exists(vm['name']):
+            print(f"  ! VM {vm['name']} non trouvée")
+            return
+
+        # Récupérer la VM
+        domain = self.conn.lookupByName(vm['name'])
+
+        # Arrêter la VM si elle est active
+        if domain.isActive():
+            domain.destroy()
+            print(f"  ✓ VM {vm['name']} arrêtée")
+
+        # Supprimer la définition de la VM
+        domain.undefine()
+        print(f"  ✓ VM {vm['name']} supprimée")
+
         # Supprimer les disques
         disk_path = os.path.join(VM_IMAGES_DIR, f"{vm['name']}.qcow2")
         if os.path.exists(disk_path):
             os.remove(disk_path)
             print(f"  ✓ Disque {disk_path} supprimé")
+
+        # Supprimer les disques supplémentaires
         for volume in vm.get('volumes', []):
             vol_path = os.path.join(VM_IMAGES_DIR, f"{vm['name']}-{volume['name']}.qcow2")
             if os.path.exists(vol_path):
                 os.remove(vol_path)
                 print(f"  ✓ Disque {vol_path} supprimé")
+
         # Supprimer l'ISO cloud-init
         cloud_init_iso = os.path.join(CLOUD_INIT_ISO_DIR, f"{vm['name']}-cloudinit.iso")
         if os.path.exists(cloud_init_iso):
             os.remove(cloud_init_iso)
             print(f"  ✓ ISO cloud-init {cloud_init_iso} supprimée")
 
+
     def _clean_network(self, network: Dict):
         """Supprime un réseau."""
         print(f"Suppression du réseau {network['name']}...")
-        try:
-            net = self.conn.networkLookupByName(network['name'])
-            if net.isActive():
-                net.destroy()
-            net.undefine()
-            print(f"  ✓ Réseau {network['name']} supprimé")
-        except libvirt.libvirtError as e:
-            print(f"  ! Réseau {network['name']} non trouvé: {e}")
+
+        # Vérifier si le réseau existe
+        if not any(net.name() == network['name'] for net in self.conn.listAllNetworks()):
+            print(f"  ! Réseau {network['name']} non trouvé")
+            return
+
+        # Récupérer le réseau
+        net = self.conn.networkLookupByName(network['name'])
+
+        # Désactiver le réseau s'il est actif
+        if net.isActive():
+            net.destroy()
+            print(f"  ✓ Réseau {network['name']} désactivé")
+
+        # Supprimer la définition du réseau
+        net.undefine()
+        print(f"  ✓ Réseau {network['name']} supprimé")
+
 
     def deploy(self):
         """Déploie l'infrastructure complète."""

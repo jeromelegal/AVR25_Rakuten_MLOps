@@ -2,16 +2,6 @@ version: "1.0"
 name: "infra-webapp"
 description: "Infrastructure pour une application web avec base de données"
 
-defaults:
-  vm:
-    cpu: 2
-    ram: 2048
-    disk_size: 20
-    user: "ubuntu"
-  network:
-    type: "nat"
-    subnet: "192.168.100.0/24"
-
 networks:
   - name: "app-net"
     description: "Réseau pour l'application"
@@ -30,12 +20,15 @@ vms:
     description: "Serveur frontend React"
     cpu: 2
     ram: 4096
+    disk_size: 20
     iso: "ubuntu-24.04.1-live-server-amd64.iso"
     networks:
       - name: "app-net"
         ip: "192.168.100.10"
     cloud_init:
-      user: "deploy"
+      hostname: backend
+      user: ubuntu
+      password: "ubuntu" 
       ssh_keys: ["ssh-rsa AAAAB3NzaC1yc2E..."]
       storage:
         layout: lvm
@@ -58,12 +51,14 @@ vms:
     description: "Serveur backend API"
     cpu: 4
     ram: 8192
+    disk_size: 20
     iso: "ubuntu-24.04.1-live-server-amd64.iso"
     networks:
       - name: "app-net"
         ip: "192.168.100.11"
     cloud_init:
-      user: "api"
+      user: ubuntu
+      password: "ubuntu"
       storage:
         layout: lvm
       packages: ["postgresql-client", "python3-pip"]
