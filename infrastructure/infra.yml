@@ -37,6 +37,8 @@ vms:
     cloud_init:
       user: "deploy"
       ssh_keys: ["ssh-rsa AAAAB3NzaC1yc2E..."]
+      storage:
+        layout: lvm
       packages: ["nginx", "nodejs", "npm"]
       runcmd:
         - "git clone https://github.com/mon-projet/frontend /var/www/frontend"
@@ -62,6 +64,8 @@ vms:
         ip: "192.168.100.11"
     cloud_init:
       user: "api"
+      storage:
+        layout: lvm
       packages: ["postgresql-client", "python3-pip"]
       runcmd:
         - "pip3 install fastapi uvicorn"

@@ -85,12 +85,13 @@ class InfraDeployer:
             for key, value in vm_defaults.items():
                 if key not in vm:
                     vm[key] = value
-        # Defaults pour les réseaux
-        network_defaults = defaults.get('network', {})
-        for network in self.infra['networks']:
-            for key, value in network_defaults.items():
-                if key not in network:
-                    network[key] = value
+            # Appliquer les defaults pour cloud_init
+            if 'cloud_init' not in vm:
+                vm['cloud_init'] = {}
+            cloud_init_defaults = defaults.get('cloud_init', {})
+            for key, value in cloud_init_defaults.items():
+                if key not in vm['cloud_init']:
+                    vm['cloud_init'][key] = value
 
     def validate(self):
         """Valide le fichier YAML."""
@@ -116,19 +117,19 @@ class InfraDeployer:
 
     def network_is_active(self, name: str) -> bool:
         """Vérifie si un réseau est actif."""
-        try:
-            net = self.conn.networkLookupByName(name)
-            return net.isActive()
-        except libvirt.libvirtError:
-            return False
-
+        networks = self.conn.listAllNetworks()
+        for net in networks:
+            if net.name() == name:
+                return net.isActive()
+        return False
+    
     def vm_exists(self, name: str) -> bool:
         """Vérifie si une VM existe."""
-        try:
-            self.conn.lookupByName(name)
-            return True
-        except libvirt.libvirtError:
-            return False
+        domains = self.conn.listAllDomains(0)  # 0 = liste toutes les VMs (actives et inactives)
+        for domain in domains:
+            if domain.name() == name:
+                return True
+        return False
 
     def create_network(self, network: Dict):
         """Crée un réseau (sans l'activer)."""
@@ -151,8 +152,7 @@ class InfraDeployer:
             return
         try:
             net = self.conn.networkLookupByName(name)
-            # net.setActive(True)
-            net.create() 
+            net.create()
             print(f"  ✓ Réseau {name} activé")
         except libvirt.libvirtError as e:
             print(f"  ✗ Erreur lors de l'activation du réseau {name}: {e}")
@@ -182,7 +182,7 @@ class InfraDeployer:
         # Générer l'ISO cloud-init
         cloud_init_iso = None
         if 'cloud_init' in vm:
-            cloud_init_iso = self._create_cloud_init_iso(vm['name'], vm['cloud_init'])
+            cloud_init_iso = self._create_cloud_init_iso(vm)
         # Générer le XML
         template = env.get_template('vm.xml.j2')
         vm_xml = template.render(
@@ -218,7 +218,7 @@ class InfraDeployer:
         for vm in self.infra['vms']:
             print(f"Déploiement de la VM {vm['name']}...")
             self.create_vm(vm)
-            # self.start_vm(vm['name'])
+            self.start_vm(vm['name'])
 
     def _create_disk(self, path: str, size_gb: int):
         """Crée un disque qcow2."""
@@ -228,20 +228,40 @@ class InfraDeployer:
         subprocess.run(['qemu-img', 'create', '-f', 'qcow2', path, f"{size_gb}G"], check=True)
         print(f"  ✓ Disque {path} créé ({size_gb} Go)")
 
-    def _create_cloud_init_iso(self, vm_name: str, cloud_init: Dict) -> str:
-        """Génère une ISO cloud-init."""
-        iso_path = os.path.join(CLOUD_INIT_ISO_DIR, f"{vm_name}-cloudinit.iso")
-        user_data_template = env.get_template('user_data.j2')
-        user_data = user_data_template.render(cloud_init=cloud_init, password_hash=password_hash)
-        with open("user-data", "w") as f:
+    def _create_cloud_init_iso(self, vm: Dict) -> str:
+        """Génère une ISO cloud-init à partir des templates Jinja2."""
+        iso_path = os.path.join(CLOUD_INIT_ISO_DIR, f"{vm['name']}-cloudinit.iso")
+
+        # Rendre les templates meta-data et user-data
+        meta_data = env.get_template('meta-data.j2').render(vm=vm)
+        user_data = env.get_template('user-data.j2').render(vm=vm)
+
+        # Écrire les fichiers temporaires
+        with open("/tmp/meta-data", "w") as f:
+            f.write(meta_data)
+        with open("/tmp/user-data", "w") as f:
             f.write(user_data)
-        with open("meta-data", "w") as f:
-            f.write(f"instance-id: iid-local01\nlocal-hostname: {vm_name}\n")
+
+        # Créer l'ISO
         subprocess.run([
-            'genisoimage', '-output', iso_path,
+            'genisoimage', '-input-charset', 'utf-8',
+            '-output', iso_path,
             '-volid', 'cidata', '-joliet', '-rock',
-            'user-data', 'meta-data'
+            '/tmp/meta-data', '/tmp/user-data'
         ], check=True)
+
+
+        # Nettoyer les fichiers temporaires
+        os.remove("/tmp/meta-data")
+        os.remove("/tmp/user-data")
+
+        # Appliquer les bonnes permissions
+        os.chmod(iso_path, 0o644)
+        uid = pwd.getpwnam("libvirt-qemu").pw_uid
+        gid = grp.getgrnam("libvirt-qemu").gr_gid
+        # The user belong to the libvirt group
+        # os.chown(iso_path, uid, gid)
+
         print(f"  ✓ ISO cloud-init générée: {iso_path}")
         return iso_path
 
