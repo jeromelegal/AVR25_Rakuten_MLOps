@@ -54,16 +54,13 @@ sed \
   -e "s|CA_FILE|${PROMETHEUS_CA_PATH}|g" \
   -e "s|USER|${PROMETHEUS_ROOT_USER}|g" \
   -e "s|PASSWORD_HASH|$(cat $PROMETHEUS_PASSWORD_HASH_FILE)|g" \
-  web-config.yaml.template > web-config.yaml
+  web-config.yaml.template > web-config.yml
 rm web-config.yaml.template
 
 echo "Starting prometheus..."
 prometheus-$PROMETHEUS_VERSION.$ARCH/prometheus \
         --web.listen-address="0.0.0.0:${SERVICE_PORT}" \
-        --web.config.file="/app/web-config.yaml" \
-        --config.file="/app/prometheus-${PROMETHEUS_VERSION}.${ARCH}/prometheus.yml" &
+        --web.config.file="/app/web-config.yml" \
+        --config.file="/app/prometheus.yml" &
 
 echo "Prometheus started successfully!"
-
-#TODO: Remove, for debug only
-tail -f /dev/null

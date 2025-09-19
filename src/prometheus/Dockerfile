@@ -50,9 +50,6 @@ RUN groupadd --gid 999 --system prometheus && \
     mkdir -p /home/prometheus && \
     chown -R prometheus:prometheus /home/prometheus
 
-# Copy configuration template
-COPY prometheus/web-config.yaml.template web-config.yaml.template
-
 # Mettre à jour les paquets et installer les dépendances
 RUN apt-get update && apt-get install -y \
 gcc \
@@ -78,6 +75,10 @@ rm -rf /var/lib/apt/lists/*
 RUN setcap -r /usr/bin/vault
 # Vérifier les versions installées
 RUN consul --version && vault --version
+
+# Copy configuration template
+COPY prometheus/web-config.yaml.template web-config.yaml.template
+COPY prometheus/prometheus.yml prometheus.yml
 
 # Copier les scripts et les fichiers de configuration
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
