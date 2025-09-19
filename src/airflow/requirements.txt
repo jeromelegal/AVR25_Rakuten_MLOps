@@ -1,12 +1,5 @@
-apache-airflow 
-apache-airflow-providers-cncf-kubernetes 
-apache-airflow-providers-mongo 
-apache-airflow-providers-docker 
-apache-airflow-providers-http 
-apache-airflow-providers-slack 
-requests 
-psycopg2-binary 
-asyncpg 
+apache-airflow
+psycopg2-binary
+asyncpg
 apache-airflow-providers-fab
-apache-airflow-providers-amazon
-graphviz
+flask-limiter==3.3.0
