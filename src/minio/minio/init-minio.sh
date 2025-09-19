@@ -54,5 +54,16 @@ do
         exit $STATUS
     fi
 done
+echo "Minio buckets OK!"
 
-echo "Minio bucket OK"
+# Setting up scrape metrics for Prometheus (see https://docs.min.io/community/minio-object-store/operations/monitoring/collect-minio-metrics-using-prometheus.html)
+echo "Setting up Prometheus metrics..."
+metrics=("" "node" "bucket" "resource")
+for metric in "${metrics[@]}"; do
+    result=$(mc admin prometheus generate "$ALIAS" "$metric")
+    echo "\tconfiguration for metric '$metric':\n$result"
+    token=$(echo "$result" | grep -Po '(?<=bearer_token:\s).*')
+    echo "Token for metric '$metric' is: $token. Storing token in vault..."
+    vault kv put secret/minio/prometheus/token_${metric} token="$token"
+done
+

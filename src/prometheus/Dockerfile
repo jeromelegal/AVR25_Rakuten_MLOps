@@ -25,7 +25,7 @@ ENV SERVICE_NAME=${SERVICE_NAME:-"prometheus"}
 ENV SERVICE_PORT=${SERVICE_PORT:-"9090"}
 ENV PROMETHEUS_PASSWORD_HASH_FILE="hashed_password.txt"
 ENV PROMETHEUS_ROOT_USER=${PROMETHEUS_ROOT_USER:-"prometheus-user"}
-# ENV PROMETHEUS_ROOT_PASSWORD=${PROMETHEUS_ROOT_PASSWORD:-"prometheus-password"}
+ENV PROMETHEUS_ROOT_PASSWORD=${PROMETHEUS_ROOT_PASSWORD:-"prometheus-password"}
 # TODO: If the version is changed, the checksum must also be modified in the init script
 ENV PROMETHEUS_VERSION=${PROMETHEUS_VERSION:-"3.5.0"}
 ENV PROMETHEUS_PEM_PATH=${PROMETHEUS_PEM_PATH:-"/etc/ssl/prometheus/prometheus.pem"}
@@ -38,6 +38,14 @@ ENV PROMETHEUS_PROMETHEUS_PEM_PATH=${PROMETHEUS_PROMETHEUS_PEM_PATH:-"/etc/ssl/p
 ENV PROMETHEUS_PROMETHEUS_CA_PATH=${PROMETHEUS_PROMETHEUS_CA_PATH:-"/etc/ssl/prometheus/prometheus_prometheus.ca"}
 ENV PROMETHEUS_PROMETHEUS_KEY_PATH=${PROMETHEUS_PROMETHEUS_KEY_PATH:-"/etc/ssl/prometheus/prometheus_prometheus.key"}
 ENV PROMETHEUS_PROMETHEUS_CERT_PATH=${PROMETHEUS_PROMETHEUS_CERT_PATH:-"/etc/ssl/prometheus/prometheus_prometheus.crt"}
+
+ENV MINIO_SERVICE_NAME=${MINIO_SERVICE_NAME:-"minio"}
+ENV MINIO_SERVICE_PORT=${MINIO_SERVICE_PORT:-"9010"}
+ENV MINIO_PROMETHEUS_PEM_PATH=${MINIO_PROMETHEUS_PEM_PATH:-"/etc/ssl/prometheus/minio_prometheus.pem"}
+ENV MINIO_PROMETHEUS_CA_PATH=${MINIO_PROMETHEUS_CA_PATH:-"/etc/ssl/prometheus/minio_prometheus.ca"}
+ENV MINIO_PROMETHEUS_KEY_PATH=${MINIO_PROMETHEUS_KEY_PATH:-"/etc/ssl/prometheus/minio_prometheus.key"}
+ENV MINIO_PROMETHEUS_CERT_PATH=${MINIO_PROMETHEUS_CERT_PATH:-"/etc/ssl/prometheus/minio_prometheus.crt"}
+
 ENV AUTHORIZATION=${AUTHORIZATION:-"enabled"}
 ENV VAULT_CERT_FILE=${VAULT_CERT_FILE:-"prometheus-cert.crt"}
 ENV VAULT_KEY_FILE=${VAULT_KEY_FILE:-"prometheus.key"}
@@ -79,8 +87,8 @@ RUN setcap -r /usr/bin/vault
 RUN consul --version && vault --version
 
 # Copy configuration template
-COPY prometheus/web-config.yaml.template web-config.yaml.template
-COPY prometheus/prometheus.yml prometheus.yml
+COPY prometheus/web-config.template.yml web-config.template.yml
+COPY prometheus/prometheus.template.yml prometheus.template.yml
 
 # Copier les scripts et les fichiers de configuration
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh

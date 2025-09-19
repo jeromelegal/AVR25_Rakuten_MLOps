@@ -1,0 +1,65 @@
+global:
+  scrape_interval: 15s # Set the scrape interval to every 15 seconds. Default is every 1 minute.
+  evaluation_interval: 15s # Evaluate rules every 15 seconds. The default is every 1 minute.
+  # scrape_timeout is set to the global default (10s).
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+          # - alertmanager:9093
+
+# Load rules once and periodically evaluate them according to the global 'evaluation_interval'.
+rule_files: []
+
+scrape_configs:
+  # The job name is added as a label `job=<job_name>` to any timeseries scraped from this config.
+  - job_name: "prometheus"
+    scheme: https
+    tls_config:
+      ca_file: PROMETHEUS_PROMETHEUS_CA_PATH
+      insecure_skip_verify: false  # false because we trust the CA
+    basic_auth:
+      username: PROMETHEUS_ROOT_USER
+      password: PROMETHEUS_ROOT_PASSWORD
+    static_configs:
+      - targets: ["SERVICE_NAME:SERVICE_PORT"]
+        labels:
+          app: "prometheus"  
+  - job_name: minio-job
+    bearer_token: MINIO_JOB_BEARER_TOKEN
+    metrics_path: /minio/v2/metrics/cluster
+    scheme: https
+    tls_config:
+      ca_file: MINIO_PROMETHEUS_CA_PATH
+      insecure_skip_verify: false  # false because we trust the CA
+    static_configs:
+    - targets: ['MINIO_SERVICE_NAME:MINIO_SERVICE_PORT']
+  - job_name: minio-job-node
+    bearer_token: MINIO_JOB_NODE_BEARER_TOKEN
+    metrics_path: /minio/v2/metrics/node
+    scheme: https
+    tls_config:
+      ca_file: MINIO_PROMETHEUS_CA_PATH
+      insecure_skip_verify: false  # false because we trust the CA
+    static_configs:
+    - targets: ['MINIO_SERVICE_NAME:MINIO_SERVICE_PORT']
+  - job_name: minio-job-bucket
+    bearer_token: MINIO_JOB_BUCKET_BEARER_TOKEN
+    metrics_path: /minio/v2/metrics/bucket
+    scheme: https
+    tls_config:
+      ca_file: MINIO_PROMETHEUS_CA_PATH
+      insecure_skip_verify: false  # false because we trust the CA
+    static_configs:
+    - targets: ['MINIO_SERVICE_NAME:MINIO_SERVICE_PORT']
+  - job_name: minio-job-resource
+    bearer_token: MINIO_JOB_RESOURCE_BEARER_TOKEN
+    metrics_path: /minio/v2/metrics/resource
+    scheme: https
+    tls_config:
+      ca_file: MINIO_PROMETHEUS_CA_PATH
+      insecure_skip_verify: false  # false because we trust the CA
+    static_configs:
+    - targets: ['MINIO_SERVICE_NAME:MINIO_SERVICE_PORT']
