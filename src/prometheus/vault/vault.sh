@@ -169,3 +169,24 @@ EOF
 cat <<EOF > $MINIO_PROMETHEUS_CA_PATH
 $(printf "%s" "$MINIO_PROMETHEUS_CA")
 EOF
+
+# Vérifier si le certificat et la clé Vault existent déjà pour Grafana
+if vault kv get -field=cert secret/prometheus/grafana/certs > /dev/null 2>&1 && vault kv get -field=key secret/prometheus/grafana/certs > /dev/null 2>&1; then
+  echo "Le certificat mTLS prometheus pour le service grafana existe déjà"
+else
+  # Générer le certificat et la clé
+  echo "Générer le certificat et la clé"
+  vault write -format=json pki_prometheus/issue/prometheus common_name="prometheus"   ttl="72h" > prometheus_grafana_cert.json
+
+  # Extraire le certificat et la clé privée
+  PROMETHEUS_GRAFANA_CA=$(jq -r '.data.ca_chain[0]' prometheus_grafana_cert.json)
+  PROMETHEUS_GRAFANA_CERT=$(jq -r '.data.certificate' prometheus_grafana_cert.json)
+  PROMETHEUS_GRAFANA_KEY=$(jq -r '.data.private_key' prometheus_grafana_cert.json)
+
+
+  # Enregistrer le certificat et la clé privée dans Vault
+  vault kv put secret/prometheus/grafana/certs cert="$PROMETHEUS_GRAFANA_CERT" key="$PROMETHEUS_GRAFANA_KEY" ca="$PROMETHEUS_GRAFANA_CA"
+
+  # Nettoyage des fichiers temporaires
+  rm -f prometheus_grafana_cert.json
+fi

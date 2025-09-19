@@ -25,7 +25,7 @@ services:
       VAULT_PASSWORD: vault
       CONSUL_SERVER_HOST: consul
       CONSUL_SERVER_PORT: 8501
-      SECURED_SERVICES: vault,consul,mongodb,api-mongodb,postgresql,api-postgresql,api-gateway,frontend,reverse-proxy,zookeeper,kafka,minio,api-minio,mlflow,model-downloader,api-text-processing,api-image-processing,api-processing,prometheus
+      SECURED_SERVICES: vault,consul,mongodb,api-mongodb,postgresql,api-postgresql,api-gateway,frontend,reverse-proxy,zookeeper,kafka,minio,api-minio,mlflow,model-downloader,api-text-processing,api-image-processing,api-processing,prometheus,grafana
   consul:
     expose_ports:
       - 8600/udp
@@ -320,4 +320,21 @@ services:
       VAULT_SERVICE_NAME: vault
       VAULT_USERNAME: prometheus
       VAULT_PASSWORD: prometheus
-  
+  grafana:
+    expose_ports:
+      - 3030
+      - 80
+      - 443
+    network-alias:
+      - grafana
+    health_check:
+      urls:
+        - url: https://grafana/health
+          expected_code: 200
+    env_vars:
+      SERVICE_NAME: grafana
+      SERVICE_PORT: 8030
+      VAULT_ADDR: https://vault:8200
+      VAULT_SERVICE_NAME: vault
+      VAULT_USERNAME: grafana
+      VAULT_PASSWORD: grafana
