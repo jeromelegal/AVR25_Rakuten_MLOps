@@ -75,7 +75,7 @@ chown minio:minio $MINIO_PEM_PATH
 chmod 400 $MINIO_PEM_PATH
 
 # Nettoyage des fichiers temporaires
-rm -f mongo_service.json
+rm -f minio_cert.json
 
 # Vérifier si le certificat et la clé Backend existent déjà
 if vault kv get -field=cert secret/minio/minio/certs > /dev/null 2>&1 && vault kv get -field=key secret/minio/minio/certs > /dev/null 2>&1; then
