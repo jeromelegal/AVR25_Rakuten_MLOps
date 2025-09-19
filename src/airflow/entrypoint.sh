@@ -55,16 +55,19 @@ airflow connections add 'minio_s3' \
 
 echo "EXEC AIRFLOW API server..."
 airflow api-server -p 8795 &
-
+sleep 10
 
 echo "EXEC AIRFLOW scheduler..."
-airflow scheduler &
+airflow scheduler -l DEBUG &
+sleep 10
 
 echo "EXEC AIRFLOW dag-processor..."
 airflow dag-processor &
+sleep 10
 
 echo "EXEC AIRFLOW triggerer..."
 airflow triggerer &
+wait
 tail -f /dev/null
 
 jobs

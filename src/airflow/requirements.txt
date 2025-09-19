@@ -9,3 +9,4 @@ psycopg2-binary
 asyncpg 
 apache-airflow-providers-fab
 apache-airflow-providers-amazon
+graphviz

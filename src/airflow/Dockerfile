@@ -11,7 +11,19 @@ RUN groupadd --gid 999 airflow && \
 ENV AIRFLOW_HOME=/opt/airflow
 ENV PATH="/opt/airflow_venv/bin:$PATH"
 ENV AIRFLOW__CORE__EXECUTOR=LocalExecutor
+#ENV AIRFLOW__CORE__PARALLELISM=8
+# Nombre de tâches parallèles autorisées
 ENV AIRFLOW__CORE__PARALLELISM=8
+ENV TZ=UTC
+
+# (Optionnel mais recommandé) Nombre de threads du scheduler
+ENV AIRFLOW__SCHEDULER__MAX_THREADS=8
+
+# (Optionnel) Nombre de DAGs que le scheduler peut traiter simultanément
+ENV AIRFLOW__SCHEDULER__MAX_DAGRUNS_TO_CREATE_PER_LOOP=16
+
+# (Optionnel) Nombre de tâches par DAG que le scheduler peut planifier à chaque boucle
+ENV AIRFLOW__SCHEDULER__MAX_TASKS_PER_DAG=16
 #ENV AIRFLOW__CORE__EXECUTOR=KubernetesExecutor
 ENV AIRFLOW__CORE__DAGS_FOLDER=/opt/airflow/dags
 ENV AIRFLOW__CORE__LOAD_EXAMPLES=False
