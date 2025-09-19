@@ -145,6 +145,13 @@ RUN apt-get update && apt-get install -y vault
 RUN setcap -r /usr/bin/vault
 RUN vault --version
 
+# Defining Minio related env. variables and certificates here to not mess with pip certificates
+ENV AIRFLOW_S3_ENDPOINT_URL=https://${MINIO_SERVICE_NAME}:${MINIO_SERVICE_PORT}
+ENV AWS_ACCESS_KEY_ID=${MINIO_AIRFLOW_USER}
+ENV AWS_SECRET_ACCESS_KEY=${MINIO_AIRFLOW_PASSWORD}
+ENV AWS_CA_BUNDLE=${MINIO_AIRFLOW_CA_PATH}
+ENV REQUESTS_CA_BUNDLE=${AIRFLOW_PEM_PATH}
+
 # Copie des DAGs et scripts
 COPY dags/ ${AIRFLOW__CORE__DAGS_FOLDER}
 

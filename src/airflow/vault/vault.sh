@@ -13,6 +13,8 @@ done
 # Se connecter à Vault et récupérer un token
 export VAULT_SKIP_VERIFY="1"
 
+mkdir -p $(dirname $MINIO_AIRFLOW_PEM_PATH) $(dirname $MINIO_AIRFLOW_CA_PATH)
+
 echo "Vault login..."
 echo $VAULT_USERNAME
 

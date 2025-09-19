@@ -29,20 +29,43 @@ echo "$POSTGRESQL_AIRFLOW_SCHEMA"
 echo "EXEC AIRFLOW db migrate..."
 airflow db migrate
 
-echo "EXEC AIRFLOW API server..."
-airflow api-server -p 8795 > api-server.log &
-
+echo "--- ---- AIRFLOW create user admin:admin ---- ---"
 [ ! -f /opt/airflow/simple_auth_manager_passwords.json.generated ] && echo '{"admin": "admin"}' > /opt/airflow/simple_auth_manager_passwords.json.generated
 
+echo " --- ---- AIRFLOW connection MINIO... ---- ---"
+# airflow connections add 'minio_s3' \
+#     --conn-type 'generic' \
+#     --conn-extra '{"host": "http://${MINIO_SERVICE_NAME}:${MINIO_SERVICE_PORT}", "aws_access_key_id": "${MINIO_AIRFLOW_USER}", "aws_secret_access_key": "${MINIO_AIRFLOW_PASSWORD}", "verify": "${MINIO_AIRFLOW_CA_PATH}"}'
+
+# if ! airflow connections get 'minio_s3' > /dev/null 2>&1; then
+#     airflow connections add 'minio_s3' \
+#         --conn-type 'generic' \
+#         --conn-extra '{"host": "http://${MINIO_SERVICE_NAME}:${MINIO_SERVICE_PORT}", "aws_access_key_id": "${MINIO_AIRFLOW_USER}", "aws_secret_access_key": "${MINIO_AIRFLOW_PASSWORD}", "verify": "${MINIO_AIRFLOW_CA_PATH}"}'
+# else
+#     echo "Connection minio_s3 already exists, skipping add."
+# fi
+
+airflow connections delete minio_s3
+airflow connections add 'minio_s3' \
+    --conn-type 'aws' \
+    --conn-extra '{"host": "http://${MINIO_SERVICE_NAME}:${MINIO_SERVICE_PORT}", 
+                    "aws_access_key_id": "${MINIO_AIRFLOW_USER}", 
+                    "aws_secret_access_key": "${MINIO_AIRFLOW_PASSWORD}", 
+                    "verify": "${MINIO_AIRFLOW_CA_PATH}"}'
+
+echo "EXEC AIRFLOW API server..."
+airflow api-server -p 8795 &
+
+
 echo "EXEC AIRFLOW scheduler..."
-airflow scheduler > scheduler.log & 
+airflow scheduler &
 
 echo "EXEC AIRFLOW dag-processor..."
-airflow dag-processor > dag-processor.log &
+airflow dag-processor &
 
 echo "EXEC AIRFLOW triggerer..."
-airflow triggerer > triggerer.log &
-tail -f /dev/null 
+airflow triggerer &
+tail -f /dev/null
 
 jobs
 
