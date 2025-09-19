@@ -58,8 +58,18 @@ sed \
 rm web-config.yaml.template
 
 echo "Starting prometheus..."
+echo "prometheus-$PROMETHEUS_VERSION.$ARCH/prometheus \
+        --web.listen-address=\"0.0.0.0:${SERVICE_PORT}\" \
+        --storage.tsdb.retention.time=$PROMETHEUS_RETENTION_TIME \
+        --storage.tsdb.retention.size=$PROMETHEUS_RETENTION_SIZE \
+        --web.config.file=\"/app/web-config.yml\" \
+        --config.file=\"/app/prometheus.yml\""
+    
+
 prometheus-$PROMETHEUS_VERSION.$ARCH/prometheus \
         --web.listen-address="0.0.0.0:${SERVICE_PORT}" \
+        --storage.tsdb.retention.time=$PROMETHEUS_RETENTION_TIME \
+        --storage.tsdb.retention.size=$PROMETHEUS_RETENTION_SIZE \
         --web.config.file="/app/web-config.yml" \
         --config.file="/app/prometheus.yml" &
 
