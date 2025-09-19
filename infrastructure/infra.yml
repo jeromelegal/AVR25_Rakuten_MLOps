@@ -2,6 +2,16 @@ version: "1.0"
 name: "infra-webapp"
 description: "Infrastructure pour une application web avec base de données"
 
+defaults:
+  vm:
+    cpu: 2
+    ram: 2048
+    disk_size: 20
+    user: "ubuntu"
+  network:
+    type: "nat"
+    subnet: "192.168.100.0/24"
+
 networks:
   - name: "app-net"
     description: "Réseau pour l'application"
@@ -15,76 +25,72 @@ networks:
       domain: "app.local"
       servers: ["8.8.8.8"]
 
+
 vms:
   - name: "frontend"
-    description: "Serveur frontend React"
-    cpu: 2
-    ram: 4096
-    disk_size: 20
-    iso: "ubuntu-24.04.1-live-server-amd64.iso"
-    networks:
-      - name: "app-net"
-        ip: "192.168.100.10"
     cloud_init:
-      hostname: backend
-      user: ubuntu
-      password: "ubuntu" 
-      ssh_keys: ["ssh-rsa AAAAB3NzaC1yc2E..."]
-      storage:
-        layout: lvm
-      packages: ["nginx", "nodejs", "npm"]
-      runcmd:
-        - "git clone https://github.com/mon-projet/frontend /var/www/frontend"
-        - "cd /var/www/frontend && npm install && npm run build"
-        - "ln -s /var/www/frontend/build /var/www/html"
-      write_files:
-        - path: "/etc/nginx/sites-available/default"
-          content: |
-            server {
-              listen 80;
-              server_name _;
-              root /var/www/html;
-              index index.html;
-            }
+      iso: "ubuntu-24.04.1-live-server-amd64.iso"
+      meta_data:
+        instance-id: frontend
+        local-hostname: frontend
+      ssh_keys:
+        - "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDBCp7UHEy9aOkk7N6NixYu+gxnyuUHEyjKKE3qk7YijR2dKZHWREsWVr/H6ibL50iZx8ubbTCyNCwhEnyX8J2DipJHtlfw0c2CYj1JW4DMnhQ7P6Cur0dMnPOhu3l1fg9WeEEAfKPm6D9OszWCg/A6Q6dDXDYv0T5WlUiEpnGvJsAlQqOJ64wx75LwwBXEqC089T5lZE50gisDXjkwNf9HFvEPLdUmxKG5s9ttcR8M5/BHJNB0kR+pGaY9QPG67CFchgSFpPtj+Kn/go4uDuv4TrpxWrcvOuLRK7w3ssEGREyVIOmhEJytKkOBnkgAPTadm0LY4UmnJQTH2n2ywkVm51WrgJbwsZ/6YonewGJxJLGsuQ/BSQ8VYrVZQ9Vu6q9mOJd1ORhRjjvtEpk1PpbAGmKESDEbElk19OY1W1WhREVrTjKlmn5sXjngYDQlkBuQfolIbx+7mqAsbIt6LU0UE886WIdyhXUY1ZoBpVNXlntS7WgR+kCcjL8jzxhUdtTCKFHjJhtQDUgEjkCez4lyVB7PRQRDX3Hp6qydL+wsC8LuuJfOb1CbkTFBqYZp1ZTYK1Thfy9USdYzQ3S+/wcUTlOCLzTtfPaY8oVhrBoPITcZsd+aut1QW+71L9h7eRwKYEK9O1NmQUDAagrfisPDjZahPD6aLwnAm5mmJICNiQ== Philippe-RM@github/131196788"
+      user_data:
+        #cloud-config
+        autoinstall:
+          version: 1
+          identity:
+            hostname: frontend
+            username: ubuntu
+            password: "$6$WcwfuUSllyjL2MM3$..."
+          ssh:
+            install-server: true
+            allow-pw: true
+            authorized-keys:
+              - "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDBCp7UHEy9aOkk7N6NixYu+gxnyuUHEyjKKE3qk7YijR2dKZHWREsWVr/H6ibL50iZx8ubbTCyNCwhEnyX8J2DipJHtlfw0c2CYj1JW4DMnhQ7P6Cur0dMnPOhu3l1fg9WeEEAfKPm6D9OszWCg/A6Q6dDXDYv0T5WlUiEpnGvJsAlQqOJ64wx75LwwBXEqC089T5lZE50gisDXjkwNf9HFvEPLdUmxKG5s9ttcR8M5/BHJNB0kR+pGaY9QPG67CFchgSFpPtj+Kn/go4uDuv4TrpxWrcvOuLRK7w3ssEGREyVIOmhEJytKkOBnkgAPTadm0LY4UmnJQTH2n2ywkVm51WrgJbwsZ/6YonewGJxJLGsuQ/BSQ8VYrVZQ9Vu6q9mOJd1ORhRjjvtEpk1PpbAGmKESDEbElk19OY1W1WhREVrTjKlmn5sXjngYDQlkBuQfolIbx+7mqAsbIt6LU0UE886WIdyhXUY1ZoBpVNXlntS7WgR+kCcjL8jzxhUdtTCKFHjJhtQDUgEjkCez4lyVB7PRQRDX3Hp6qydL+wsC8LuuJfOb1CbkTFBqYZp1ZTYK1Thfy9USdYzQ3S+/wcUTlOCLzTtfPaY8oVhrBoPITcZsd+aut1QW+71L9h7eRwKYEK9O1NmQUDAagrfisPDjZahPD6aLwnAm5mmJICNiQ== Philippe-RM@github/131196788"
+          storage:
+            layout:
+              name: lvm
+          runcmd:
+            - "systemctl enable --now ssh"
+      disks:
+        - name: system
+          path: "/var/lib/libvirt/images/frontend.qcow2"
+          size: 20
 
   - name: "backend"
-    description: "Serveur backend API"
-    cpu: 4
-    ram: 8192
-    disk_size: 20
-    iso: "ubuntu-24.04.1-live-server-amd64.iso"
-    networks:
-      - name: "app-net"
-        ip: "192.168.100.11"
     cloud_init:
-      user: ubuntu
-      password: "ubuntu"
-      storage:
-        layout: lvm
-      packages: ["postgresql-client", "python3-pip"]
-      runcmd:
-        - "pip3 install fastapi uvicorn"
-        - "git clone https://github.com/mon-projet/backend /opt/backend"
-        - "cd /opt/backend && pip3 install -r requirements.txt"
-      write_files:
-        - path: "/etc/systemd/system/backend.service"
-          content: |
-            [Unit]
-            Description=Backend API
-            After=network.target
-            [Service]
-            User=api
-            WorkingDirectory=/opt/backend
-            ExecStart=/usr/local/bin/uvicorn main:app --host 0.0.0.0 --port 8000
-            Restart=always
-            [Install]
-            WantedBy=multi-user.target
-        - path: "/opt/backend/config.py"
-          content: |
-            DB_HOST = "192.168.100.12"
-            DB_NAME = "appdb"
-            DB_USER = "api"
-            DB_PASSWORD = "dbpassword"
+      iso: "ubuntu-24.04.1-live-server-amd64.iso"
+      meta_data:
+        instance-id: backend
+        local-hostname: backend
+      ssh_keys:
+        - "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDBCp7UHEy9aOkk7N6NixYu+gxnyuUHEyjKKE3qk7YijR2dKZHWREsWVr/H6ibL50iZx8ubbTCyNCwhEnyX8J2DipJHtlfw0c2CYj1JW4DMnhQ7P6Cur0dMnPOhu3l1fg9WeEEAfKPm6D9OszWCg/A6Q6dDXDYv0T5WlUiEpnGvJsAlQqOJ64wx75LwwBXEqC089T5lZE50gisDXjkwNf9HFvEPLdUmxKG5s9ttcR8M5/BHJNB0kR+pGaY9QPG67CFchgSFpPtj+Kn/go4uDuv4TrpxWrcvOuLRK7w3ssEGREyVIOmhEJytKkOBnkgAPTadm0LY4UmnJQTH2n2ywkVm51WrgJbwsZ/6YonewGJxJLGsuQ/BSQ8VYrVZQ9Vu6q9mOJd1ORhRjjvtEpk1PpbAGmKESDEbElk19OY1W1WhREVrTjKlmn5sXjngYDQlkBuQfolIbx+7mqAsbIt6LU0UE886WIdyhXUY1ZoBpVNXlntS7WgR+kCcjL8jzxhUdtTCKFHjJhtQDUgEjkCez4lyVB7PRQRDX3Hp6qydL+wsC8LuuJfOb1CbkTFBqYZp1ZTYK1Thfy9USdYzQ3S+/wcUTlOCLzTtfPaY8oVhrBoPITcZsd+aut1QW+71L9h7eRwKYEK9O1NmQUDAagrfisPDjZahPD6aLwnAm5mmJICNiQ== Philippe-RM@github/131196788"
+      user_data:
+        #cloud-config
+        autoinstall:
+          version: 1
+          identity:
+            hostname: backend
+            username: ubuntu
+            password: "$6$WcwfuUSllyjL2MM3$..."
+          ssh:
+            install-server: true
+            allow-pw: true
+            authorized-keys:
+              - "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDBCp7UHEy9aOkk7N6NixYu+gxnyuUHEyjKKE3qk7YijR2dKZHWREsWVr/H6ibL50iZx8ubbTCyNCwhEnyX8J2DipJHtlfw0c2CYj1JW4DMnhQ7P6Cur0dMnPOhu3l1fg9WeEEAfKPm6D9OszWCg/A6Q6dDXDYv0T5WlUiEpnGvJsAlQqOJ64wx75LwwBXEqC089T5lZE50gisDXjkwNf9HFvEPLdUmxKG5s9ttcR8M5/BHJNB0kR+pGaY9QPG67CFchgSFpPtj+Kn/go4uDuv4TrpxWrcvOuLRK7w3ssEGREyVIOmhEJytKkOBnkgAPTadm0LY4UmnJQTH2n2ywkVm51WrgJbwsZ/6YonewGJxJLGsuQ/BSQ8VYrVZQ9Vu6q9mOJd1ORhRjjvtEpk1PpbAGmKESDEbElk19OY1W1WhREVrTjKlmn5sXjngYDQlkBuQfolIbx+7mqAsbIt6LU0UE886WIdyhXUY1ZoBpVNXlntS7WgR+kCcjL8jzxhUdtTCKFHjJhtQDUgEjkCez4lyVB7PRQRDX3Hp6qydL+wsC8LuuJfOb1CbkTFBqYZp1ZTYK1Thfy9USdYzQ3S+/wcUTlOCLzTtfPaY8oVhrBoPITcZsd+aut1QW+71L9h7eRwKYEK9O1NmQUDAagrfisPDjZahPD6aLwnAm5mmJICNiQ== Philippe-RM@github/131196788"
+          storage:
+            layout:
+              name: lvm
+          runcmd:
+            - "systemctl enable --now ssh"
+      disks:
+        - name: system
+          path: "/var/lib/libvirt/images/backend.qcow2"
+          size: 20
+
+
+
 
 firewall:
   rules:

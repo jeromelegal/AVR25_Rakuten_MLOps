@@ -73,20 +73,36 @@ class InfraDeployer:
         """Charge et valide le fichier YAML."""
         with open(self.yaml_file, 'r') as f:
             self.infra = yaml.safe_load(f)
+        self._apply_defaults()
         self.validate()
+
+    def _apply_defaults(self):
+        """Applique les valeurs par défaut et hache les mots de passe."""
+        for vm in self.infra['vms']:
+            # Appliquer les defaults pour cloud_init
+            if 'cloud_init' not in vm:
+                vm['cloud_init'] = {}
+
+            # Hacher le mot de passe s'il est en clair
+            if 'cloud_init' in vm and 'user_data' in vm['cloud_init'] and 'autoinstall' in vm['cloud_init']['user_data']:
+                identity = vm['cloud_init']['user_data']['autoinstall'].get('identity', {})
+                if 'password' in identity:
+                    plain_password = identity.pop('password')
+                    identity['password'] = password_hash(plain_password)
 
     def validate(self):
         """Valide le fichier YAML."""
         errors = []
         # Vérifier que les ISO existent
         for vm in self.infra['vms']:
-            iso_path = os.path.join(ISO_DIR, vm['iso'])
-            if not os.path.exists(iso_path):
-                errors.append(f"ISO introuvable: {iso_path}")
+            if 'cloud_init' in vm and 'iso' in vm['cloud_init']:
+                iso_path = os.path.join(ISO_DIR, vm['cloud_init']['iso'])
+                if not os.path.exists(iso_path):
+                    errors.append(f"ISO introuvable: {iso_path}")
         # Vérifier que les réseaux référencés existent
         network_names = {net['name'] for net in self.infra['networks']}
         for vm in self.infra['vms']:
-            for net in vm['networks']:
+            for net in vm.get('networks', []):
                 if net['name'] not in network_names:
                     errors.append(f"Réseau {net['name']} non défini (utilisé par {vm['name']})")
         if errors:
@@ -104,7 +120,7 @@ class InfraDeployer:
             if net.name() == name:
                 return net.isActive()
         return False
-    
+
     def vm_exists(self, name: str) -> bool:
         """Vérifie si une VM existe."""
         domains = self.conn.listAllDomains(0)  # 0 = liste toutes les VMs (actives et inactives)
@@ -147,40 +163,54 @@ class InfraDeployer:
             self.create_network(network)
             self.start_network(network['name'])
 
-    def create_vm(self, vm: Dict):
-        """Crée une VM (sans la démarrer)."""
+    def install_vm(self, vm: Dict):
+        """Installe une nouvelle VM avec virt-install et cloud-init."""
         if self.vm_exists(vm['name']):
             print(f"  ! VM {vm['name']} existe déjà, ignorée")
             return
-        # Créer le disque système
-        disk_path = os.path.join(VM_IMAGES_DIR, f"{vm['name']}.qcow2")
-        self._create_disk(disk_path, vm['disk_size'])
-        # Créer les disques supplémentaires
-        additional_disks = []
-        for i, volume in enumerate(vm.get('volumes', [])):
-            vol_path = os.path.join(VM_IMAGES_DIR, f"{vm['name']}-{volume['name']}.qcow2")
-            self._create_disk(vol_path, volume['size'])
-            additional_disks.append({'path': vol_path, 'target': f"vdb{i+1}"})
+
+        # Créer les disques
+        for disk in vm['cloud_init'].get('disks', [{'name': 'system', 'path': f"{VM_IMAGES_DIR}/{vm['name']}.qcow2", 'size': vm.get('disk_size', 10)}]):
+            self._create_disk(disk['path'], disk.get('size', vm.get('disk_size', 10)))
+
         # Générer l'ISO cloud-init
-        cloud_init_iso = None
-        if 'cloud_init' in vm:
-            cloud_init_iso = self._create_cloud_init_iso(vm)
-        # Générer le XML
-        template = env.get_template('vm.xml.j2')
-        vm_xml = template.render(
-            vm=vm,
-            disk_path=disk_path,
-            iso_path=os.path.join(ISO_DIR, vm['iso']),
-            cloud_init_iso=cloud_init_iso,
-            additional_disks=additional_disks,
-            netmask=netmask
-        )
-        try:
-            self.conn.defineXML(vm_xml)
-            print(f"  ✓ VM {vm['name']} créée")
-        except libvirt.libvirtError as e:
-            print(f"  ✗ Erreur lors de la création de la VM {vm['name']}: {e}")
-            raise
+        cloud_init_iso = self._create_cloud_init_iso(vm)
+
+        # Commande virt-install
+        cmd = [
+            "virt-install",
+            "--name", vm['name'],
+            "--ram", str(vm.get('ram', 3072)),
+            "--vcpus", str(vm.get('cpu', 2)),
+            "--cpu", "qemu64",
+            "--disk", f"path={vm['cloud_init']['disks'][0]['path']},size={vm.get('disk_size', 10)},bus=virtio",
+            "--location", os.path.join(ISO_DIR, vm['cloud_init']['iso']),
+            "--extra-args", "console=ttyS0 autoinstall ds=nocloud-net",
+            "--console", "pty,target_type=serial",
+            "--noautoconsole"
+        ]
+
+        # Ajouter l'ISO cloud-init
+        cmd.extend(["--disk", f"path={cloud_init_iso},device=cdrom"])
+
+        # Exécuter la commande
+        subprocess.run(cmd, check=True)
+        print(f"  ✓ VM {vm['name']} installée avec autoinstall")
+
+    def create_vm(self, vm: Dict):
+        """Crée ou configure une VM."""
+        if not self.vm_exists(vm['name']):
+            self.install_vm(vm)
+        else:
+            # Créer le XML simplifié pour une VM existante
+            template = env.get_template('vm.xml.j2')
+            vm_xml = template.render(vm=vm)
+            try:
+                self.conn.defineXML(vm_xml)
+                print(f"  ✓ VM {vm['name']} configurée")
+            except libvirt.libvirtError as e:
+                print(f"  ✗ Erreur lors de la configuration de la VM {vm['name']}: {e}")
+                raise
 
     def start_vm(self, name: str):
         """Démarre une VM."""
@@ -211,16 +241,16 @@ class InfraDeployer:
         print(f"  ✓ Disque {path} créé ({size_gb} Go)")
 
     def _create_cloud_init_iso(self, vm: Dict) -> str:
-        """Génère une ISO cloud-init à partir des templates Jinja2."""
+        """Génère une ISO cloud-init avec un format valide pour autoinstall."""
         iso_path = os.path.join(CLOUD_INIT_ISO_DIR, f"{vm['name']}-cloudinit.iso")
 
-        # Rendre les templates meta-data et user-data
-        meta_data = env.get_template('meta-data.j2').render(vm=vm)
-        user_data = env.get_template('user-data.j2').render(vm=vm)
-
-        # Écrire les fichiers temporaires
+        # Écrire meta-data
+        meta_data = "\n".join(f"{k}: {v}" for k, v in vm['cloud_init'].get('meta_data', {}).items())
         with open("/tmp/meta-data", "w") as f:
             f.write(meta_data)
+
+        # Utiliser directement user_data du YAML (déjà bien formaté)
+        user_data = "#cloud-config\n" + yaml.dump(vm['cloud_init']['user_data'], default_flow_style=False, sort_keys=False)
         with open("/tmp/user-data", "w") as f:
             f.write(user_data)
 
@@ -231,10 +261,6 @@ class InfraDeployer:
             '-volid', 'cidata', '-joliet', '-rock',
             '/tmp/meta-data', '/tmp/user-data'
         ], check=True)
-
-        # Nettoyer les fichiers temporaires
-        os.remove("/tmp/meta-data")
-        os.remove("/tmp/user-data")
 
         print(f"  ✓ ISO cloud-init générée: {iso_path}")
         return iso_path
@@ -260,7 +286,6 @@ class InfraDeployer:
     def _clean_vm(self, vm: Dict):
         """Supprime une VM et ses ressources."""
         print(f"Suppression de la VM {vm['name']}...")
-
         # Vérifier si la VM existe
         if not self.vm_exists(vm['name']):
             print(f"  ! VM {vm['name']} non trouvée")
@@ -279,17 +304,10 @@ class InfraDeployer:
         print(f"  ✓ VM {vm['name']} supprimée")
 
         # Supprimer les disques
-        disk_path = os.path.join(VM_IMAGES_DIR, f"{vm['name']}.qcow2")
-        if os.path.exists(disk_path):
-            os.remove(disk_path)
-            print(f"  ✓ Disque {disk_path} supprimé")
-
-        # Supprimer les disques supplémentaires
-        for volume in vm.get('volumes', []):
-            vol_path = os.path.join(VM_IMAGES_DIR, f"{vm['name']}-{volume['name']}.qcow2")
-            if os.path.exists(vol_path):
-                os.remove(vol_path)
-                print(f"  ✓ Disque {vol_path} supprimé")
+        for disk in vm['cloud_init'].get('disks', [{'name': 'system', 'path': f"{VM_IMAGES_DIR}/{vm['name']}.qcow2"}]):
+            if os.path.exists(disk['path']):
+                os.remove(disk['path'])
+                print(f"  ✓ Disque {disk['path']} supprimé")
 
         # Supprimer l'ISO cloud-init
         cloud_init_iso = os.path.join(CLOUD_INIT_ISO_DIR, f"{vm['name']}-cloudinit.iso")
@@ -297,11 +315,9 @@ class InfraDeployer:
             os.remove(cloud_init_iso)
             print(f"  ✓ ISO cloud-init {cloud_init_iso} supprimée")
 
-
     def _clean_network(self, network: Dict):
         """Supprime un réseau."""
         print(f"Suppression du réseau {network['name']}...")
-
         # Vérifier si le réseau existe
         if not any(net.name() == network['name'] for net in self.conn.listAllNetworks()):
             print(f"  ! Réseau {network['name']} non trouvé")
@@ -319,12 +335,9 @@ class InfraDeployer:
         net.undefine()
         print(f"  ✓ Réseau {network['name']} supprimé")
 
-
     def deploy(self):
         """Déploie l'infrastructure complète."""
         print(f"Déploiement de l'infrastructure {self.infra['name']}...")
-        # self.check_prerequisites()
-        # self.load_infra()
         self.deploy_networks()
         self.deploy_vms()
         self.deploy_firewall()
