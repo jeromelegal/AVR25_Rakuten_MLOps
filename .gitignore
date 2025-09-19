@@ -107,3 +107,4 @@ test_result/
 TODO.md
 
 infrastructure/projet/frontend/hyperviseur/node_modules/*
+infrastructure/isos/*.iso
