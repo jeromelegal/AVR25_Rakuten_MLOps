@@ -1,0 +1,11 @@
+tls_server_config:
+  cert_file: CERT_FILE
+  key_file: KEY_FILE
+  client_auth_type: NoClientCert
+  # TODO: To enable full mTLS, the auth type should be as defined below but we did
+  # not activate it since doing make the web GUI not accessible
+  # client_auth_type: RequireAndVerifyClientCert
+  # client_ca_file: CA_FILE
+
+basic_auth_users:
+  USER: PASSWORD_HASH
