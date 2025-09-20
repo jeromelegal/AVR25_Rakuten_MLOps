@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: 'rakuten'
+    orgId: 1
+    folder: 'AVR25 MLE Rakuten'
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: ${GRAFANA_PROVISIONING_DIR}/dashboards
