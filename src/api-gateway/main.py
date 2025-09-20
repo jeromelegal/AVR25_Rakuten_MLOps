@@ -5,6 +5,7 @@ from api.middlewares.logging import LoggingMiddleware
 from api.routes.user.login import router as login_router
 from api.routes.user.signup import router as signup_router
 from api.routes.user.delete import router as delete_router
+from api.routes.ad.create import router as create_router
 from config.settings import Settings
 import logging
 
@@ -36,6 +37,7 @@ def create_app(settings: Settings):
     app.include_router(login_router, prefix=settings.PROTECTED_ENDPOINT_URL, tags=["login"])
     app.include_router(signup_router, prefix=settings.PROTECTED_ENDPOINT_URL, tags=["signup"])
     app.include_router(delete_router, prefix=settings.PROTECTED_ENDPOINT_URL, tags=["delete"])
+    app.include_router(create_router, prefix=settings.PROTECTED_ENDPOINT_URL, tags=["create"])
 
     # Route racine
     @app.get("/")

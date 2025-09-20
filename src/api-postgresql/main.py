@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api import hello as hello_router, auth as auth_router
 from api.postgresql.entity import user, role, ad, category, image
-from api.postgresql.relation import roles_users, ad_cats, ad_images, user_ads
+from api.postgresql.relation import roles_users, ads_cats, ads_images, users_ads
 from middleware.auth import create_auth_middleware
 from middleware.logging import create_logging_middleware
 from config.settings import Settings
@@ -35,9 +35,9 @@ def create_app(settings: Settings):
     app.include_router(ad.router)
     app.include_router(category.router)
     app.include_router(image.router)
-    app.include_router(ad_cats.router)
-    app.include_router(ad_images.router)
-    app.include_router(user_ads.router)
+    app.include_router(ads_cats.router)
+    app.include_router(ads_images.router)
+    app.include_router(users_ads.router)
 
     return app
 

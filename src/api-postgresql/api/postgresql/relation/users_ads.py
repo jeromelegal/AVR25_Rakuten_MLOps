@@ -17,7 +17,7 @@ class UserAdResponse(BaseModel):
     user_id: int
     ad_id: int
 
-@router.post("/api/internal/postgresql/relation/user_ad", response_model=UserAdResponse)
+@router.post("/api/internal/postgresql/relation/users_ads", response_model=UserAdResponse)
 async def create_user_ad(request: Request, relation: UserAdRelation, current_user: dict = Depends(get_current_user)):
     settings: Settings = request.app.state.settings
     # TODO SETUP ROLE
@@ -26,9 +26,9 @@ async def create_user_ad(request: Request, relation: UserAdRelation, current_use
     relation_dict = relation.model_dump()
     async with get_db_client(settings) as conn:
         try:
-            # Insertion dans la table user_ads
+            # Insertion dans la table users_ads
             await conn.execute(
-                "INSERT INTO user_ads (user_id, ad_id) VALUES ($1, $2) ON CONFLICT (user_id, ad_id) DO NOTHING RETURNING user_id, ad_id",
+                "INSERT INTO users_ads (user_id, ad_id) VALUES ($1, $2) ON CONFLICT (user_id, ad_id) DO NOTHING RETURNING user_id, ad_id",
                 relation_dict["user_id"],
                 relation_dict["ad_id"]
             )
@@ -36,7 +36,7 @@ async def create_user_ad(request: Request, relation: UserAdRelation, current_use
         except asyncpg.UniqueViolationError:
             raise HTTPException(status_code=400, detail="User-Ad relation already exists")
 
-@router.get("/api/internal/postgresql/relation/user_ad", response_model=List[UserAdResponse])
+@router.get("/api/internal/postgresql/relation/users_ads", response_model=List[UserAdResponse])
 async def get_user_ad(user_id: int=None, ad_id: int=None, current_user: dict = Depends(get_current_user), request: Request = None):
     settings: Settings = request.app.state.settings
     # TODO SETUP ROLE
@@ -45,7 +45,7 @@ async def get_user_ad(user_id: int=None, ad_id: int=None, current_user: dict = D
     async with get_db_client(settings) as conn:
         if user_id is not None and ad_id is not None:
             relation = await conn.fetchrow(
-                "SELECT user_id, ad_id FROM user_ads WHERE user_id = $1 AND ad_id = $2",
+                "SELECT user_id, ad_id FROM users_ads WHERE user_id = $1 AND ad_id = $2",
                 user_id, ad_id
             )
             if relation:
@@ -54,7 +54,7 @@ async def get_user_ad(user_id: int=None, ad_id: int=None, current_user: dict = D
                 raise HTTPException(status_code=404, detail="User-Ad relation not found")
         else:
             # Récupérer toutes les relations pour un utilisateur ou une annonce spécifique, ou toutes
-            query = "SELECT user_id, ad_id FROM user_ads"
+            query = "SELECT user_id, ad_id FROM users_ads"
             params = []
             if user_id is not None:
                 query += " WHERE user_id = $1"
@@ -66,7 +66,7 @@ async def get_user_ad(user_id: int=None, ad_id: int=None, current_user: dict = D
             relations = await conn.fetch(query, *params)
             return [UserAdResponse(**relation) for relation in relations]
 
-@router.delete("/api/internal/postgresql/relation/user_ad", response_model=Dict)
+@router.delete("/api/internal/postgresql/relation/users_ads", response_model=Dict)
 async def delete_user_ad(user_id: int, ad_id: int, current_user: dict = Depends(get_current_user), request: Request = None):
     settings: Settings = request.app.state.settings
     # TODO SETUP ROLE
@@ -74,7 +74,7 @@ async def delete_user_ad(user_id: int, ad_id: int, current_user: dict = Depends(
     #     raise HTTPException(status_code=403, detail="Not enough permissions")
     async with get_db_client(settings) as conn:
         result = await conn.execute(
-            "DELETE FROM user_ads WHERE user_id = $1 AND ad_id = $2 RETURNING user_id, ad_id",
+            "DELETE FROM users_ads WHERE user_id = $1 AND ad_id = $2 RETURNING user_id, ad_id",
             user_id, ad_id
         )
         if result:

@@ -1,6 +1,6 @@
 import pytest
 from fastapi.testclient import TestClient
-from api.postgresql.relation.ad_images import router as ad_image_router
+from api.postgresql.relation.ads_images import router as ads_images_router
 from main import create_app
 from config.db import get_db_client
 from api.auth import hash_password, create_internal_api_access_token
@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 @pytest.fixture(scope="function")
 def test_app():
     app = create_app(test_settings)  # Passez test_settings à create_app
-    app.include_router(ad_image_router)
+    app.include_router(ads_images_router)
     yield TestClient(app)
 
 def print_response_details(response):
@@ -56,27 +56,27 @@ async def test_flow_ad_image(test_app):
             "ad_id": ad_id,
             "image_id": image_id
         }
-        response = test_app.post("/api/internal/postgresql/relation/ad_image", json=new_ad_image, headers=headers)
+        response = test_app.post("/api/internal/postgresql/relation/ads_images", json=new_ad_image, headers=headers)
         print_response_details(response)
         assert response.status_code == 200
         assert response.json()["ad_id"] == new_ad_image["ad_id"]
         assert response.json()["image_id"] == new_ad_image["image_id"]
 
         # Test get ad_image relation
-        response = test_app.get(f"/api/internal/postgresql/relation/ad_image?image_id={image_id}&ad_id={ad_id}", headers=headers)
+        response = test_app.get(f"/api/internal/postgresql/relation/ads_images?image_id={image_id}&ad_id={ad_id}", headers=headers)
         print_response_details(response)
         assert response.status_code == 200
         assert response.json()[0]["image_id"] == image_id
         assert response.json()[0]["ad_id"] == ad_id
 
         # Test delete ad_image relation
-        response = test_app.delete(f"/api/internal/postgresql/relation/ad_image?image_id={image_id}&ad_id={ad_id}", headers=headers)
+        response = test_app.delete(f"/api/internal/postgresql/relation/ads_images?image_id={image_id}&ad_id={ad_id}", headers=headers)
         print_response_details(response)
         assert response.status_code == 200
         assert response.json()["message"] == "Ad-Image relation deleted successfully"
 
         # Cleanup
-        await db.execute("DELETE FROM ad_images WHERE image_id = $1 AND ad_id = $2", image_id, ad_id)
+        await db.execute("DELETE FROM ads_images WHERE image_id = $1 AND ad_id = $2", image_id, ad_id)
         await db.execute("DELETE FROM ads WHERE id = $1", ad_id)
         await db.execute("DELETE FROM images WHERE id = $1", image_id)
         await db.execute("DELETE FROM users WHERE id = $1", user_id)

@@ -5,7 +5,6 @@ from typing import Optional, Dict, cast
 from config.settings import Settings
 from api.auth.clients.manager import ClientManager, create_client_manager
 from api.auth.token.manager import TokenManager, create_token_manager
-import base64
 
 DEFAULT_BUCKET = "raw-images"
 
@@ -38,7 +37,7 @@ def get_user_data_from_token(
     logger.info("Extracting user data from token...")
     return token_manager.get_user_data_from_token(authorization)
 
-def insert_psql_table(data, table, client, token, relation=False):
+def insert_psql(data, table, client, token, relation=False):
     """ Insert data in PostgreSQL """
     try:
         # Insert in '{table}' on PostgreSQL
@@ -57,40 +56,6 @@ def insert_psql_table(data, table, client, token, relation=False):
         )
     return response
 
-def insert_entities(ad_data, cat_data, image_data, postgresql_client, postgresql_token):
-    # Insert in 'ads' on PostgreSQL
-    ad_response = insert_psql_table(ad_data, "ad", postgresql_client, postgresql_token)
-    ad_id = ad_response["id"]
-    # Insert in 'categories' on PostgreSQL
-    cat_response = insert_psql_table(cat_data, "category", postgresql_client, postgresql_token)
-    cat_id = cat_response["id"]
-    # Insert in 'image' on PostgreSQL
-    image_response = insert_psql_table(image_data, "image", postgresql_client, postgresql_token)
-    image_id = image_response["id"]
-    return ad_id, cat_id, image_id 
-
-def insert_relations(ad_cat, user_ad, ad_image, postgresql_client, postgresql_token):
-    # Insert 'ad_cats' relation in PostgreSQL
-    insert_psql_table(ad_cat, "ads_cats", postgresql_client, postgresql_token, relation=True)
-    # Insert 'user_ads' relation in PostgreSQL
-    insert_psql_table(user_ad, "users_ads", postgresql_client, postgresql_token, relation=True)
-    # Insert 'ad_image' relation in PostgreSQL
-    insert_psql_table(ad_image, "ads_images", postgresql_client, postgresql_token, relation=True)
-
-def insert_image_minio(payload, minio_client):
-    try:
-        logger.debug(f"Push image to bucket")
-        response = minio_client.create_entity(token=None, object="image", params={"bucket": DEFAULT_BUCKET}, payload=payload)
-        logger.debug(f"Minio response: {response}")
-    except Exception as e:
-        logger.error(f"Error in api-minio: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error in copy image on Minio: {str(e)}"
-        )
-    return response
-
-
 @router.post("/create_ad")
 async def create_ad(
     request: Request,
@@ -101,27 +66,21 @@ async def create_ad(
     # Retrieve 'form' from FRONT
     form = await request.form()
     try:
-        ad_data = {
-            "designation": form.get("designation"),
-            "description": form.get("description")
-        }
-        cat_data = {
-            "code": form.get("category_code"),
-            "label": form.get("category_label")
-        }
+        designation = form.get("designation")
+        description = form.get("description")
+        category_code = form.get("category_code")
+        category_label = form.get("category_label")
         file = cast(UploadFile, form["file"])
-        image_data = {
-            "image_name": file.filename,
-            "bucket_name": DEFAULT_BUCKET
-        }
- 
+        image_name = file.filename
+        # Transform image in bytes
+        image_bytes = await file.read()
+
     except (KeyError, ValueError) as e:
         logger.error(f"Invalid Form : {str(e)}")
         raise HTTPException(status_code=422, detail=f"Invalid Form: {e}")
         
-    postgresql_uid = user_data.get('uids', {}).get('postgresql')
-
-    if not postgresql_uid:
+    user_id = user_data.get('user_id')
+    if not user_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="User ID not found in token data")
     
@@ -129,30 +88,64 @@ async def create_ad(
     postgresql_client = client_manager.get_client("postgresql")
 
     ### Insert entities ###
-    ad_id, cat_id, image_id = insert_entities(ad_data, cat_data, image_data, postgresql_client, postgresql_token)
+    # Insert in 'ads' on PostgreSQL
+    ad_data = {
+            "designation": designation,
+            "description": description
+        }
+    ad_response = insert_psql(ad_data, "ad", postgresql_client, postgresql_token)
+    ad_id = ad_response["id"]
+    
+    # Insert in 'categories' on PostgreSQL
+    cat_data = {
+            "code": category_code,
+            "label": category_label
+        }
+    cat_response = insert_psql(cat_data, "category", postgresql_client, postgresql_token)
+    cat_id = cat_response["id"]
+
+    # Insert in 'image' on PostgreSQL
+    image_data = {
+            "image_name": image_name,
+            "bucket_name": DEFAULT_BUCKET
+        }
+    image_response = insert_psql(image_data, "image", postgresql_client, postgresql_token)
+    image_id = image_response["id"]
 
     ### Insert relations ###
+    # Insert 'ad_cats' relation in PostgreSQL
     ad_cat = {
         "ad_id": ad_id,
         "cat_id": cat_id
     }
+    insert_psql(ad_cat, "ad_cats", postgresql_client, postgresql_token, relation=True)
+
+    # Insert 'user_ads' relation in PostgreSQL
     user_ad = {
-        "user_id": postgresql_uid,
+        "user_id": user_id,
         "ad_id": ad_id
     }
+    insert_psql(user_ad, "user_ads", postgresql_client, postgresql_token, relation=True)
+
+    # Insert 'ad_image' relation in PostgreSQL
     ad_image = {
         "ad_id": ad_id,
         "image_id": image_id
     }
-    insert_relations(ad_cat, user_ad, ad_image, postgresql_client, postgresql_token)
+    insert_psql(ad_image, "ad_images", postgresql_client, postgresql_token, relation=True)
 
     ### Minio ###
+    minio_token = user_data.get('tokens', {}).get('minio') 
     minio_client = client_manager.get_client("minio")
-    # Transform image in bytes
-    image_bytes = await file.read()
-    payload = {
-        "username": postgresql_uid,
-        "content": base64.b64encode(image_bytes).decode("ascii")
-    }
     # Copy image in bucket
-    minio_response = insert_image_minio(payload, minio_client)
+    try:
+        logger.debug(f"Push image to bucket")
+        response = minio_client.create_entity(token=minio_token, object=DEFAULT_BUCKET, entity_data=image_bytes)
+        logger.debug(f"Minio response: {response}")
+        
+    except Exception as e:
+        logger.error(f"Error in api-minio: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error in copy image on Minio: {str(e)}"
+        )

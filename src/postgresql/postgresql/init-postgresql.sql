@@ -62,21 +62,21 @@ CREATE TABLE images (
 );
 
 -- Créer une table de relation users_ads
-CREATE TABLE user_ads (
+CREATE TABLE users_ads (
     user_id INTEGER REFERENCES users(id),
     ad_id INTEGER REFERENCES ads(id),
     PRIMARY KEY (user_id, ad_id)
 );
 
 -- Créer une table de relation ad_cats
-CREATE TABLE ad_cats (
+CREATE TABLE ads_cats (
     ad_id INTEGER REFERENCES ads(id),
     cat_id INTEGER REFERENCES categories(id),
     PRIMARY KEY (ad_id, cat_id)
 );
 
 -- Créer une table de relation ad_images
-CREATE TABLE ad_images (
+CREATE TABLE ads_images (
     ad_id INTEGER REFERENCES ads(id),
     image_id INTEGER REFERENCES images(id),
     PRIMARY KEY (ad_id, image_id)

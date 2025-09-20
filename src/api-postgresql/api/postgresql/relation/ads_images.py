@@ -17,7 +17,7 @@ class AdImageResponse(BaseModel):
     ad_id: int
     image_id: int
 
-@router.post("/api/internal/postgresql/relation/ad_image", response_model=AdImageResponse)
+@router.post("/api/internal/postgresql/relation/ads_images", response_model=AdImageResponse)
 async def create_ad_image(request: Request, relation: AdImageRelation, current_user: dict = Depends(get_current_user)):
     settings: Settings = request.app.state.settings
     # TODO SETUP ROLE
@@ -26,9 +26,9 @@ async def create_ad_image(request: Request, relation: AdImageRelation, current_u
     relation_dict = relation.model_dump()
     async with get_db_client(settings) as conn:
         try:
-            # Insertion dans la table ad_images
+            # Insertion dans la table ads_images
             await conn.execute(
-                "INSERT INTO ad_images (ad_id, image_id) VALUES ($1, $2) ON CONFLICT (ad_id, image_id) DO NOTHING RETURNING ad_id, image_id",
+                "INSERT INTO ads_images (ad_id, image_id) VALUES ($1, $2) ON CONFLICT (ad_id, image_id) DO NOTHING RETURNING ad_id, image_id",
                 relation_dict["ad_id"],
                 relation_dict["image_id"]
             )
@@ -37,7 +37,7 @@ async def create_ad_image(request: Request, relation: AdImageRelation, current_u
             raise HTTPException(status_code=400, detail="Ad-Image relation already exists")
 
 
-@router.get("/api/internal/postgresql/relation/ad_image", response_model=List[AdImageResponse])
+@router.get("/api/internal/postgresql/relation/ads_images", response_model=List[AdImageResponse])
 async def get_ad_image(ad_id: int=None, image_id: int=None, current_user: dict = Depends(get_current_user), request: Request = None):
     settings: Settings = request.app.state.settings
     # TODO SETUP ROLE
@@ -46,7 +46,7 @@ async def get_ad_image(ad_id: int=None, image_id: int=None, current_user: dict =
     async with get_db_client(settings) as conn:
         if ad_id is not None and image_id is not None:
             relation = await conn.fetchrow(
-                "SELECT ad_id, image_id FROM ad_images WHERE ad_id = $1 AND image_id = $2",
+                "SELECT ad_id, image_id FROM ads_images WHERE ad_id = $1 AND image_id = $2",
                 ad_id, image_id
             )
             if relation:
@@ -55,7 +55,7 @@ async def get_ad_image(ad_id: int=None, image_id: int=None, current_user: dict =
                 raise HTTPException(status_code=404, detail="Ad-Image relation not found")
         else:
             # Récupérer toutes les relations pour un utilisateur ou une annonce spécifique, ou toutes
-            query = "SELECT ad_id, image_id FROM ad_images"
+            query = "SELECT ad_id, image_id FROM ads_images"
             params = []
             if ad_id is not None:
                 query += " WHERE user_id = $1"
@@ -67,7 +67,7 @@ async def get_ad_image(ad_id: int=None, image_id: int=None, current_user: dict =
             relations = await conn.fetch(query, *params)
             return [AdImageResponse(**relation) for relation in relations]
 
-@router.delete("/api/internal/postgresql/relation/ad_image", response_model=Dict)
+@router.delete("/api/internal/postgresql/relation/ads_images", response_model=Dict)
 async def delete_ad_image(ad_id: int, image_id: int, current_user: dict = Depends(get_current_user), request: Request = None):
     settings: Settings = request.app.state.settings
     # TODO SETUP ROLE
@@ -75,7 +75,7 @@ async def delete_ad_image(ad_id: int, image_id: int, current_user: dict = Depend
     #     raise HTTPException(status_code=403, detail="Not enough permissions")
     async with get_db_client(settings) as conn:
         result = await conn.execute(
-            "DELETE FROM ad_images WHERE ad_id = $1 AND image_id = $2 RETURNING ad_id, image_id",
+            "DELETE FROM ads_images WHERE ad_id = $1 AND image_id = $2 RETURNING ad_id, image_id",
             ad_id, image_id
         )
         if result:

@@ -6,7 +6,6 @@ from config.settings import Settings
 from api.auth import get_current_user
 import asyncpg
 
-
 router = APIRouter()
 
 class AdCatRelation(BaseModel):
@@ -17,7 +16,7 @@ class AdCatResponse(BaseModel):
     ad_id: int
     cat_id: int
 
-@router.post("/api/internal/postgresql/relation/ad_cat", response_model=AdCatResponse)
+@router.post("/api/internal/postgresql/relation/ads_cats", response_model=AdCatResponse)
 async def create_ad_cat(request: Request, relation: AdCatRelation, current_user: dict = Depends(get_current_user)):
     settings: Settings = request.app.state.settings
     # TODO SETUP ROLE
@@ -26,9 +25,9 @@ async def create_ad_cat(request: Request, relation: AdCatRelation, current_user:
     relation_dict = relation.model_dump()
     async with get_db_client(settings) as conn:
         try:
-            # Insertion dans la table ad_cats
-            await conn.execute(
-                "INSERT INTO ad_cats (ad_id, cat_id) VALUES ($1, $2) ON CONFLICT (ad_id, cat_id) DO NOTHING RETURNING ad_id, cat_id",
+            # Insertion dans la table ads_cats
+            await conn.fetchval(
+                "INSERT INTO ads_cats (ad_id, cat_id) VALUES ($1, $2) ON CONFLICT (ad_id, cat_id) DO NOTHING RETURNING ad_id, cat_id",
                 relation_dict["ad_id"],
                 relation_dict["cat_id"]
             )
@@ -37,7 +36,7 @@ async def create_ad_cat(request: Request, relation: AdCatRelation, current_user:
             raise HTTPException(status_code=400, detail="Ad-Cat relation already exists")
 
 
-@router.get("/api/internal/postgresql/relation/ad_cat", response_model=List[AdCatResponse])
+@router.get("/api/internal/postgresql/relation/ads_cats", response_model=List[AdCatResponse])
 async def get_ad_cat(ad_id: int=None, cat_id: int=None, current_user: dict = Depends(get_current_user), request: Request = None):
     settings: Settings = request.app.state.settings
     # TODO SETUP ROLE
@@ -46,7 +45,7 @@ async def get_ad_cat(ad_id: int=None, cat_id: int=None, current_user: dict = Dep
     async with get_db_client(settings) as conn:
         if ad_id is not None and cat_id is not None:
             relation = await conn.fetchrow(
-                "SELECT ad_id, cat_id FROM ad_cats WHERE ad_id = $1 AND cat_id = $2",
+                "SELECT ad_id, cat_id FROM ads_cats WHERE ad_id = $1 AND cat_id = $2",
                 ad_id, cat_id
             )
             if relation:
@@ -55,7 +54,7 @@ async def get_ad_cat(ad_id: int=None, cat_id: int=None, current_user: dict = Dep
                 raise HTTPException(status_code=404, detail="Ad-Cat relation not found")
         else:
             # Récupérer toutes les relations pour un utilisateur ou une annonce spécifique, ou toutes
-            query = "SELECT ad_id, cat_id FROM ad_cats"
+            query = "SELECT ad_id, cat_id FROM ads_cats"
             params = []
             if ad_id is not None:
                 query += " WHERE user_id = $1"
@@ -67,7 +66,7 @@ async def get_ad_cat(ad_id: int=None, cat_id: int=None, current_user: dict = Dep
             relations = await conn.fetch(query, *params)
             return [AdCatResponse(**relation) for relation in relations]
 
-@router.delete("/api/internal/postgresql/relation/ad_cat", response_model=Dict)
+@router.delete("/api/internal/postgresql/relation/ads_cats", response_model=Dict)
 async def delete_ad_cat(ad_id: int, cat_id: int, current_user: dict = Depends(get_current_user), request: Request = None):
     settings: Settings = request.app.state.settings
     # TODO SETUP ROLE
@@ -75,7 +74,7 @@ async def delete_ad_cat(ad_id: int, cat_id: int, current_user: dict = Depends(ge
     #     raise HTTPException(status_code=403, detail="Not enough permissions")
     async with get_db_client(settings) as conn:
         result = await conn.execute(
-            "DELETE FROM ad_cats WHERE ad_id = $1 AND cat_id = $2 RETURNING ad_id, cat_id",
+            "DELETE FROM ads_cats WHERE ad_id = $1 AND cat_id = $2 RETURNING ad_id, cat_id",
             ad_id, cat_id
         )
         if result:
