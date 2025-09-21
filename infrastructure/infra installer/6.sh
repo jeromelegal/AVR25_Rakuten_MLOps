@@ -44,5 +44,3 @@ sudo mkdir -p /var/lib/libvirt/shared
 sudo chown -R "$USERNAME:$USERNAME" /var/lib/libvirt/shared
 
 sudo chmod 666 /var/lib/libvirt/shared
-
-

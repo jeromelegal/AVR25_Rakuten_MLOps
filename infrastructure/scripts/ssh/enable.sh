@@ -1,0 +1,3 @@
+#!/bin
+
+systemctl enable ssh
