@@ -34,6 +34,9 @@
       {% if net.get('mac') %}
       <mac address='{{ net.mac }}'/>
       {% endif %}
+      {% if net.get('ip') %}
+      <ip address='{{ net.ip }}'/>
+      {% endif %}
     </interface>
     {% endfor %}
     <!-- Console série -->
