@@ -3,3 +3,5 @@ psycopg2-binary
 asyncpg
 apache-airflow-providers-fab
 flask-limiter==3.3.0
+Flask
+Flask-AppBuilder

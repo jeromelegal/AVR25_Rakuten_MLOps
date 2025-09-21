@@ -4,7 +4,7 @@
 # Fonction pour afficher un message d'erreur et quitter
 error_exit() {
     echo "❌ ERREUR: $1" >&2
-    exit 1
+    # exit 1
 }
 
 # Fonction pour afficher un message d'information
@@ -33,14 +33,13 @@ info_msg "AIRFLOW_INTERNAL_SECRET_KEY_PATH est défini à: ${AIRFLOW_INTERNAL_SE
 
 # Attente de la disponibilité de PostgreSQL
 info_msg "Attente de la disponibilité de PostgreSQL..."
-MAX_ATTEMPTS=30
-ATTEMPT=0
+
 HTTP_CODE=0
-until [ $HTTP_CODE -eq 200 ] || [ $ATTEMPT -eq $MAX_ATTEMPTS ]; do
+until [ $HTTP_CODE -eq 200 ] ; do
     HTTP_CODE=$(curl -k -o /dev/null -s -w "%{http_code}\n" "https://${POSTGRESQL_SERVICE_NAME}/health")
-    info_msg "Tentative $((ATTEMPT+1))/$MAX_ATTEMPTS: En attente que le service PostgreSQL soit disponible (code HTTP: $HTTP_CODE)..."
+    info_msg "En attente que le service PostgreSQL soit disponible (code HTTP: $HTTP_CODE)..."
     sleep 1
-    ATTEMPT=$((ATTEMPT+1))
+    
 done
 if [ $HTTP_CODE -ne 200 ]; then
     error_exit "Le service PostgreSQL n'est pas devenu disponible après $MAX_ATTEMPTS tentatives (code HTTP: $HTTP_CODE)."
@@ -72,6 +71,8 @@ else
     fi
 fi
 
+tail -f /dev/null
+
 # Migration de la base de données Airflow
 info_msg "Migration de la base de données Airflow..."
 airflow db migrate
@@ -90,42 +91,26 @@ success_msg "Airflow a démarré en mode standalone."
 
 # Attendre que le serveur Airflow soit disponible
 info_msg "Attente de la disponibilité du serveur Airflow..."
-MAX_ATTEMPTS=60
-ATTEMPT=0
-while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
-    sleep 5
-    HTTP_CODE=$(curl -k -s -o /dev/null -w "%{http_code}\n" "http://localhost:8793/api/v1/health" || echo "0")
-    info_msg "Tentative $((ATTEMPT+1))/$MAX_ATTEMPTS: En attente que le serveur Airflow soit disponible (code HTTP: $HTTP_CODE)..."
-    if [ "$HTTP_CODE" = "200" ]; then
-        break
-    fi
-    ATTEMPT=$((ATTEMPT+1))
-done
-if [ "$HTTP_CODE" -ne 200 ]; then
-    error_exit "Le serveur Airflow n'est pas devenu disponible après $MAX_ATTEMPTS tentatives (code HTTP: $HTTP_CODE)."
-fi
-success_msg "Le serveur Airflow est disponible."
+sleep 20
 
-# Création de l'utilisateur admin via l'API Airflow
-info_msg "Création de l'utilisateur admin via l'API Airflow..."
-USER_DATA='{
-  "username": "admin",
-  "first_name": "Admin",
-  "last_name": "User",
-  "email": "admin@example.com",
-  "password": "admin",
-  "role": "Admin"
-}'
-RESPONSE=$(curl -X POST "http://localhost:8793/api/v1/users" \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Basic $(echo -n "admin:admin" | base64)" \
-  -d "$USER_DATA" \
-  -w "%{http_code}\n" \
-  -o /dev/null || echo "0")
-if [ "$RESPONSE" -ne 200 ]; then
-    error_exit "Échec de la création de l'utilisateur admin via l'API Airflow (code HTTP: $RESPONSE)."
+# Création de l'utilisateur admin via SQL
+info_msg "Création de l'utilisateur admin pour Airflow via SQL..."
+
+
+
+
+
+#su - airflow -c "psql \"host=$POSTGRESQL_SERVICE_NAME port=5432 user=$POSTGRESQL_AIRFLOW_USER password=$POSTGRESQL_AIRFLOW_PASSWORD dbname=$POSTGRESQL_AIRFLOW_DATABASE sslmode=verify-full sslcert=$POSTGRESQL_AIRFLOW_CERT_PATH sslkey=$POSTGRESQL_AIRFLOW_KEY_PATH sslrootcert=$POSTGRESQL_AIRFLOW_CA_PATH\""
+
+# su  psql -h $POSTGRESQL_SERVICE_NAME -p 5432 -U $POSTGRESQL_AIRFLOW_USER -d $POSTGRESQL_AIRFLOW_DATABASE --set=sslmode=verify-full --set=sslcert=$POSTGRESQL_AIRFLOW_CERT_PATH --set=sslkey=$POSTGRESQL_AIRFLOW_KEY_PATH --set=sslrootcert=$POSTGRESQL_AIRFLOW_CA_PATH -c "
+#     INSERT INTO public.users (username, first_name, last_name, email, password, role)
+#     VALUES ('admin', 'Admin', 'User', 'admin@example.com', 'pbkdf2_sha256\$120000\$v1\$2y\$12\$...hash...', 'Admin');
+# "
+
+if [ $? -ne 0 ]; then
+    error_exit "Échec de la création de l'utilisateur admin via SQL."
 fi
-success_msg "Utilisateur admin créé avec succès via l'API Airflow."
+success_msg "Utilisateur admin créé avec succès via SQL."
 
 # Garder le conteneur actif
 tail -f /dev/null

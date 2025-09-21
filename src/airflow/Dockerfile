@@ -109,6 +109,14 @@ COPY entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/entrypoint.sh
 COPY vault/vault.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/vault.sh
+
+#TODO: Retirer l'installation du client postgreesql et mettre en place le schéma et le compte de service dans le container postgresql
+RUN apt-get update && apt-get install -y postgresql-client
+
+
+
+
+
 # Ports exposés (webserver)
 EXPOSE 8793 8795
 # Point d’entrée

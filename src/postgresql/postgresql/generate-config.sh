@@ -77,8 +77,6 @@ echo -e "local\tall\t\t$AIRFLOW_USER\t\t\t\tscram-sha-256" >> /etc/postgresql/pg
 echo "cat /etc/postgresql/pg_hba.conf"
 cat /etc/postgresql/pg_hba.conf
 
-
-
 cat <<EOF > /etc/postgresql/pg_ident.conf
 # MAPNAME  IDENT-USERNAME  PG-USERNAME
 EOF
