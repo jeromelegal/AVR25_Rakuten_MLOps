@@ -6,12 +6,20 @@ global:
 # Alertmanager configuration
 alerting:
   alertmanagers:
-    - static_configs:
-        - targets: []
-          # - alertmanager:9093
+    - scheme: https
+      tls_config:
+        ca_file: ALERTMANAGER_PROMETHEUS_CA_PATH
+        insecure_skip_verify: false  # false because we trust the CA
+      basic_auth:
+        username: ALERTMANAGER_ROOT_USER
+        password: ALERTMANAGER_ROOT_PASSWORD
+      static_configs:
+        - targets:
+            - "ALERTMANAGER_SERVICE_NAME:ALERTMANAGER_SERVICE_PORT"
 
 # Load rules once and periodically evaluate them according to the global 'evaluation_interval'.
-rule_files: []
+rule_files: 
+  - "instance_shutdown_rules.yml"
 
 scrape_configs:
   # The job name is added as a label `job=<job_name>` to any timeseries scraped from this config.

@@ -46,6 +46,17 @@ ENV MINIO_PROMETHEUS_CA_PATH=${MINIO_PROMETHEUS_CA_PATH:-"/etc/ssl/prometheus/mi
 ENV MINIO_PROMETHEUS_KEY_PATH=${MINIO_PROMETHEUS_KEY_PATH:-"/etc/ssl/prometheus/minio_prometheus.key"}
 ENV MINIO_PROMETHEUS_CERT_PATH=${MINIO_PROMETHEUS_CERT_PATH:-"/etc/ssl/prometheus/minio_prometheus.crt"}
 
+ENV ALERTMANAGER_SERVICE_NAME=${ALERTMANAGER_SERVICE_NAME:-"alertmanager"}
+ENV ALERTMANAGER_SERVICE_PORT=${ALERTMANAGER_SERVICE_PORT:-"9093"}
+#TODO: Instead of passing these credentials as env. variables, use Vault
+ENV ALERTMANAGER_ROOT_USER=${ALERTMANAGER_ROOT_USER:-"alertmanager-user"}
+ENV ALERTMANAGER_ROOT_PASSWORD=${ALERTMANAGER_ROOT_PASSWORD:-"alertmanager-password"}
+ENV ALERTMANAGER_PROMETHEUS_PEM_PATH=${ALERTMANAGER_PROMETHEUS_PEM_PATH:-"/etc/ssl/prometheus/alertmanager_prometheus.pem"}
+ENV ALERTMANAGER_PROMETHEUS_CA_PATH=${ALERTMANAGER_PROMETHEUS_CA_PATH:-"/etc/ssl/prometheus/alertmanager_prometheus.ca"}
+ENV ALERTMANAGER_PROMETHEUS_KEY_PATH=${ALERTMANAGER_PROMETHEUS_KEY_PATH:-"/etc/ssl/prometheus/alertmanager_prometheus.key"}
+ENV ALERTMANAGER_PROMETHEUS_CERT_PATH=${ALERTMANAGER_PROMETHEUS_CERT_PATH:-"/etc/ssl/prometheus/alertmanager_prometheus.crt"}
+
+
 ENV AUTHORIZATION=${AUTHORIZATION:-"enabled"}
 ENV VAULT_CERT_FILE=${VAULT_CERT_FILE:-"prometheus-cert.crt"}
 ENV VAULT_KEY_FILE=${VAULT_KEY_FILE:-"prometheus.key"}
@@ -89,6 +100,7 @@ RUN consul --version && vault --version
 # Copy configuration template
 COPY prometheus/web-config.template.yml web-config.template.yml
 COPY prometheus/prometheus.template.yml prometheus.template.yml
+COPY prometheus/instance_shutdown_rules.template.yml instance_shutdown_rules.template.yml
 
 # Copier les scripts et les fichiers de configuration
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
