@@ -37,3 +37,12 @@ sudo chown -R "$USERNAME:$USERNAME" ~/qemu_boot/
 sudo chmod u+rw ~/qemu_boot/vmlinuz-*
 sudo chmod u+rw ~/qemu_boot/initrd.img-*
 sudo chmod u+rw ~/qemu_boot/*
+
+
+sudo mkdir -p /var/lib/libvirt/shared
+
+sudo chown -R "$USERNAME:$USERNAME" /var/lib/libvirt/shared
+
+sudo chmod 666 /var/lib/libvirt/shared
+
+
