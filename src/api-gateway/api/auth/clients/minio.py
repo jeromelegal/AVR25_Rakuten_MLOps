@@ -76,7 +76,13 @@ class MinioClient:
             return None
 
 
-    def create_entity(self, token: str, object: str, params: Dict[str, Any], payload: Dict[str, Any]) -> Dict[str, Any]:
+    def create_entity(self, 
+                      token: str, 
+                      object: str, # endpoint
+                      params: Dict[str, Any], # bucket ==> {"bucket": DEFAULT_BUCKET}
+                      payload: Dict[str, Any], # username ==> {"username": postgresql_uid}
+                      files: Dict[str, Any], # image file ==> {"file": (file.filename, image_bytes, file.content_type)}
+                      ) -> Dict[str, Any]:
         """ Crée une nouvelle entité dans le bucket. """
         base_url = self.settings.API_MINIO_BASE_URL
         headers = self.get_headers(token)
@@ -86,15 +92,26 @@ class MinioClient:
         logger.debug(f"Request URL: {endpoint}")
         logger.debug(f"Request Headers: {headers}")
         logger.debug(f"Request Data: {payload}")
+        logger.debug(f"Request Data: {files}")
 
-        response = session.post(endpoint, params=params, json=payload, headers=headers)
+        response = session.post(endpoint, 
+                                params=params, 
+                                json=payload, 
+                                headers=headers,
+                                files=files
+                                )
         logger.debug(f"Response Status Code: {response.status_code}")
         logger.debug(f"Response Content: {response.text}")
         response.raise_for_status()
 
         return response.json()
 
-    def read_entity(self, token: str, object: str, entity_id: str) -> Dict[str, Any]:
+    def read_entity(self, 
+                    token: str, 
+                    object: str, 
+                    params: Dict[str, Any], 
+                    entity_id: str,
+                    ) -> Dict[str, Any]:
         """ Lit une entité de l'object spécifié. """
         base_url = self.settings.API_MINIO_BASE_URL
         headers = self.get_headers(token)
@@ -110,7 +127,14 @@ class MinioClient:
 
         return response.json()
     
-    def update_entity(self, token: str, object: str, entity_id: str, params: Dict[str, Any], payload: Dict[str, Any]) -> Dict[str, Any]:
+    def update_entity(self, 
+                      token: str, 
+                      object: str, 
+                      entity_id: str, 
+                      params: Dict[str, Any], 
+                      payload: Dict[str, Any],
+                      files: Dict[str, Any],
+                      ) -> Dict[str, Any]:
         """ Met à jour une entité dans la object spécifiée. """
         base_url = self.settings.API_MINIO_BASE_URL
         headers = self.get_headers(token)
@@ -142,3 +166,5 @@ class MinioClient:
         response.raise_for_status()
 
         return response.json()
+    
+    

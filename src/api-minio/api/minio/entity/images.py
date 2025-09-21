@@ -1,7 +1,7 @@
 import os
 import io
 from PIL import Image
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from api.config.s3 import get_client
 from typing import Annotated, List, Optional
@@ -11,6 +11,7 @@ from datetime import datetime, UTC
 import uuid
 from api.config.config import get_settings, Settings
 from botocore.exceptions import ClientError
+from fastapi import File, UploadFile, Form
 
 router = APIRouter()
 
@@ -88,6 +89,45 @@ async def store_image(
         created_by=image.username,
     )
 
+@router.post("/api/internal/minio/entity/image-multipart", response_model=ImageResponse)
+async def store_image_multipart(
+    bucket: str,
+    username: str = Form(...),
+    file: UploadFile = File(...),
+    settings: Settings = Depends(get_settings),
+    tmp_folder: str = TEMP_FOLDER,
+):
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="Empty file")
+    
+    client = get_client(settings=settings)
+    tmp_path, info = _store_temp_image_from_bytes(
+        file=content, bucket=bucket, tmp_folder=tmp_folder
+    )
+
+    exception = None
+
+    try:
+        client.upload_file(tmp_path, bucket, info.image_id)
+    except ClientError as e:
+        exception = HTTPException(
+            status_code=500,
+            detail=f"Impossible to store image {info.image_name}: {e}",
+        )
+    finally:
+        _delete_temp_file(tmp_path=tmp_path)
+
+    if exception is not None:
+        raise exception
+
+    return ImageResponse(
+        image_id=info.image_id,
+        image_name=info.image_name,
+        bucket_path=info.bucket_path,
+        created_at=info.created_at,
+        created_by=username,
+    )
 
 def _store_temp_image_from_bytes(
     file: bytes, bucket: str, tmp_folder: str, image_id: str = None

@@ -5,7 +5,6 @@ from typing import Optional, Dict, cast
 from config.settings import Settings
 from api.auth.clients.manager import ClientManager, create_client_manager
 from api.auth.token.manager import TokenManager, create_token_manager
-import base64
 
 DEFAULT_BUCKET = "raw-images"
 
@@ -18,6 +17,12 @@ router = APIRouter()
 class CreateAd(BaseModel):
     designation: str
     description: Optional[str]
+
+class CreateAdResponse(BaseModel):
+    ad: dict
+    category: dict
+    image: dict
+    relations: dict
 
 def get_settings(request: Request) -> Settings:
     return request.app.state.settings
@@ -44,54 +49,69 @@ def insert_psql_table(data, table, client, token, relation=False):
         # Insert in '{table}' on PostgreSQL
         logger.debug(f"Write '{table}' in PostgreSQL")
         if relation:
-            response = client.create_relation(token=token, table=table, relation_data=data)
+            response = client.create_relation(token=token, 
+                                              table=table, relation_data=data)
         else:
-            response = client.create_entity(token=token, table=table, entity_data=data)
+            response = client.create_entity(token=token, 
+                                            table=table, entity_data=data)
         logger.debug(f"PostgreSQL '{table}' response: {response}")
-        
+        return response
     except Exception as e:
         logger.error(f"Error in insert '{table}' on PostgreSQL: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error in insert '{table}' on PostgreSQL: {str(e)}"
         )
-    return response
-
-def insert_entities(ad_data, cat_data, image_data, postgresql_client, postgresql_token):
+    
+def insert_entities(ad_data, cat_data, image_data, 
+                    postgresql_client, postgresql_token):
     # Insert in 'ads' on PostgreSQL
-    ad_response = insert_psql_table(ad_data, "ad", postgresql_client, postgresql_token)
+    ad_response = insert_psql_table(ad_data, "ads", 
+                                    postgresql_client, postgresql_token)
     ad_id = ad_response["id"]
     # Insert in 'categories' on PostgreSQL
-    cat_response = insert_psql_table(cat_data, "category", postgresql_client, postgresql_token)
+    cat_response = insert_psql_table(cat_data, "categories", 
+                                     postgresql_client, postgresql_token)
     cat_id = cat_response["id"]
     # Insert in 'image' on PostgreSQL
-    image_response = insert_psql_table(image_data, "image", postgresql_client, postgresql_token)
+    image_response = insert_psql_table(image_data, "images", 
+                                       postgresql_client, postgresql_token)
     image_id = image_response["id"]
     return ad_id, cat_id, image_id 
 
-def insert_relations(ad_cat, user_ad, ad_image, postgresql_client, postgresql_token):
+def insert_relations(ad_cat, user_ad, ad_image, postgresql_client, 
+                     postgresql_token):
     # Insert 'ad_cats' relation in PostgreSQL
-    insert_psql_table(ad_cat, "ads_cats", postgresql_client, postgresql_token, relation=True)
+    insert_psql_table(ad_cat, "ads_cats", postgresql_client, 
+                      postgresql_token, relation=True)
     # Insert 'user_ads' relation in PostgreSQL
-    insert_psql_table(user_ad, "users_ads", postgresql_client, postgresql_token, relation=True)
+    insert_psql_table(user_ad, "users_ads", postgresql_client, 
+                      postgresql_token, relation=True)
     # Insert 'ad_image' relation in PostgreSQL
-    insert_psql_table(ad_image, "ads_images", postgresql_client, postgresql_token, relation=True)
+    insert_psql_table(ad_image, "ads_images", postgresql_client, 
+                      postgresql_token, relation=True)
 
-def insert_image_minio(payload, minio_client):
+def insert_image_minio(payload, files, minio_client):
     try:
-        logger.debug(f"Push image to bucket")
-        response = minio_client.create_entity(token=None, object="image", params={"bucket": DEFAULT_BUCKET}, payload=payload)
+        logger.debug("Push image to bucket")
+        response = minio_client.create_entity(
+            token=None, 
+            #object="image", 
+            object="image-multipart",
+            params={"bucket": DEFAULT_BUCKET}, 
+            payload=payload, 
+            files=files,
+        )
         logger.debug(f"Minio response: {response}")
+        return response.json()
     except Exception as e:
         logger.error(f"Error in api-minio: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error in copy image on Minio: {str(e)}"
         )
-    return response
 
-
-@router.post("/create_ad")
+@router.post("/create_ad", response_model=CreateAdResponse)
 async def create_ad(
     request: Request,
     user_data: dict = Depends(get_user_data_from_token),
@@ -110,26 +130,44 @@ async def create_ad(
             "label": form.get("category_label")
         }
         file = cast(UploadFile, form["file"])
-        image_data = {
-            "image_name": file.filename,
-            "bucket_name": DEFAULT_BUCKET
-        }
- 
     except (KeyError, ValueError) as e:
         logger.error(f"Invalid Form : {str(e)}")
         raise HTTPException(status_code=422, detail=f"Invalid Form: {e}")
         
+    ### Auth PostgreSQL ###
     postgresql_uid = user_data.get('uids', {}).get('postgresql')
-
     if not postgresql_uid:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="User ID not found in token data")
-    
-    postgresql_token = user_data.get('tokens', {}).get('postgresql') 
+        raise HTTPException(status_code=400, 
+                            detail="User ID not found in token data")
+    postgresql_token = user_data.get('tokens', {}).get('postgresql')
     postgresql_client = client_manager.get_client("postgresql")
 
+    ### Minio ###
+    minio_client = client_manager.get_client("minio")
+    # Transform image in bytes
+    image_bytes = await file.read()
+    files = {"file": (file.filename, image_bytes, file.content_type)}
+    payload = {"username": postgresql_uid}
+    # Copy image in bucket
+    
+    minio_response = insert_image_minio(payload, files, minio_client)
+
+    ### PostgreSQL ###    
+    image_data = {
+            "image_name": minio_response.filename,
+            "image_uuid": minio_response.image_id,
+            "bucket_path": minio_response.bucket_path,
+            "created_at": minio_response.created_at,
+            "created_by": minio_response.username,
+        }
+        
     ### Insert entities ###
-    ad_id, cat_id, image_id = insert_entities(ad_data, cat_data, image_data, postgresql_client, postgresql_token)
+    ad_id, cat_id, image_id = insert_entities(
+        ad_data, 
+        cat_data, 
+        image_data, 
+        postgresql_client, 
+        postgresql_token)
 
     ### Insert relations ###
     ad_cat = {
@@ -144,15 +182,22 @@ async def create_ad(
         "ad_id": ad_id,
         "image_id": image_id
     }
-    insert_relations(ad_cat, user_ad, ad_image, postgresql_client, postgresql_token)
+    insert_relations(ad_cat, 
+                     user_ad, 
+                     ad_image, 
+                     postgresql_client, 
+                     postgresql_token)
 
-    ### Minio ###
-    minio_client = client_manager.get_client("minio")
-    # Transform image in bytes
-    image_bytes = await file.read()
-    payload = {
-        "username": postgresql_uid,
-        "content": base64.b64encode(image_bytes).decode("ascii")
-    }
-    # Copy image in bucket
-    minio_response = insert_image_minio(payload, minio_client)
+    return CreateAdResponse(
+        ad={"id": ad_id, **ad_data},
+        category={"id": cat_id, **cat_data},
+        image={
+            "id": image_id,
+            "image_name": minio_response.filename,
+            "image_uuid": minio_response.image_id,
+            "bucket_path": minio_response.bucket_path,
+        },
+        relations={"ad_cat": True, "user_ad": True, "ad_image": True},
+    )
+
+

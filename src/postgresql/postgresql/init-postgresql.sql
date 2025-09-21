@@ -56,7 +56,8 @@ CREATE TABLE categories (
 CREATE TABLE images (
     id SERIAL PRIMARY KEY,
     image_name VARCHAR(50) UNIQUE,
-    bucket_name VARCHAR(50),
+    image_uuid UUID UNIQUE,
+    bucket_path VARCHAR(100),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_by INT NOT NULL
 );
