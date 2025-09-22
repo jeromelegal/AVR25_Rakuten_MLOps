@@ -61,8 +61,6 @@ vms:
           path: "/var/lib/libvirt/images/frontend.qcow2"
           size: 20
     copy_files:
-      # - source: scripts/
-      #   destination: /opt/
       - source: nginx/
         destination: /opt/
     post_install_scripts:

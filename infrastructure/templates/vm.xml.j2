@@ -19,13 +19,23 @@
   <on_crash>restart</on_crash>
   <devices>
     <!-- Disques -->
-    {% for disk in vm.cloud_init.disks %}
-    <disk type='file' device='disk'>
-      <driver name='qemu' type='qcow2'/>
-      <source file='{{ disk.path }}'/>
-      <target dev='v{{ loop.index0 | string }}' bus='virtio'/>
-    </disk>
-    {% endfor %}
+    {% if 'cloud_init' in vm %}
+      {% for disk in vm.cloud_init.disks %}
+      <disk type='file' device='disk'>
+        <driver name='qemu' type='qcow2'/>
+        <source file='{{ disk.path }}'/>
+        <target dev='vd{{ 'abcdefghijklmnopqrstuvwxyz'[loop.index0] }}' bus='virtio'/>
+      </disk>
+      {% endfor %}
+    {% elif 'clone_init' in vm %}
+      {% for disk in vm.clone_init.disks %}
+      <disk type='file' device='disk'>
+        <driver name='qemu' type='qcow2'/>
+        <source file='{{ disk.path }}'/>
+        <target dev='vd{{ 'abcdefghijklmnopqrstuvwxyz'[loop.index0] }}' bus='virtio'/>
+      </disk>
+      {% endfor %}
+    {% endif %}
     <!-- Interfaces réseau -->
     {% for net in vm.networks %}
     <interface type='network'>
@@ -33,9 +43,6 @@
       <model type='virtio'/>
       {% if net.get('mac') %}
       <mac address='{{ net.mac }}'/>
-      {% endif %}
-      {% if net.get('ip') %}
-      <ip address='{{ net.ip }}'/>
       {% endif %}
     </interface>
     {% endfor %}
