@@ -69,7 +69,9 @@ echo "MINIO_JOB_NODE_BEARER_TOKEN: ${MINIO_JOB_NODE_BEARER_TOKEN}"
 echo "MINIO_JOB_BUCKET_BEARER_TOKEN: ${MINIO_JOB_BUCKET_BEARER_TOKEN}"
 echo "MINIO_JOB_RESOURCE_BEARER_TOKEN: ${MINIO_JOB_RESOURCE_BEARER_TOKEN}"
 
-
+echo "Getting AlertManager credentials..."
+ALERTMANAGER_ROOT_USER=$(vault kv get -field=user secret/alertmanager/prometheus/credentials)
+ALERTMANAGER_ROOT_PASSWORD=$(vault kv get -field=password secret/alertmanager/prometheus/credentials)
 
 echo "Configuring scraping..."
 sed \

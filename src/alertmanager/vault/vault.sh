@@ -167,3 +167,7 @@ else
   # Nettoyage des fichiers temporaires
   rm -f alertmanager_prometheus_cert.json
 fi
+
+# Store credentials for Prometheus to use them
+# TODO: Instead of root credentials, we should create specific credentials
+vault kv put secret/alertmanager/prometheus/credentials user="$ALERTMANAGER_ROOT_USER" password="$ALERTMANAGER_ROOT_PASSWORD"
