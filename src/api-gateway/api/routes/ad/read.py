@@ -105,7 +105,7 @@ def read_image_minio(entity_id, minio_client):
             detail=f"Error in copy image on Minio: {str(e)}"
         )
     
-@router.get("/read_ad/{ad_id}", response_model=ReadAdResponse)
+@router.get("/read_ad_psql/{ad_id}", response_model=ReadAdResponse)
 async def read_ad(
     ad_id: int,
     request: Request,
