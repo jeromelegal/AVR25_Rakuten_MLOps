@@ -60,6 +60,7 @@ rm web-config.template.yml
 echo "Configuring scraping..."
 sed \
   -e "s|SLACK_API_URL|${SLACK_API_URL}|g" \
+  -e "s|SLACK_NOTIFICATION_CHANNEL|${SLACK_NOTIFICATION_CHANNEL}|g" \
   alertmanager.template.yml > alertmanager.yml
 rm alertmanager.template.yml
 

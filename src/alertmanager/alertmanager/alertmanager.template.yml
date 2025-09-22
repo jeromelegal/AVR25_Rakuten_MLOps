@@ -8,5 +8,5 @@ route:
 receivers:
 - name: 'slack-notifications'
   slack_configs:
-  - channel: '#avr25-mle-rakuten-alert'
+  - channel: '#SLACK_NOTIFICATION_CHANNEL'
     send_resolved: true
