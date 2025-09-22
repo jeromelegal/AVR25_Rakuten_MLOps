@@ -49,11 +49,11 @@ rm -f "$ARCHIVE"
 
 echo "Generating configuration file to enable mTLS..."
 sed \
-  -e "s|CERT_FILE|${PROMETHEUS_CERT_PATH}|g" \
-  -e "s|KEY_FILE|${PROMETHEUS_KEY_PATH}|g" \
-  -e "s|CA_FILE|${PROMETHEUS_CA_PATH}|g" \
-  -e "s|USER|${PROMETHEUS_ROOT_USER}|g" \
-  -e "s|PASSWORD_HASH|$(cat $PROMETHEUS_PASSWORD_HASH_FILE)|g" \
+  -e "s|\bCERT_FILE\b|${PROMETHEUS_CERT_PATH}|g" \
+  -e "s|\bKEY_FILE\b|${PROMETHEUS_KEY_PATH}|g" \
+  -e "s|\bCA_FILE\b|${PROMETHEUS_CA_PATH}|g" \
+  -e "s|\bUSER\b|${PROMETHEUS_ROOT_USER}|g" \
+  -e "s|\bPASSWORD_HASH\b|$(cat $PROMETHEUS_PASSWORD_HASH_FILE)|g" \
   web-config.template.yml > web-config.yml
 rm web-config.template.yml
 
@@ -69,22 +69,38 @@ echo "MINIO_JOB_NODE_BEARER_TOKEN: ${MINIO_JOB_NODE_BEARER_TOKEN}"
 echo "MINIO_JOB_BUCKET_BEARER_TOKEN: ${MINIO_JOB_BUCKET_BEARER_TOKEN}"
 echo "MINIO_JOB_RESOURCE_BEARER_TOKEN: ${MINIO_JOB_RESOURCE_BEARER_TOKEN}"
 
+echo "Getting AlertManager credentials..."
+ALERTMANAGER_ROOT_USER=$(vault kv get -field=user secret/alertmanager/prometheus/credentials)
+ALERTMANAGER_ROOT_PASSWORD=$(vault kv get -field=password secret/alertmanager/prometheus/credentials)
+
 echo "Configuring scraping..."
 sed \
-  -e "s|PROMETHEUS_PROMETHEUS_CA_PATH|${PROMETHEUS_PROMETHEUS_CA_PATH}|g" \
-  -e "s|PROMETHEUS_ROOT_USER|${PROMETHEUS_ROOT_USER}|g" \
-  -e "s|PROMETHEUS_ROOT_PASSWORD|${PROMETHEUS_ROOT_PASSWORD}|g" \
-  -e "s|MINIO_PROMETHEUS_CA_PATH|${MINIO_PROMETHEUS_CA_PATH}|g" \
-  -e "s|MINIO_SERVICE_NAME|${MINIO_SERVICE_NAME}|g" \
-  -e "s|MINIO_SERVICE_PORT|${MINIO_SERVICE_PORT}|g" \
-  -e "s|SERVICE_NAME|${SERVICE_NAME}|g" \
-  -e "s|SERVICE_PORT|${SERVICE_PORT}|g" \
-  -e "s|MINIO_JOB_BEARER_TOKEN|${MINIO_JOB_BEARER_TOKEN}|g" \
-  -e "s|MINIO_JOB_NODE_BEARER_TOKEN|${MINIO_JOB_NODE_BEARER_TOKEN}|g" \
-  -e "s|MINIO_JOB_BUCKET_BEARER_TOKEN|${MINIO_JOB_BUCKET_BEARER_TOKEN}|g" \
-  -e "s|MINIO_JOB_RESOURCE_BEARER_TOKEN|${MINIO_JOB_RESOURCE_BEARER_TOKEN}|g" \
+  -e "s|\bALERTMANAGER_PROMETHEUS_CA_PATH\b|${ALERTMANAGER_PROMETHEUS_CA_PATH}|g" \
+  -e "s|\bALERTMANAGER_SERVICE_NAME\b|${ALERTMANAGER_SERVICE_NAME}|g" \
+  -e "s|\bALERTMANAGER_SERVICE_PORT\b|${ALERTMANAGER_SERVICE_PORT}|g" \
+  -e "s|\bALERTMANAGER_ROOT_USER\b|${ALERTMANAGER_ROOT_USER}|g" \
+  -e "s|\bALERTMANAGER_ROOT_PASSWORD\b|${ALERTMANAGER_ROOT_PASSWORD}|g" \
+  -e "s|\bPROMETHEUS_PROMETHEUS_CA_PATH\b|${PROMETHEUS_PROMETHEUS_CA_PATH}|g" \
+  -e "s|\bPROMETHEUS_ROOT_USER\b|${PROMETHEUS_ROOT_USER}|g" \
+  -e "s|\bPROMETHEUS_ROOT_PASSWORD\b|${PROMETHEUS_ROOT_PASSWORD}|g" \
+  -e "s|\bMINIO_PROMETHEUS_CA_PATH\b|${MINIO_PROMETHEUS_CA_PATH}|g" \
+  -e "s|\bMINIO_SERVICE_NAME\b|${MINIO_SERVICE_NAME}|g" \
+  -e "s|\bMINIO_SERVICE_PORT\b|${MINIO_SERVICE_PORT}|g" \
+  -e "s|\bSERVICE_NAME\b|${SERVICE_NAME}|g" \
+  -e "s|\bSERVICE_PORT\b|${SERVICE_PORT}|g" \
+  -e "s|\bMINIO_JOB_BEARER_TOKEN\b|${MINIO_JOB_BEARER_TOKEN}|g" \
+  -e "s|\bMINIO_JOB_NODE_BEARER_TOKEN\b|${MINIO_JOB_NODE_BEARER_TOKEN}|g" \
+  -e "s|\bMINIO_JOB_BUCKET_BEARER_TOKEN\b|${MINIO_JOB_BUCKET_BEARER_TOKEN}|g" \
+  -e "s|\bMINIO_JOB_RESOURCE_BEARER_TOKEN\b|${MINIO_JOB_RESOURCE_BEARER_TOKEN}|g" \
   prometheus.template.yml > prometheus.yml
 rm prometheus.template.yml
+
+echo "Configuring alerts..."
+sed \
+  -e "s|\bMINIO_SERVICE_NAME\b|${MINIO_SERVICE_NAME}|g" \
+  -e "s|\bMINIO_SERVICE_PORT\b|${MINIO_SERVICE_PORT}|g" \
+  instance_shutdown_rules.template.yml > instance_shutdown_rules.yml
+rm instance_shutdown_rules.template.yml
 
 echo "Starting prometheus..."
 prometheus-$PROMETHEUS_VERSION.$ARCH/prometheus \

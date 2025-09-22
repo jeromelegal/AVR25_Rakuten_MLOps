@@ -18,6 +18,15 @@ until [ $HTTP_CODE -eq 200 ]; do
     sleep 1
 done
 
+# Appeler le script Vault pour récupérer les certificats et la clé privée
+HTTP_CODE=$(curl -k -o /dev/null -s -w "%{http_code}\n" https://$ALERTMANAGER_SERVICE_NAME/health)
+# Vous pouvez ajouter une logique conditionnelle ici
+until [ $HTTP_CODE -eq 200 ]; do
+    HTTP_CODE=$(curl -k -o /dev/null -s -w "%{http_code}\n" https://$ALERTMANAGER_SERVICE_NAME/health)
+    echo "Waiting for Alertmanager service to be healthy."
+    sleep 1
+done
+
 # Se connecter à Vault et récupérer un token
 export VAULT_SKIP_VERIFY="1"
 
@@ -156,7 +165,7 @@ EOF
 chown prometheus:prometheus $PROMETHEUS_PROMETHEUS_KEY_PATH
 chmod 600 $PROMETHEUS_PROMETHEUS_KEY_PATH
 
-# Extraire le certificat et la clé privée
+# Extraire le certificat et la clé privée pour Minio
 MINIO_PROMETHEUS_CA=$(vault kv get -field=ca secret/minio/prometheus/certs)
 MINIO_PROMETHEUS_CERT=$(vault kv get -field=cert secret/minio/prometheus/certs)
 MINIO_PROMETHEUS_KEY=$(vault kv get -field=key secret/minio/prometheus/certs)
@@ -190,3 +199,17 @@ else
   # Nettoyage des fichiers temporaires
   rm -f prometheus_grafana_cert.json
 fi
+
+# Extraire le certificat et la clé privée pour AlertManager
+ALERTMANAGER_PROMETHEUS_CA=$(vault kv get -field=ca secret/alertmanager/prometheus/certs)
+ALERTMANAGER_PROMETHEUS_CERT=$(vault kv get -field=cert secret/alertmanager/prometheus/certs)
+ALERTMANAGER_PROMETHEUS_KEY=$(vault kv get -field=key secret/alertmanager/prometheus/certs)
+
+cat <<EOF > $ALERTMANAGER_PROMETHEUS_PEM_PATH
+$(printf "%s" "$ALERTMANAGER_PROMETHEUS_KEY")
+$(printf "%s" "$ALERTMANAGER_PROMETHEUS_CERT")
+EOF
+
+cat <<EOF > $ALERTMANAGER_PROMETHEUS_CA_PATH
+$(printf "%s" "$ALERTMANAGER_PROMETHEUS_CA")
+EOF

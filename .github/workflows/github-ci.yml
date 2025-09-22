@@ -16,7 +16,7 @@ jobs:
     runs-on: [self-hosted, phil-host]
     strategy:
       matrix:
-        service: [vault, consul, mongodb, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio, api-processing, api-image-processing, api-text-processing, mlflow, prometheus, grafana]
+        service: [vault, consul, mongodb, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio, api-processing, api-image-processing, api-text-processing, mlflow, prometheus, grafana, alertmanager]
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
@@ -64,7 +64,7 @@ jobs:
     needs: [clear-containers]
     strategy:
       matrix:
-        service: [vault, consul, mongodb, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio, api-processing, api-image-processing, api-text-processing, mlflow, prometheus, grafana]
+        service: [vault, consul, mongodb, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio, api-processing, api-image-processing, api-text-processing, mlflow, prometheus, grafana, alertmanager]
     permissions:
       contents: 'read'
       id-token: 'write'
@@ -96,7 +96,7 @@ jobs:
     needs: [create-network, build]
     strategy:
       matrix:
-        service: [vault, consul, mongodb, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio, api-processing, api-image-processing, api-text-processing, mlflow, prometheus, grafana]
+        service: [vault, consul, mongodb, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio, api-processing, api-image-processing, api-text-processing, mlflow, prometheus, grafana, alertmanager]
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
@@ -173,7 +173,7 @@ jobs:
     needs: start-containers
     strategy:
       matrix:
-        service: [vault, consul, mongodb, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio, api-processing, api-image-processing, api-text-processing, mlflow, prometheus, grafana]
+        service: [vault, consul, mongodb, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio, api-processing, api-image-processing, api-text-processing, mlflow, prometheus, grafana, alertmanager]
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
@@ -270,7 +270,7 @@ jobs:
     if: always()
     strategy:
       matrix:
-        service: [vault, consul, mongodb, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio, api-processing, api-image-processing, api-text-processing, mlflow, prometheus, grafana]
+        service: [vault, consul, mongodb, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio, api-processing, api-image-processing, api-text-processing, mlflow, prometheus, grafana, alertmanager]
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
