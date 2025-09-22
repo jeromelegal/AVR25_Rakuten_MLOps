@@ -167,6 +167,7 @@ services:
       dockerfile: Dockerfile
     container_name: airflow
     ports:
+      - "8790:8790"
       - "8793:8793"
       - "8795:8795"
     environment:

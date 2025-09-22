@@ -17,7 +17,7 @@ ENV AIRFLOW__SCHEDULER__MAX_TASKS_PER_DAG=16
 ENV AIRFLOW__CORE__DAGS_FOLDER=/opt/airflow/dags
 ENV AIRFLOW__CORE__LOAD_EXAMPLES=False
 ENV SERVICE_NAME=${SERVICE_NAME:-"airflow"}
-ENV SERVICE_PORT=${SERVICE_PORT:-"8793"}
+ENV SERVICE_PORT=${SERVICE_PORT:-"8790"}
 ENV AIRFLOW__WEBSERVER__WEB_SERVER_PORT="$SERVICE_PORT"
 ENV AIRFLOW__WEBSERVER__AUTHENTICATE="True"
 ENV VAULT_ADDR=${VAULT_ADDR:-"https://vault:8200"}
@@ -37,6 +37,8 @@ ENV AIRFLOW_AIRFLOW_PEM_PATH=${AIRFLOW_AIRFLOW_PEM_PATH:-"/etc/ssl/airflow/airfl
 ENV AIRFLOW_AIRFLOW_KEY_PATH=${AIRFLOW_AIRFLOW_KEY_PATH:-"/etc/ssl/airflow/airflow_airflow.key"}
 ENV AIRFLOW_AIRFLOW_CERT_PATH=${AIRFLOW_AIRFLOW_CERT_PATH:-"/etc/ssl/airflow/airflow_airflow.crt"}
 ENV AIRFLOW_AIRFLOW_CA_PATH=${AIRFLOW_AIRFLOW_CA_PATH:-"/etc/ssl/airflow/airflow_airflow_ca.crt"}
+ENV AIRFLOW__CORE__AUTH_MANAGER="airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager"
+ENV AIRFLOW__CORE__AUTH_BACKEND="airflow.providers.fab.auth_manager.api.auth.backend.basic_auth"
 ENV POSTGRESQL_SERVICE_NAME ${POSTGRESQL_SERVICE_NAME:-"postgresql"}
 ENV POSTGRESQL_SERVICE_PORT ${POSTGRESQL_SERVICE_PORT:-"5432"}
 ENV POSTGRESQL_AIRFLOW_USER ${POSTGRESQL_AIRFLOW_USER:-"airflow_user"}
@@ -48,10 +50,13 @@ ENV POSTGRESQL_AIRFLOW_KEY_PATH=${POSTGRESQL_AIRFLOW_KEY_PATH:-"/etc/ssl/airflow
 ENV POSTGRESQL_AIRFLOW_CERT_PATH=${POSTGRESQL_AIRFLOW_CERT_PATH:-"/etc/ssl/airflow/postgresql_airflow.crt"}
 ENV POSTGRESQL_AIRFLOW_CA_PATH=${POSTGRESQL_AIRFLOW_CA_PATH:-"/etc/ssl/airflow/postgresql_airflow_ca.crt"}
 ENV AIRFLOW__DATABASE__SQL_ALCHEMY_CONN="postgresql+psycopg2://airflow_user:airflow_user_password@postgresql:5432/airflow?sslmode=verify-full&sslcert=/etc/ssl/airflow/postgresql_airflow.crt&sslkey=/etc/ssl/airflow/postgresql_airflow.key&sslrootcert=/etc/ssl/airflow/postgresql_airflow_ca.crt"
-ENV AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS="admin:admin"
-ENV AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS='{"admin": "admin"}'
+# ENV AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS="admin:admin"
+# ENV AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS='{"admin": "admin"}'
 ENV AIRFLOW__API__AUTH_MANAGER="airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager"
 ENV AIRFLOW__API__AUTH_BACKEND="airflow.providers.fab.auth_manager.api.auth.backend.basic_auth"
+ENV AIRFLOW__API__PORT=${SERVICE_PORT}
+ENV AIRFLOW__API__SSL_CERT=${AIRFLOW_CERT_PATH}
+ENV AIRFLOW__API__SSL_KEY=${AIRFLOW_KEY_PATH}
 ENV MINIO_AIRFLOW_PEM_PATH=${MINIO_AIRFLOW_PEM_PATH:-"/etc/ssl/airflow/minio_airflow.pem"}
 ENV MINIO_AIRFLOW_KEY_PATH=${MINIO_AIRFLOW_KEY_PATH:-"/etc/ssl/airflow/minio_airflow.key"}
 ENV MINIO_AIRFLOW_CERT_PATH=${MINIO_AIRFLOW_CERT_PATH:-"/etc/ssl/airflow/minio_airflow.crt"}
@@ -105,19 +110,19 @@ ENV REQUESTS_CA_BUNDLE=${AIRFLOW_PEM_PATH}
 # Copie des DAGs et scripts
 COPY dags/ ${AIRFLOW__CORE__DAGS_FOLDER}
 # Script d'entrée pour obtenir les certificats depuis Vault et démarrer Uvicorn
-COPY entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/entrypoint.sh
-COPY vault/vault.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/vault.sh
+COPY vault/vault.sh /usr/local/bin/vault.sh
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh 
+COPY nginx/nginx-fcgiwrap.sh /usr/local/bin/nginx-fcgiwrap.sh
+COPY nginx/health-check.sh /usr/local/bin/health-check.sh
+COPY nginx/nginx-conf.sh /usr/local/bin/nginx-conf.sh
+COPY airflow/init-airflow.sh /usr/local/bin/
 
-#TODO: Retirer l'installation du client postgreesql et mettre en place le schéma et le compte de service dans le container postgresql
-RUN apt-get update && apt-get install -y postgresql-client
-
+RUN chmod +x /usr/local/bin/*
 
 
 
 
 # Ports exposés (webserver)
-EXPOSE 8793 8795
+EXPOSE 8790 8793 8795 80 443
 # Point d’entrée
 ENTRYPOINT ["entrypoint.sh"]
