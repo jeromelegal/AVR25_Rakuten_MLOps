@@ -21,6 +21,12 @@ class Settings(BaseSettings):
     API_POSTGRESQL_API_GATEWAY_KEY_PATH: str = os.getenv("API_POSTGRESQL_API_GATEWAY_KEY_PATH", "")
     API_POSTGRESQL_API_GATEWAY_CERT_PATH: str = os.getenv("API_POSTGRESQL_API_GATEWAY_CERT_PATH", "")
 
+    # Configuration pour Minio
+    API_MINIO_BASE_URL: str = os.getenv("API_MINIO_BASE_URL", 'http://localhost:8020')
+    API_MINIO_API_GATEWAY_CA_PATH: str = os.getenv("API_MINIO_API_GATEWAY_CA_PATH", "")
+    API_MINIO_API_GATEWAY_KEY_PATH: str = os.getenv("API_MINIO_API_GATEWAY_KEY_PATH", "")
+    API_MINIO_API_GATEWAY_CERT_PATH: str = os.getenv("API_MINIO_API_GATEWAY_CERT_PATH", "")
+
     # Configuration JWT
     SECRET_KEY: str = os.getenv("API_GATEWAY_SECRET_KEY", "test-secret-key")
     INTERNAL_SECRET_KEY: str = os.getenv("API_GATEWAY_INTERNAL_SECRET_KEY", "test-internal-secret-key")

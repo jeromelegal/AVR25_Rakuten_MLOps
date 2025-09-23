@@ -95,7 +95,7 @@ async def test_get_role_user(test_app):
         }, headers=headers)
 
         # Test get role_user relation
-        response = test_app.get(f"/api/internal/postgresql/relation/role_user?user_id={user_id}&role_id={role_id}", headers=headers)
+        response = test_app.get(f"/api/internal/postgresql/relation/role_user/{user_id}", headers=headers)
         print_response_details(response)
         assert response.status_code == 200
         assert response.json()[0]["user_id"] == user_id
@@ -139,7 +139,7 @@ async def test_delete_role_user(test_app):
         }, headers=headers)
 
         # Test delete role_user relation
-        response = test_app.delete(f"/api/internal/postgresql/relation/role_user?user_id={user_id}&role_id={role_id}", headers=headers)
+        response = test_app.delete(f"/api/internal/postgresql/relation/role_user/{user_id}", headers=headers)
         print_response_details(response)
         assert response.status_code == 200
         assert response.json()["message"] == "Role-User relation deleted successfully"

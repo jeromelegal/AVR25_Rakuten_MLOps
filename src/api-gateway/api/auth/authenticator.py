@@ -11,6 +11,7 @@ class BackendAuthenticator:
     def __init__(self, client_manager: ClientManager):
         self.client_manager = client_manager
         # Liste des noms des clients que vous souhaitez utiliser
+        # TODO : lors des ajouts d'ACL, ajouter minio
         self.client_names = ["mongodb", "postgresql"]
         self.clients = [self.client_manager.get_client(name) for name in self.client_names]
         logger.debug("BackendAuthenticator initialized with clients: %s", self.client_names)

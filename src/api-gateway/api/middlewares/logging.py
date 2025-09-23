@@ -16,11 +16,15 @@ class LoggingMiddleware(BaseHTTPMiddleware):
         logger.addHandler(handler)
 
         # Log des détails de la requête
+        content_type = request.headers.get("content-type", "")
         request_body = await request.body()
         logger.info(f"Request: {request.method} {request.url}")
         logger.info(f"Request Headers: {dict(request.headers)}")
-        if request_body:
-            logger.info(f"Request Body: {request_body.decode()}")
+        if "multipart/form-data" in content_type:
+            logger.info(f"Request Body: <multipart; {len(request_body)} bytes; omitted>")
+        else:
+            if request_body:
+                logger.info(f"Request Body: {request_body.decode('utf-8', errors='replace')}")
 
         start_time = datetime.now(UTC)
 
