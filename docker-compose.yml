@@ -247,6 +247,18 @@ services:
       VAULT_USERNAME: "alertmanager"
       VAULT_PASSWORD: "alertmanager"
 
+  redis:
+    build:
+      context: ./src/redis
+      dockerfile: Dockerfile
+    container_name: redis
+    ports:
+      - "6379:6379"
+    environment:
+      VAULT_ADDR: "https://vault:8200"
+      VAULT_USERNAME: "redis"
+      VAULT_PASSWORD: "redis"
+  
   # zookeeper:
   #   build:
   #     context: ./src/zookeeper
