@@ -7,7 +7,10 @@ import ProductCategoryModal from '../components/ProductCategoryModal';
 import ValidateButton from '../components/ValidateButton';
 import { handleValidateAll } from './handlers/handleValidateAll';
 
+const API_BASE = process.env.API_GATEWAY_BASE_URL
+
 const NewProduct = () => {
+  const accessToken = localStorage.getItem('access_token');
   const [description, setDescription] = useState('');
   const [picture, setPicture] = useState(null);
   const [title, setTitle] = useState('');
@@ -34,10 +37,31 @@ const NewProduct = () => {
    // Example save handler
   const onValidateClick = async () => {
     try {
-      await handleValidateAll({ title, description, picture });
-      // Show success message or redirect
-    } catch (error) {
-      // Show error message
+      const formData = new FormData();
+      formData.append("designation", title);
+      formData.append("description", description);
+      formData.append("category_code", selectedCategory.code);
+      formData.append("category_label", selectedCategory.name);
+      formData.append("file", picture);
+
+      const headers = {};
+      if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+      const response = await fetch(`${API_BASE}/create_ad`, {
+        method: "POST",
+        headers,
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erreur API: ${response.status}`);
+      }
+
+      const payload = await response.json();
+      console.log("Annonce créée:", payload);
+      alert(`Annonce créée avec ID: ${payload.ad.id}`);
+    } catch (err) {
+      console.error("Erreur lors de la création:", err);
+      alert("Impossible de créer l'annonce");
     }
   };
 
