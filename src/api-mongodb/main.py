@@ -1,7 +1,6 @@
 from fastapi import FastAPI
 from api import hello as hello_router, auth as auth_router
-from api.mongodb.entity import user, ad, category
-from api.mongodb.relation import ad_category
+from api.mongodb.entity import user, ad
 from fastapi.middleware.cors import CORSMiddleware
 from middleware.auth import create_auth_middleware
 from middleware.logging import create_logging_middleware
@@ -30,9 +29,7 @@ def create_app(settings: Settings):
     app.include_router(hello_router.router)
     app.include_router(auth_router.router)
     app.include_router(ad.router)
-    app.include_router(category.router)
     app.include_router(user.router)
-    app.include_router(ad_category.router)
 
     return app
 

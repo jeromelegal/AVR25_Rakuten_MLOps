@@ -2,6 +2,7 @@ import logging
 from config.settings import Settings
 from api.auth.clients.postgresql import PostgreSQLClient
 from api.auth.clients.mongodb import MongoDBClient
+from api.auth.clients.minio import MinioClient
 
 # Configurer le logger pour ce module
 logger = logging.getLogger(__name__)
@@ -17,6 +18,7 @@ class ClientManager:
         """Initialise et enregistre les clients disponibles."""
         self.register_client("mongodb", MongoDBClient(self.settings))
         self.register_client("postgresql", PostgreSQLClient(self.settings))
+        self.register_client("minio", MinioClient(self.settings))
         logger.debug("Initialized clients: %s", list(self.clients.keys()))
 
     def register_client(self, name: str, client):

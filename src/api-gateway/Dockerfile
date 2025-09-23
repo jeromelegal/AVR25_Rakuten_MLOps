@@ -55,8 +55,15 @@ ENV NGINX_STATUS_FILE="/var/log/status"
 ENV NGINX_CONTENT_FILE="/var/log/content"
 ENV HEALTH_CHECK_FILE="/usr/local/bin/health-check.sh"
 
-ENV UVICORN_LOG_LEVEL=${UVICORN_LOG_LEVEL:-"debug"} 
+ENV UVICORN_LOG_LEVEL=${UVICORN_LOG_LEVEL:-"warning"} 
 
+ENV API_MINIO_SERVICE_NAME=${API_MINIO_SERVICE_NAME:-"api-minio"}
+ENV API_MINIO_SERVICE_PORT=${API_MINIO_SERVICE_PORT:-"8020"}
+ENV API_MINIO_BASE_URL=${API_MINIO_BASE_URL:-"https://$API_MINIO_SERVICE_NAME:$API_MINIO_SERVICE_PORT"}
+ENV API_MINIO_API_GATEWAY_PEM_PATH=${API_MINIO_API_GATEWAY_PEM_PATH:-"/etc/ssl/api-gateway/api-minio_api-gateway.pem"}
+ENV API_MINIO_API_GATEWAY_CA_PATH=${API_MINIO_API_GATEWAY_CA_PATH:-"/etc/ssl/api-gateway/api-minio_api-gateway.ca"}
+ENV API_MINIO_API_GATEWAY_KEY_PATH=${API_MINIO_API_GATEWAY_KEY_PATH:-"/etc/ssl/api-gateway/api-minio_api-gateway.key"}
+ENV API_MINIO_API_GATEWAY_CERT_PATH=${API_MINIO_API_GATEWAY_CERT_PATH:-"/etc/ssl/api-gateway/api-minio_api-gateway.crt"}
 
 # Ajouter l'utilisateur et le groupe api-gateway
 RUN groupadd --gid 999 --system api-gateway && \

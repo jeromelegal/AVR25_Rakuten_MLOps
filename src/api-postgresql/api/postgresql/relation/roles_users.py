@@ -35,7 +35,7 @@ async def create_role_user(request: Request, relation: RoleUserRelation, current
         except asyncpg.UniqueViolationError:
             raise HTTPException(status_code=400, detail="Role-User relation already exists")
 
-@router.get("/api/internal/postgresql/relation/role_user", response_model=List[RoleUserResponse])
+@router.get("/api/internal/postgresql/relation/role_user/{user_id}", response_model=List[RoleUserResponse])
 async def get_role_user(user_id: int = None, role_id: int = None, current_user: dict = Depends(get_current_user), request: Request = None):
     settings: Settings = request.app.state.settings
     # TODO SETUP ROLE
@@ -65,16 +65,16 @@ async def get_role_user(user_id: int = None, role_id: int = None, current_user: 
             relations = await conn.fetch(query, *params)
             return [RoleUserResponse(**relation) for relation in relations]
 
-@router.delete("/api/internal/postgresql/relation/role_user", response_model=dict)
-async def delete_role_user(user_id: int, role_id: int, current_user: dict = Depends(get_current_user), request: Request = None):
+@router.delete("/api/internal/postgresql/relation/role_user/{user_id}", response_model=dict)
+async def delete_role_user(user_id: int, current_user: dict = Depends(get_current_user), request: Request = None):
     settings: Settings = request.app.state.settings
     # TODO SETUP ROLE
     # if "superadmin" not in current_user.get("roles", []):
     #     raise HTTPException(status_code=403, detail="Not enough permissions")
     async with get_db_client(settings) as conn:
         result = await conn.execute(
-            "DELETE FROM user_roles WHERE user_id = $1 AND role_id = $2 RETURNING user_id, role_id",
-            user_id, role_id
+            "DELETE FROM user_roles WHERE user_id = $1 RETURNING user_id",
+            user_id
         )
         if result:
             return {"message": "Role-User relation deleted successfully"}

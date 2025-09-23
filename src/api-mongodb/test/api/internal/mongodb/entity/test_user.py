@@ -1,7 +1,6 @@
 import pytest
 from fastapi.testclient import TestClient
 from main import create_app
-from motor.motor_asyncio import AsyncIOMotorClient
 from config.db import get_db_client
 from bson import ObjectId
 from api.auth import create_internal_api_access_token

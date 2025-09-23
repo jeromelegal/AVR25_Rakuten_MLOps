@@ -24,8 +24,7 @@ class MTLSAdapter(HTTPAdapter):
         kwargs['ssl_context'] = context
         return super().init_poolmanager(*args, **kwargs)
 
-# TODO : variabiliser entity/relation dans les fonctions CRUD 
-class PostgreSQLClient:
+class MinioClient:
     def __init__(self, settings: Settings):
         self.settings = settings
 
@@ -37,10 +36,10 @@ class PostgreSQLClient:
 
     def get_session(self) -> Session:
         """ Crée une session avec les configurations SSL/TLS nécessaires. """
-        ca_path = self.settings.API_POSTGRESQL_API_GATEWAY_CA_PATH
-        key_path = self.settings.API_POSTGRESQL_API_GATEWAY_KEY_PATH
-        cert_path = self.settings.API_POSTGRESQL_API_GATEWAY_CERT_PATH
-        # Vérification de l'existence des fichiers
+        ca_path = self.settings.API_MINIO_API_GATEWAY_CA_PATH
+        key_path = self.settings.API_MINIO_API_GATEWAY_KEY_PATH
+        cert_path = self.settings.API_MINIO_API_GATEWAY_CERT_PATH
+        #Vérification de l'existence des fichiers
         self._check_file_existence(ca_path, "CA certificate")
         self._check_file_existence(key_path, "Key")
         self._check_file_existence(cert_path, "Certificate")
@@ -63,7 +62,7 @@ class PostgreSQLClient:
 
     def authenticate(self, token: Optional[str], credentials: Dict[str, str]) -> Optional[Dict[str, str]]:
         """ Authentifie un utilisateur. """
-        base_url = self.settings.API_POSTGRESQL_BASE_URL
+        base_url = self.settings.API_MINIO_BASE_URL
         headers = self.get_headers(token)
         session = self.get_session()
         try:
@@ -76,31 +75,49 @@ class PostgreSQLClient:
             logger.error(f"Authentication error: {e}")
             return None
 
-    def create_entity(self, token: str, table: str, entity_data: Dict[str, Any]) -> Dict[str, Any]:
-        """ Crée une nouvelle entité dans la table spécifiée. """
-        base_url = self.settings.API_POSTGRESQL_BASE_URL
+
+    def create_entity(self, 
+                      token: str, 
+                      object: str, # endpoint
+                      params: Dict[str, Any], # bucket ==> {"bucket": DEFAULT_BUCKET}
+                      payload: Dict[str, Any], # username ==> {"username": postgresql_uid}
+                      files: Dict[str, Any], # image file ==> {"file": (file.filename, image_bytes, file.content_type)}
+                      ) -> Dict[str, Any]:
+        """ Crée une nouvelle entité dans le bucket. """
+        base_url = self.settings.API_MINIO_BASE_URL
         headers = self.get_headers(token)
         session = self.get_session()
 
-        endpoint = f"{base_url}/api/internal/postgresql/entity/{table}"
+        endpoint = f"{base_url}/api/internal/minio/entity/{object}"
         logger.debug(f"Request URL: {endpoint}")
         logger.debug(f"Request Headers: {headers}")
-        logger.debug(f"Request Data: {entity_data}")
+        logger.debug(f"Request Data: {payload}")
+        logger.debug(f"Request Data: {files}")
 
-        response = session.post(endpoint, json=entity_data, headers=headers)
+        response = session.post(endpoint, 
+                                params=params, 
+                                data=payload, 
+                                headers=headers,
+                                files=files
+                                )
         logger.debug(f"Response Status Code: {response.status_code}")
         logger.debug(f"Response Content: {response.text}")
         response.raise_for_status()
 
         return response.json()
 
-    def read_entity(self, token: str, table: str, entity_id: int) -> Dict[str, Any]:
-        """ Lit une entité de la table spécifiée. """
-        base_url = self.settings.API_POSTGRESQL_BASE_URL
+    def read_entity(self, 
+                    token: str, 
+                    object: str, 
+                    bucket:str,
+                    entity_id: str,
+                    ) -> Dict[str, Any]:
+        """ Lit une entité de l'object spécifié. """
+        base_url = self.settings.API_MINIO_BASE_URL
         headers = self.get_headers(token)
         session = self.get_session()
 
-        endpoint = f"{base_url}/api/internal/postgresql/entity/{table}/{entity_id}"
+        endpoint = f"{base_url}/api/internal/minio/entity/bucket/{bucket}/{object}/{entity_id}"
         logger.debug(f"Request URL: {endpoint}")
 
         response = session.get(endpoint, headers=headers)
@@ -109,82 +126,44 @@ class PostgreSQLClient:
         response.raise_for_status()
 
         return response.json()
-
-    def update_entity(self, token: str, table: str, entity_id: str, entity_data: Dict[str, Any]) -> Dict[str, Any]:
-        """ Met à jour une entité dans la table spécifiée. """
-        base_url = self.settings.API_POSTGRESQL_BASE_URL
+    
+    def update_entity(self, 
+                      token: str, 
+                      object: str, 
+                      bucket:str,
+                      entity_id: str, 
+                      params: Dict[str, Any], 
+                      payload: Dict[str, Any],
+                      files: Dict[str, Any],
+                      ) -> Dict[str, Any]:
+        """ Met à jour une entité dans la object spécifiée. """
+        base_url = self.settings.API_MINIO_BASE_URL
         headers = self.get_headers(token)
         session = self.get_session()
 
-        endpoint = f"{base_url}/api/internal/postgresql/entity/{table}/{entity_id}"
+        endpoint = f"{base_url}/api/internal/minio/entity/bucket/{bucket}/{object}/{entity_id}"
         logger.debug(f"Request URL: {endpoint}")
-        logger.debug(f"Request Data: {entity_data}")
+        logger.debug(f"Request Data: {payload}")
 
-        response = session.put(endpoint, json=entity_data, headers=headers)
+        response = session.put(endpoint, params=params, json=payload, headers=headers)
         logger.debug(f"Response Status Code: {response.status_code}")
         logger.debug(f"Response Content: {response.text}")
         response.raise_for_status()
 
         return response.json()
 
-    def delete_entity(self, token: str, table: str, entity_id: int) -> Dict[str, Any]:
-        """ Supprime une entité de la table spécifiée. """
-        base_url = self.settings.API_POSTGRESQL_BASE_URL
+    def delete_entity(self, 
+                      token: str, 
+                      object: str, 
+                      bucket:str,
+                      entity_id: str
+                      ) -> Dict[str, Any]:
+        """ Supprime une entité de la object spécifiée. """
+        base_url = self.settings.API_MINIO_BASE_URL
         headers = self.get_headers(token)
         session = self.get_session()
 
-        endpoint = f"{base_url}/api/internal/postgresql/entity/{table}/{entity_id}"
-        logger.debug(f"Request URL: {endpoint}")
-
-        response = session.delete(endpoint, headers=headers)
-        logger.debug(f"Response Status Code: {response.status_code}")
-        logger.debug(f"Response Content: {response.text}")
-        response.raise_for_status()
-
-        return response.json()
-
-# TODO : variabiliser entity/relation dans les fonctions CRUD 
-    def create_relation(self, token: str, table: str, relation_data: Dict[str, Any]) -> Dict[str, Any]:
-        """ Crée une nouvelle relation dans la table spécifiée. """
-        base_url = self.settings.API_POSTGRESQL_BASE_URL
-        headers = self.get_headers(token)
-        session = self.get_session()
-
-        endpoint = f"{base_url}/api/internal/postgresql/relation/{table}"
-        logger.debug(f"Request URL: {endpoint}")
-        logger.debug(f"Request Headers: {headers}")
-        logger.debug(f"Request Data: {relation_data}")
-
-        response = session.post(endpoint, json=relation_data, headers=headers)
-        logger.debug(f"Response Status Code: {response.status_code}")
-        logger.debug(f"Response Content: {response.text}")
-        response.raise_for_status()
-
-        return response.json()
-
-    def read_relation(self, token: str, table: str, relation_id: int) -> Dict[str, Any]:
-        """ Lit une relation de la table spécifiée. """
-        base_url = self.settings.API_POSTGRESQL_BASE_URL
-        headers = self.get_headers(token)
-        session = self.get_session()
-
-        endpoint = f"{base_url}/api/internal/postgresql/relation/{table}/{relation_id}"
-        logger.debug(f"Request URL: {endpoint}")
-
-        response = session.get(endpoint, headers=headers)
-        logger.debug(f"Response Status Code: {response.status_code}")
-        logger.debug(f"Response Content: {response.text}")
-        response.raise_for_status()
-
-        return response.json()
-
-    def delete_relation(self, token: str, table: str, relation_id: int) -> Dict[str, Any]:
-        """ Supprime une relation de la table spécifiée. """
-        base_url = self.settings.API_POSTGRESQL_BASE_URL
-        headers = self.get_headers(token)
-        session = self.get_session()
-
-        endpoint = f"{base_url}/api/internal/postgresql/relation/{table}/{relation_id}"
+        endpoint = f"{base_url}/api/internal/minio/entity/bucket/{bucket}/{object}/{entity_id}"
         logger.debug(f"Request URL: {endpoint}")
 
         response = session.delete(endpoint, headers=headers)
@@ -193,4 +172,5 @@ class PostgreSQLClient:
         response.raise_for_status()
 
         return response.json()
-
+    
+    

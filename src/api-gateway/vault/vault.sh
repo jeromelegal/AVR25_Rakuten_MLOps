@@ -211,3 +211,25 @@ EOF
 cat <<EOF > $MLFLOW_API_GATEWAY_CERT_PATH
 $(printf "%s" "$MLFLOW_API_GATEWAY_CERT")
 EOF
+
+# Extraire le certificat et la clé privée pour Minio
+API_MINIO_API_GATEWAY_CA=$(vault kv get -field=ca secret/api-minio/api-gateway/certs)
+API_MINIO_API_GATEWAY_CERT=$(vault kv get -field=cert secret/api-minio/api-gateway/certs)
+API_MINIO_API_GATEWAY_KEY=$(vault kv get -field=key secret/api-minio/api-gateway/certs)
+
+cat <<EOF > $API_MINIO_API_GATEWAY_PEM_PATH
+$(printf "%s" "$API_MINIO_API_GATEWAY_KEY")
+$(printf "%s" "$API_MINIO_API_GATEWAY_CERT")
+EOF
+
+cat <<EOF > $API_MINIO_API_GATEWAY_CA_PATH
+$(printf "%s" "$API_MINIO_API_GATEWAY_CA")
+EOF
+
+cat <<EOF > $API_MINIO_API_GATEWAY_KEY_PATH
+$(printf "%s" "$API_MINIO_API_GATEWAY_KEY")
+EOF
+
+cat <<EOF > $API_MINIO_API_GATEWAY_CERT_PATH
+$(printf "%s" "$API_MINIO_API_GATEWAY_CERT")
+EOF

@@ -100,6 +100,7 @@ COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY postgresql/init-postgresql.sql /usr/local/bin/init-postgresql.sql
 COPY postgresql/init-postgresql-mlflow.sql /usr/local/bin/init-postgresql-mlflow.sql
 COPY postgresql/init-postgresql.sh /usr/local/bin/init-postgresql.sh
+COPY postgresql/init-categories.sql /usr/local/bin/init-categories.sql
 COPY postgresql/generate-config.sh /usr/local/bin/generate-config.sh
 COPY nginx/health-check.sh /usr/local/bin/health-check.sh
 COPY nginx/nginx-conf.sh /usr/local/bin/nginx-conf.sh

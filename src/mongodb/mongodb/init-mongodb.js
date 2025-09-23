@@ -41,50 +41,57 @@ db.getSiblingDB('file_storage').createUser({
 // Create ads collection
 db.getSiblingDB('file_storage').createCollection("ads", {
   validator: {
-      $jsonSchema: {
-        bsonType: "object",
-        required: ["designation", "description", "image_name", "bucket_name", "created_at", "created_by"],
-        properties: {
-          designation: { bsonType: "string" },
-          description: { bsonType: "string" },
-          image_name:  { bsonType: "string" },
-          bucket_name: { bsonType: "string" },
-          created_at:  { bsonType: "string" },
-          created_by:  { bsonType: "string" }
-        }
-      }
-    }
-});
-
-// Create categories collection
-db.getSiblingDB('file_storage').createCollection("categories", {
-  validator: {
     $jsonSchema: {
       bsonType: "object",
-      required: ["code", "label"],
+      required: ["user", "designation", "category", "created_at"],
       properties: {
-        code:      { bsonType: "int" },
-        label:     { bsonType: "string" }
+        _id: { bsonType: "objectId" },
+        user: {
+          bsonType: "object",
+          required: ["id","username"],
+          properties: {
+            id: { bsonType: "int" },
+            username: { bsonType: "string" }
+          }
+        },
+        designation: { bsonType: "string" },
+        description: { bsonType: ["string", "null"] },
+        category: { bsonType: "string" },
+        images: {
+          bsonType: ["array", "null"],
+          items: {
+            bsonType: "object",
+            required: ["image_uuid", "bucket_path"],
+            additionalProperties: false,
+            properties: {
+              image_uuid: { bsonType: "string" },
+              bucket_path: { bsonType: "string" }
+            }
+          }
+        },
+        created_at: { bsonType: "string" }
       }
     }
   }
 });
-db.categories.createIndex({ code: 1 }, { unique: true });
 
-// Create ad_categories collection
-db.getSiblingDB('file_storage').createCollection("ad_category", {
-  validator: {
-    $jsonSchema: {
-      bsonType: "object",
-      required: ["ad_id", "category_id", "created_at", "created_by"],
-      properties: {
-        ad_id:       { bsonType: "ObjectId" },
-        category_id: { bsonType: "ObjectId" },
-        created_at:  { bsonType: "string" },
-        created_by:  { bsonType: "string" }
-      }
-    }
+// Create index
+db.getSiblingDB('file_storage').ads.createIndex(
+  {
+    designation: 'text',
+    description: 'text',
+    category:  'text',
+    images:      'text',
+    'user.username': 'text'
+  },
+  {
+    weights: {
+      designation: 10,
+      description: 10,
+      category: 5,
+      images: 1,
+      'user.username': 1,
+    },
+    name: 'ads_search'
   }
-});
-db.ad_categories.createIndex({ ad_id: 1 }, { unique: true });
-db.ad_categories.createIndex({ category_id: 1 });
+);
