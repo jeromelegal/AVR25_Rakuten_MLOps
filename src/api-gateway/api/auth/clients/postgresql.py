@@ -24,6 +24,7 @@ class MTLSAdapter(HTTPAdapter):
         kwargs['ssl_context'] = context
         return super().init_poolmanager(*args, **kwargs)
 
+# TODO : variabiliser entity/relation dans les fonctions CRUD 
 class PostgreSQLClient:
     def __init__(self, settings: Settings):
         self.settings = settings
@@ -141,7 +142,8 @@ class PostgreSQLClient:
         response.raise_for_status()
 
         return response.json()
-    
+
+# TODO : variabiliser entity/relation dans les fonctions CRUD 
     def create_relation(self, token: str, table: str, relation_data: Dict[str, Any]) -> Dict[str, Any]:
         """ Crée une nouvelle relation dans la table spécifiée. """
         base_url = self.settings.API_POSTGRESQL_BASE_URL

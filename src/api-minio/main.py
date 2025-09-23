@@ -16,6 +16,7 @@ logger = logging.getLogger("internal_access_minio")
 
 class InternalAccessMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
+        # TODO : Finaliser la partie SECURE ou supprimer la partie commentée.
         # Vérifier si l'endpoint est interne
         # if request.url.path.startswith(settings.INTERNAL_ENDPOINT_URL):
         #     referer = request.headers.get("Referer")

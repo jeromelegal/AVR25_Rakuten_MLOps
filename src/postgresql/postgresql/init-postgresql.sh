@@ -47,6 +47,7 @@ echo "Initialization of the database START"
 su - postgresql -c "psql \"host=$SERVICE_NAME port=5432 user=postgresql dbname=postgres sslmode=verify-full sslcert=$POSTGRESQL_POSTGRESQL_CERT_PATH sslkey=$POSTGRESQL_POSTGRESQL_KEY_PATH sslrootcert=$POSTGRESQL_POSTGRESQL_CA_PATH\" -f /usr/local/bin/init-postgresql.sql"
 echo "Initialization of the database END"
 
+# TODO variables d'environnement à réaliser : port, user et dbname 
 # Insert basics categories in database
 echo "Insert categories in the database START"
 su - postgresql -c "psql \"host=$SERVICE_NAME port=5432 user=postgresql dbname=postgres sslmode=verify-full sslcert=$POSTGRESQL_POSTGRESQL_CERT_PATH sslkey=$POSTGRESQL_POSTGRESQL_KEY_PATH sslrootcert=$POSTGRESQL_POSTGRESQL_CA_PATH\" -f /usr/local/bin/init-categories.sql"
