@@ -28,7 +28,7 @@ echo "Vault récupère les certificats ..."
 # Récupérer les CA à ajouter aux magasins
 vault kv get -field=certificate secret/vault/ca > vault_ca.crt
 vault kv get -field=certificate secret/consul/ca > consul_ca.crt
-vault kv get -field=certificate secret/airflow/ca > airflow_ca.crt
+vault kv get -field=certificate secret/$VAULT_USERNAME/ca > ${VAULT_USERNAME}_ca.crt
 vault kv get -field=certificate secret/postgresql/ca > postgresql_ca.crt
 
 mkdir -p $(dirname $AIRFLOW_PEM_PATH)  
@@ -41,12 +41,12 @@ mkdir -p $(dirname $AIRFLOW_AIRFLOW_KEY_PATH)
 mkdir -p $(dirname $AIRFLOW_AIRFLOW_CERT_PATH)
 #mkdir -p $(dirname $AIRFLOW_FERNET_KEY_PATH)
 
-cp airflow_ca.crt $AIRFLOW_CA_PATH
+cp ${VAULT_USERNAME}_ca.crt $AIRFLOW_CA_PATH
 
 # Ajouter les CA aux magasins de certificats
 cp vault_ca.crt /usr/local/share/ca-certificates/
 cp consul_ca.crt /usr/local/share/ca-certificates/
-cp airflow_ca.crt /usr/local/share/ca-certificates/
+cp ${VAULT_USERNAME}_ca.crt /usr/local/share/ca-certificates/
 cp postgresql_ca.crt /usr/local/share/ca-certificates/
 #cp airflow_fernet_key.txt /usr/local/share/ca-certificates/
 

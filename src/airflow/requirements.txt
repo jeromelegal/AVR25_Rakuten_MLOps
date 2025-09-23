@@ -5,3 +5,4 @@ apache-airflow-providers-fab
 flask-limiter==3.3.0
 Flask
 Flask-AppBuilder
+apache-airflow-providers-amazon
