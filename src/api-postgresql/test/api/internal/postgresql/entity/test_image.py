@@ -54,7 +54,9 @@ async def test_create_image():
     # Test create image
     image_payload = {
         "image_name": "00_image_1234.jpg",
-        "bucket_name": "image-raw"
+        "image_uuid": "123f2e1r2e-1545443",
+        "bucket_path": "image-raw",
+        "created_by": 5
         }
     create_response = client.post(
         "/api/internal/postgresql/entity/image",
@@ -65,7 +67,9 @@ async def test_create_image():
     assert create_response.status_code == 200
     image_data = create_response.json()
     assert image_data["image_name"] == "00_image_1234.jpg"
-    assert image_data["bucket_name"] == "image-raw"
+    assert image_data["image_uuid"] == "123f2e1r2e-1545443"
+    assert image_data["bucket_path"] == "image-raw"
+    assert image_data["created_by"] == 5
     image_id = image_data["id"]
 
     # Test get image
@@ -77,12 +81,16 @@ async def test_create_image():
     assert response.status_code == 200
     image_data = response.json()
     assert image_data["image_name"] == "00_image_1234.jpg"
-    assert image_data["bucket_name"] == "image-raw"
+    assert image_data["image_uuid"] == "123f2e1r2e-1545443"
+    assert image_data["bucket_path"] == "image-raw"
+    assert image_data["created_by"] == 5
 
     # Test update image
     update_payload = {
         "image_name": "10_image_456.jpg",
-        "bucket_name": "image-augmented"
+        "image_uuid": "f2e1r2e-154544345641564",
+        "bucket_path": "image-augmented",
+        "created_by": 5
         }
     update_response = client.put(
         f"/api/internal/postgresql/entity/image/{image_id}",
@@ -93,7 +101,8 @@ async def test_create_image():
     assert update_response.status_code == 200
     update_data = update_response.json()
     assert update_data["image_name"] == "10_image_456.jpg"
-    assert update_data["bucket_name"] == "image-augmented"
+    assert update_data["image_uuid"] == "f2e1r2e-154544345641564"
+    assert update_data["bucket_path"] == "image-augmented"
 
     # Test delete image
     delete_response = client.delete(

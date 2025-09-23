@@ -96,7 +96,7 @@ class MinioClient:
 
         response = session.post(endpoint, 
                                 params=params, 
-                                json=payload, 
+                                data=payload, 
                                 headers=headers,
                                 files=files
                                 )
@@ -109,7 +109,7 @@ class MinioClient:
     def read_entity(self, 
                     token: str, 
                     object: str, 
-                    params: Dict[str, Any], 
+                    bucket:str,
                     entity_id: str,
                     ) -> Dict[str, Any]:
         """ Lit une entité de l'object spécifié. """
@@ -117,7 +117,7 @@ class MinioClient:
         headers = self.get_headers(token)
         session = self.get_session()
 
-        endpoint = f"{base_url}/api/internal/minio/entity/{object}/{entity_id}"
+        endpoint = f"{base_url}/api/internal/minio/entity/bucket/{bucket}/{object}/{entity_id}"
         logger.debug(f"Request URL: {endpoint}")
 
         response = session.get(endpoint, headers=headers)
@@ -130,6 +130,7 @@ class MinioClient:
     def update_entity(self, 
                       token: str, 
                       object: str, 
+                      bucket:str,
                       entity_id: str, 
                       params: Dict[str, Any], 
                       payload: Dict[str, Any],
@@ -140,7 +141,7 @@ class MinioClient:
         headers = self.get_headers(token)
         session = self.get_session()
 
-        endpoint = f"{base_url}/api/internal/minio/entity/{object}/{entity_id}"
+        endpoint = f"{base_url}/api/internal/minio/entity/bucket/{bucket}/{object}/{entity_id}"
         logger.debug(f"Request URL: {endpoint}")
         logger.debug(f"Request Data: {payload}")
 
@@ -151,13 +152,18 @@ class MinioClient:
 
         return response.json()
 
-    def delete_entity(self, token: str, object: str, entity_id: str) -> Dict[str, Any]:
+    def delete_entity(self, 
+                      token: str, 
+                      object: str, 
+                      bucket:str,
+                      entity_id: str
+                      ) -> Dict[str, Any]:
         """ Supprime une entité de la object spécifiée. """
         base_url = self.settings.API_MINIO_BASE_URL
         headers = self.get_headers(token)
         session = self.get_session()
 
-        endpoint = f"{base_url}/api/internal/minio/entity/{object}/{entity_id}"
+        endpoint = f"{base_url}/api/internal/minio/entity/bucket/{bucket}/{object}/{entity_id}"
         logger.debug(f"Request URL: {endpoint}")
 
         response = session.delete(endpoint, headers=headers)

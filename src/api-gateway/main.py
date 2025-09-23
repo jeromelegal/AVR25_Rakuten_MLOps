@@ -6,11 +6,14 @@ from api.routes.user.login import router as login_router
 from api.routes.user.signup import router as signup_router
 from api.routes.user.delete import router as delete_router
 from api.routes.ad.create import router as create_router
+from api.routes.ad.delete import router as ad_delete_router
+from api.routes.ad.read import router as read_router
+from api.routes.ad.update import router as update_router
 from config.settings import Settings
 import logging
 
 # Configurer le logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
 def create_app(settings: Settings):
@@ -37,7 +40,10 @@ def create_app(settings: Settings):
     app.include_router(login_router, prefix=settings.PROTECTED_ENDPOINT_URL, tags=["login"])
     app.include_router(signup_router, prefix=settings.PROTECTED_ENDPOINT_URL, tags=["signup"])
     app.include_router(delete_router, prefix=settings.PROTECTED_ENDPOINT_URL, tags=["delete"])
-    app.include_router(create_router, prefix=settings.PROTECTED_ENDPOINT_URL, tags=["create"])
+    app.include_router(create_router, prefix=settings.PROTECTED_ENDPOINT_URL, tags=["ad_create"])
+    app.include_router(ad_delete_router, prefix=settings.PROTECTED_ENDPOINT_URL, tags=["ad_delete_router"])
+    app.include_router(read_router, prefix=settings.PROTECTED_ENDPOINT_URL, tags=["ad_read"])
+    app.include_router(update_router, prefix=settings.PROTECTED_ENDPOINT_URL, tags=["ad_update"])
 
     # Route racine
     @app.get("/")

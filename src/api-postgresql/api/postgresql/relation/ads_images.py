@@ -37,7 +37,7 @@ async def create_ad_image(request: Request, relation: AdImageRelation, current_u
             raise HTTPException(status_code=400, detail="Ad-Image relation already exists")
 
 
-@router.get("/api/internal/postgresql/relation/ads_images", response_model=List[AdImageResponse])
+@router.get("/api/internal/postgresql/relation/ads_images/{ad_id}", response_model=List[AdImageResponse])
 async def get_ad_image(ad_id: int=None, image_id: int=None, current_user: dict = Depends(get_current_user), request: Request = None):
     settings: Settings = request.app.state.settings
     # TODO SETUP ROLE
@@ -58,7 +58,7 @@ async def get_ad_image(ad_id: int=None, image_id: int=None, current_user: dict =
             query = "SELECT ad_id, image_id FROM ads_images"
             params = []
             if ad_id is not None:
-                query += " WHERE user_id = $1"
+                query += " WHERE ad_id = $1"
                 params.append(ad_id)
             elif image_id is not None:
                 query += " WHERE ad_id = $1"
@@ -67,16 +67,16 @@ async def get_ad_image(ad_id: int=None, image_id: int=None, current_user: dict =
             relations = await conn.fetch(query, *params)
             return [AdImageResponse(**relation) for relation in relations]
 
-@router.delete("/api/internal/postgresql/relation/ads_images", response_model=Dict)
-async def delete_ad_image(ad_id: int, image_id: int, current_user: dict = Depends(get_current_user), request: Request = None):
+@router.delete("/api/internal/postgresql/relation/ads_images/{ad_id}", response_model=Dict)
+async def delete_ad_image(ad_id: int, current_user: dict = Depends(get_current_user), request: Request = None):
     settings: Settings = request.app.state.settings
     # TODO SETUP ROLE
     # if "superadmin" not in current_user.get("roles", []):
     #     raise HTTPException(status_code=403, detail="Not enough permissions")
     async with get_db_client(settings) as conn:
         result = await conn.execute(
-            "DELETE FROM ads_images WHERE ad_id = $1 AND image_id = $2 RETURNING ad_id, image_id",
-            ad_id, image_id
+            "DELETE FROM ads_images WHERE ad_id = $1 RETURNING ad_id",
+            ad_id
         )
         if result:
             return {"message": "Ad-Image relation deleted successfully"}

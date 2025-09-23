@@ -14,12 +14,16 @@ class User(BaseModel):
     id: int
     username: str
 
+class Images(BaseModel):
+    image_uuid: str
+    bucket_path: str
+
 class Ad(BaseModel):
     user: User
     designation: str
     description: Optional[str] = None
     category: str
-    images: Optional[List[str]] = None
+    images: Optional[List[Images]] = None
     created_at: str
 
 class AdResponse(BaseModel):
@@ -28,7 +32,7 @@ class AdResponse(BaseModel):
     designation: str
     description: Optional[str] = None
     category: str
-    images: Optional[List[str]] = None
+    images: Optional[List[Images]] = None
     created_at: str
 
 def get_settings(request: Request) -> Settings:

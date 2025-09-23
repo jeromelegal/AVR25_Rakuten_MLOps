@@ -66,15 +66,15 @@ def insert_psql_table(data, table, client, token, relation=False):
 def insert_entities(ad_data, cat_data, image_data, 
                     postgresql_client, postgresql_token):
     # Insert in 'ads' on PostgreSQL
-    ad_response = insert_psql_table(ad_data, "ads", 
+    ad_response = insert_psql_table(ad_data, "ad", 
                                     postgresql_client, postgresql_token)
     ad_id = ad_response["id"]
     # Insert in 'categories' on PostgreSQL
-    cat_response = insert_psql_table(cat_data, "categories", 
+    cat_response = insert_psql_table(cat_data, "category", 
                                      postgresql_client, postgresql_token)
     cat_id = cat_response["id"]
     # Insert in 'image' on PostgreSQL
-    image_response = insert_psql_table(image_data, "images", 
+    image_response = insert_psql_table(image_data, "image", 
                                        postgresql_client, postgresql_token)
     image_id = image_response["id"]
     return ad_id, cat_id, image_id 
@@ -103,7 +103,7 @@ def insert_image_minio(payload, files, minio_client):
             files=files,
         )
         logger.debug(f"Minio response: {response}")
-        return response.json()
+        return response
     except Exception as e:
         logger.error(f"Error in api-minio: {str(e)}")
         raise HTTPException(
@@ -152,14 +152,19 @@ async def create_ad(
     
     minio_response = insert_image_minio(payload, files, minio_client)
 
-    ### PostgreSQL ###    
-    image_data = {
-            "image_name": minio_response.filename,
-            "image_uuid": minio_response.image_id,
-            "bucket_path": minio_response.bucket_path,
-            "created_at": minio_response.created_at,
-            "created_by": minio_response.username,
+    ### PostgreSQL ###  
+    try:
+
+        image_data = {
+            "image_name":  minio_response["image_name"],
+            "image_uuid":  minio_response["image_id"],
+            "bucket_path": minio_response["bucket_path"],
+            #"created_at":  minio_response["created_at"],
+            "created_by":  int(minio_response["created_by"]),
         }
+    except KeyError as e:
+        logger.error(f"Minio response missing key: {e}; got: {minio_response}")
+        raise HTTPException(status_code=502, detail=f"Minio response incomplete: {e}")
         
     ### Insert entities ###
     ad_id, cat_id, image_id = insert_entities(
@@ -193,11 +198,10 @@ async def create_ad(
         category={"id": cat_id, **cat_data},
         image={
             "id": image_id,
-            "image_name": minio_response.filename,
-            "image_uuid": minio_response.image_id,
-            "bucket_path": minio_response.bucket_path,
+            "image_name":  minio_response["image_name"],
+            "image_uuid":  minio_response["image_id"],
+            "bucket_path": minio_response["bucket_path"],
         },
         relations={"ad_cat": True, "user_ad": True, "ad_image": True},
     )
-
 

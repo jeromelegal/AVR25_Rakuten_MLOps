@@ -93,7 +93,7 @@ class PostgreSQLClient:
 
         return response.json()
 
-    def read_entity(self, token: str, table: str, entity_id: str) -> Dict[str, Any]:
+    def read_entity(self, token: str, table: str, entity_id: int) -> Dict[str, Any]:
         """ Lit une entité de la table spécifiée. """
         base_url = self.settings.API_POSTGRESQL_BASE_URL
         headers = self.get_headers(token)
@@ -126,7 +126,7 @@ class PostgreSQLClient:
 
         return response.json()
 
-    def delete_entity(self, token: str, table: str, entity_id: str) -> Dict[str, Any]:
+    def delete_entity(self, token: str, table: str, entity_id: int) -> Dict[str, Any]:
         """ Supprime une entité de la table spécifiée. """
         base_url = self.settings.API_POSTGRESQL_BASE_URL
         headers = self.get_headers(token)
@@ -160,7 +160,7 @@ class PostgreSQLClient:
 
         return response.json()
 
-    def read_relation(self, token: str, table: str, relation_id: str) -> Dict[str, Any]:
+    def read_relation(self, token: str, table: str, relation_id: int) -> Dict[str, Any]:
         """ Lit une relation de la table spécifiée. """
         base_url = self.settings.API_POSTGRESQL_BASE_URL
         headers = self.get_headers(token)
@@ -176,7 +176,7 @@ class PostgreSQLClient:
 
         return response.json()
 
-    def delete_relation(self, token: str, table: str, relation_id: str) -> Dict[str, Any]:
+    def delete_relation(self, token: str, table: str, relation_id: int) -> Dict[str, Any]:
         """ Supprime une relation de la table spécifiée. """
         base_url = self.settings.API_POSTGRESQL_BASE_URL
         headers = self.get_headers(token)

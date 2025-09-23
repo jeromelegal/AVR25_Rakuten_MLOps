@@ -1,5 +1,5 @@
 import logging
-from fastapi import APIRouter, Depends, HTTPException, Request, Header, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Request, Header, UploadFile, status
 from pydantic import BaseModel
 from typing import Optional, Dict, cast
 from config.settings import Settings
@@ -77,7 +77,7 @@ def replace_relation(table, where, new_data, client, token):
     """ Replace relation """
     try:
         logger.debug(f"Delete relation '{table}' where={where}")
-        client.delete_relation(token=token, table=table, where=where)
+        client.delete_relation(token=token, table=table, relation_id=where)
     except Exception as e:
         logger.warning(f"Delete relation '{table}' where={where} failed or none existed: {e}")
 
@@ -87,21 +87,23 @@ def replace_relation(table, where, new_data, client, token):
 
 def insert_image_minio(payload, files, minio_client):
     try:
-        logger.debug("Push image to MinIO bucket")
+        logger.debug("Push image to bucket")
         response = minio_client.create_entity(
-            token=None,
+            token=None, 
+            #object="image", 
             object="image-multipart",
-            params={"bucket": DEFAULT_BUCKET},
-            payload=payload,
+            params={"bucket": DEFAULT_BUCKET}, 
+            payload=payload, 
             files=files,
         )
-        logger.debug(f"MinIO response: {response}")
-        return response.json()
+        logger.debug(f"Minio response: {response}")
+        return response
     except Exception as e:
         logger.error(f"Error in api-minio: {str(e)}")
         raise HTTPException(
-            status_code=500, 
-            detail=f"Error in copy image on Minio: {str(e)}")
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error in copy image on Minio: {str(e)}"
+        )
 
 @router.patch("/update_ad/{ad_id}", response_model=UpdateAdResponse)
 async def update_ad(
@@ -142,7 +144,7 @@ async def update_ad(
         updated_ad["description"] = body.description
 
     if updated_ad:
-        update_psql_entity("ads", ad_id, updated_ad, 
+        update_psql_entity("ad", ad_id, updated_ad, 
                            postgresql_client, postgresql_token)
 
     # Modifiates category if present
@@ -153,14 +155,16 @@ async def update_ad(
             cat_data["code"] = body.category_code
         if body.category_label is not None:
             cat_data["label"] = body.category_label
-
-        cat_resp = insert_psql_table(cat_data, "categories", postgresql_client, postgresql_token)
+        print("\n"*20)
+        print(cat_data)
+        print("\n"*20)
+        cat_resp = insert_psql_table(cat_data, "category", postgresql_client, postgresql_token)
         cat_id = cat_resp["id"]
 
         # Replce ads_cats relation
         replace_relation(
             table="ads_cats",
-            where={"ad_id": ad_id},
+            where=ad_id,
             new_data={"ad_id": ad_id, "cat_id": cat_id},
             client=postgresql_client,
             token=postgresql_token,
@@ -186,19 +190,19 @@ async def update_ad(
 
         # Update image data in PostgreSQL
         image_data = {
-            "image_name": minio_response.filename,
-            "image_uuid": minio_response.image_id,
-            "bucket_path": minio_response.bucket_path,
-            "created_at": minio_response.created_at,
-            "created_by": minio_response.username,
+            "image_name":  minio_response["image_name"],
+            "image_uuid":  minio_response["image_id"],
+            "bucket_path": minio_response["bucket_path"],
+            #"created_at":  minio_response["created_at"],
+            "created_by":  int(minio_response["created_by"]),
         }
-        image_resp = insert_psql_table(image_data, "images", postgresql_client, postgresql_token)
+        image_resp = insert_psql_table(image_data, "image", postgresql_client, postgresql_token)
         image_id = image_resp["id"]
 
         # Replace image relation
         replace_relation(
             table="ads_images",
-            where={"ad_id": ad_id},
+            where=ad_id,
             new_data={"ad_id": ad_id, "image_id": image_id},
             client=postgresql_client,
             token=postgresql_token,
@@ -206,9 +210,9 @@ async def update_ad(
 
         image_payload = {
             "id": image_id,
-            "image_name": minio_response.filename,
-            "image_uuid": minio_response.image_id,
-            "bucket_path": minio_response.bucket_path,
+            "image_name": minio_response["image_name"],
+            "image_uuid": minio_response["image_id"],
+            "bucket_path": minio_response["bucket_path"],
         }
 
     # 

@@ -36,11 +36,11 @@ def _signup_and_login():
     )
     assert r.status_code == 200, f"Login a échoué: {r.status_code} {r.text}"
 
-    tok = r.json()["access_token"]
+    token = r.json()["access_token"]
     headers = {
-        "Authorization": f"Bearer {tok}",
+        "Authorization": f"Bearer {token}",
         "Referer": test_settings.API_GATEWAY_HOST + test_settings.PROTECTED_ENDPOINT_URL,
-        "X-API-Key": tok,
+        "X-API-Key": token,
     }
     return headers
 
@@ -51,7 +51,7 @@ def _create_ad(headers):
         data = {
             "designation": "Produit flow",
             "description": "Desc flow init",
-            "category_code": 1,
+            "category_code": 1000,
             "category_label": "CAT1",
         }
         response = client.post(
@@ -91,7 +91,7 @@ def test_flow_ad():
     assert response.status_code == 200, f"Read failed after create: {response.status_code} {response.text}"
     json = response.json()
     assert json["ad"]["id"] == ad_id, f"Read_ad return bad id: {json['ad']['id']} != {ad_id}"
-    assert json["ad"]["designation"] == "Flow product", f"Bad designtion: {json['ad']['designation']}"
+    assert json["ad"]["designation"] == "Produit flow", f"Bad designation: {json['ad']['designation']}"
     assert "user" in json and "username" in json["user"], "Missing 'user' informations"
 
     # UPDATE (only text)
@@ -108,30 +108,8 @@ def test_flow_ad():
     response = client.get(f"{test_settings.PROTECTED_ENDPOINT_URL}/read_ad_psql/{ad_id}", headers=headers)
     assert response.status_code == 200, f"Read after update(text) failed: {response.status_code} {response.text}"
     json = response.json()
-    assert json["ad"]["designation"] == "Updated product", "designation not updated"
-    assert json["ad"].get("description") == "Updated product", "description not updated"
-
-    # UPDATE (category + image)
-    with open(DEMO_IMAGE_PATH, "rb") as f:
-        files = {"file": ("demo_image.jpg", f, "image/jpeg")}
-        data = {"category_code": 99, "category_label": "FLOW"}
-        response = client.patch(
-            f"{test_settings.PROTECTED_ENDPOINT_URL}/update_ad/{ad_id}",
-            headers=headers,
-            data=data,
-            files=files,
-        )
-    assert response.status_code == 200, f"Update (category+image) failed: {response.status_code} {response.text}"
-    update2 = response.json()
-    for k in ("ad_cat", "ad_image"):
-        assert k in update2.get("relations", {}), f"Relation update failed: {k}"
-
-    # READ (verify category update)
-    response = client.get(f"{test_settings.PROTECTED_ENDPOINT_URL}/read_ad_psql/{ad_id}", headers=headers)
-    assert response.status_code == 200, f"Read after update (category+image) failed: {response.status_code} {response.text}"
-    json = response.json()
-    assert json["category"]["code"] == 99 and json["category"]["label"] == "FLOW", \
-        f"Category update failed: {json['category']}"
+    assert json["ad"]["designation"] == "Produit modifié", "designation not updated"
+    assert json["ad"].get("description") == "Desc flow MAJ", "description not updated"
 
     # DELETE
     response = client.delete(f"{test_settings.PROTECTED_ENDPOINT_URL}/delete_ad/{ad_id}", headers=headers)

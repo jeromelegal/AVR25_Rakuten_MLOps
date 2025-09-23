@@ -29,24 +29,24 @@ def get_user_data_from_token(
     logger.info("Extracting user data from token...")
     return token_manager.get_user_data_from_token(authorization)
 
-def get_relations(client, token, table: str, where: Dict) -> List[Dict]:
+def get_relations(client, token, table: str, relation_id: str) -> List[Dict]:
     try:
-        return client.get_relations(token=token, table=table, where=where)
+        return client.read_relation(token=token, table=table, relation_id=relation_id)
     except Exception as e:
-        logger.warning(f"[get_relations] table={table} where={where} -> {e}")
+        logger.warning(f"[get_relations] table={table} relation_id={relation_id} -> {e}")
         return []
 
-def delete_relation(client, token, table: str, where: Dict) -> bool:
+def delete_relation(client, token, table: str, relation_id: int) -> bool:
     try:
-        client.delete_relation(token=token, table=table, where=where)
+        client.delete_relation(token=token, table=table, relation_id=relation_id)
         return True
     except Exception as e:
-        logger.warning(f"[delete_relation] table={table} where={where} -> {e}")
+        logger.warning(f"[delete_relation] table={table} relation_id={relation_id} -> {e}")
         return False
 
 def get_entity(client, token, table: str, entity_id: int) -> Optional[Dict]:
     try:
-        return client.get_entity(token=token, table=table, entity_id=entity_id)
+        return client.read_entity(token=token, table=table, entity_id=entity_id)
     except Exception as e:
         logger.warning(f"[get_entity] table={table} id={entity_id} -> {e}")
         return None
@@ -64,8 +64,8 @@ def minio_delete_image(minio_client, bucket: str, image_uuid: str) -> bool:
         minio_client.delete_entity(
             token=None,
             object="image",
-            image_id=str(image_uuid),
-            params={"bucket": bucket},
+            bucket=bucket,
+            entity_id=str(image_uuid),
         )
         return True
     except Exception as e:
@@ -96,7 +96,17 @@ async def delete_ad(
 
     # Relations
     image_relations = get_relations(postgresql_client, postgresql_token, 
-                                    "ads_images", {"ad_id": ad_id})
+                                    "ads_images", ad_id)
+    cat_relation = get_relations(postgresql_client, postgresql_token, 
+                                    "ads_cats", ad_id)
+    
+    # Delete all relations
+    rel_flags = {
+        "ads_images": delete_relation(postgresql_client, postgresql_token, "ads_images", ad_id),
+        "ads_cats":   delete_relation(postgresql_client, postgresql_token, "ads_cats", ad_id),
+        "users_ads":  delete_relation(postgresql_client, postgresql_token, "ads_users", ad_id),
+    }
+
     image_ids = []
     for r in image_relations:
         iid = r.get("image_id")
@@ -107,7 +117,7 @@ async def delete_ad(
 
     # Delete each images
     for image_id in image_ids:
-        img = get_entity(postgresql_client, postgresql_token, "images", image_id)
+        img = get_entity(postgresql_client, postgresql_token, "image", image_id)
         if not img:
             continue
 
@@ -119,7 +129,7 @@ async def delete_ad(
         if image_uuid:
             minio_ok = minio_delete_image(minio, DEFAULT_BUCKET, image_uuid)
 
-        pg_img_ok = delete_entity(postgresql_client, postgresql_token, "images", image_id)
+        pg_img_ok = delete_entity(postgresql_client, postgresql_token, "image", image_id)
 
         deleted_images.append({
             "image_id": image_id,
@@ -130,19 +140,15 @@ async def delete_ad(
             "image_row_deleted": bool(pg_img_ok),
         })
 
-    # Delete all relations
-    rel_flags = {
-        "ads_images": delete_relation(postgresql_client, postgresql_token, "ads_images", {"ad_id": ad_id}),
-        "ads_cats":   delete_relation(postgresql_client, postgresql_token, "ads_cats",   {"ad_id": ad_id}),
-        "users_ads":  delete_relation(postgresql_client, postgresql_token, "users_ads",  {"ad_id": ad_id}),
-    }
-
-    # Dete ad
-    ad_deleted = delete_entity(postgresql_client, postgresql_token, "ads", ad_id)
+    # Delete ad and category
+    cat_id = cat_relation[0]["cat_id"]
+    cat_deleted = delete_entity(postgresql_client, postgresql_token, "category", cat_id)
+    ad_deleted = delete_entity(postgresql_client, postgresql_token, "ad", ad_id)
 
     return DeleteAdResponse(
         ad_id=ad_id,
         deleted_relations=rel_flags,
         deleted_images=deleted_images,
+        cat_deleted=bool(cat_deleted),
         ad_deleted=bool(ad_deleted),
     )

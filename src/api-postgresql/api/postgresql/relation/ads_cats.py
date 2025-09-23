@@ -36,7 +36,7 @@ async def create_ad_cat(request: Request, relation: AdCatRelation, current_user:
             raise HTTPException(status_code=400, detail="Ad-Cat relation already exists")
 
 
-@router.get("/api/internal/postgresql/relation/ads_cats", response_model=List[AdCatResponse])
+@router.get("/api/internal/postgresql/relation/ads_cats/{ad_id}", response_model=List[AdCatResponse])
 async def get_ad_cat(ad_id: int=None, cat_id: int=None, current_user: dict = Depends(get_current_user), request: Request = None):
     settings: Settings = request.app.state.settings
     # TODO SETUP ROLE
@@ -57,7 +57,7 @@ async def get_ad_cat(ad_id: int=None, cat_id: int=None, current_user: dict = Dep
             query = "SELECT ad_id, cat_id FROM ads_cats"
             params = []
             if ad_id is not None:
-                query += " WHERE user_id = $1"
+                query += " WHERE ad_id = $1"
                 params.append(ad_id)
             elif cat_id is not None:
                 query += " WHERE ad_id = $1"
@@ -66,16 +66,16 @@ async def get_ad_cat(ad_id: int=None, cat_id: int=None, current_user: dict = Dep
             relations = await conn.fetch(query, *params)
             return [AdCatResponse(**relation) for relation in relations]
 
-@router.delete("/api/internal/postgresql/relation/ads_cats", response_model=Dict)
-async def delete_ad_cat(ad_id: int, cat_id: int, current_user: dict = Depends(get_current_user), request: Request = None):
+@router.delete("/api/internal/postgresql/relation/ads_cats/{ad_id}", response_model=Dict)
+async def delete_ad_cat(ad_id: int, current_user: dict = Depends(get_current_user), request: Request = None):
     settings: Settings = request.app.state.settings
     # TODO SETUP ROLE
     # if "superadmin" not in current_user.get("roles", []):
     #     raise HTTPException(status_code=403, detail="Not enough permissions")
     async with get_db_client(settings) as conn:
         result = await conn.execute(
-            "DELETE FROM ads_cats WHERE ad_id = $1 AND cat_id = $2 RETURNING ad_id, cat_id",
-            ad_id, cat_id
+            "DELETE FROM ads_cats WHERE ad_id = $1 RETURNING ad_id",
+            ad_id
         )
         if result:
             return {"message": "Ad-Cat relation deleted successfully"}

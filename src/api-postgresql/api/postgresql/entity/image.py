@@ -4,18 +4,21 @@ from config.db import get_db_client
 from datetime import datetime
 from config.settings import Settings
 from api.auth import get_current_user
-from typing import Dict
+from typing import Dict, Optional
 
 router = APIRouter()
 
 class Image(BaseModel):
     image_name: str
-    image_uuid: UUID4
+    image_uuid: str
     bucket_path: str
+    created_at: Optional[datetime] = None
+    created_by: int
 
 class ImageResponse(BaseModel):
     id: int
     image_name: str
+    image_uuid: str
     bucket_path: str
     created_at: datetime
     created_by: int
@@ -32,18 +35,19 @@ async def create_image(request: Request, data: Image, current_user: Dict = Depen
     data_dict = data.model_dump()
     # data_dict["created_at"] = datetime.now(timezone.utc).replace(tzinfo=None)
     # data_dict["created_by"] = current_user["id"]
-
     async with get_db_client(settings) as conn:
         image_id = await conn.fetchval(
-            "INSERT INTO images (image_name, image_uuid, bucket_path, created_at, created_by) VALUES ($1, $2, $3, $4, $5) RETURNING id",
+            "INSERT INTO images (image_name, image_uuid, bucket_path, created_by) VALUES ($1, $2, $3, $4) RETURNING id",
             data_dict["image_name"],
             data_dict["image_uuid"],
             data_dict["bucket_path"],
-            data_dict["created_at"],
             data_dict["created_by"],
         )
-        data_dict["id"] = str(image_id)
-        return ImageResponse(**data_dict)
+        row = await conn.fetchrow(
+            "SELECT id, image_name, image_uuid, bucket_path, created_at, created_by FROM images WHERE id = $1",
+            image_id
+        )
+        return ImageResponse(**row)
 
 @router.get("/api/internal/postgresql/entity/image/{image_id}", response_model=ImageResponse)
 async def get_image(image_id: int, current_user: Dict = Depends(get_current_user), request: Request = None):

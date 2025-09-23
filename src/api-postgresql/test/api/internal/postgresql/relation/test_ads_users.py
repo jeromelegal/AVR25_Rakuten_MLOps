@@ -1,6 +1,6 @@
 import pytest
 from fastapi.testclient import TestClient
-from api.postgresql.relation.ads_images import router as ads_images_router
+from api.postgresql.relation.users_ads import router as users_ads_router
 from main import create_app
 from config.db import get_db_client
 from api.auth import hash_password, create_internal_api_access_token
@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 @pytest.fixture(scope="function")
 def test_app():
     app = create_app(test_settings)  # Passez test_settings à create_app
-    app.include_router(ads_images_router)
+    app.include_router(users_ads_router)
     yield TestClient(app)
 
 def print_response_details(response):
@@ -20,9 +20,9 @@ def print_response_details(response):
         print(f"Response Body: {response.text}")
 
 @pytest.mark.asyncio
-async def test_flow_ad_image(test_app):
+async def test_flow_ad_user(test_app):
     async with get_db_client(test_settings) as db:
-        # Create a user, ad and image for testing
+        # Create a user, ad and category for testing
         hashed_password = hash_password("password")
         user_id = await db.fetchval(
             "INSERT INTO users (username, email, password, created_by) VALUES ($1, $2, $3, $4) RETURNING id",
@@ -32,10 +32,6 @@ async def test_flow_ad_image(test_app):
         ad_id = await db.fetchval(
             "INSERT INTO ads (designation, description, created_at, created_by) VALUES ($1, $2, $3, $4) RETURNING id",
             "test", "testdescription", test_date, 0
-        )
-        image_id = await db.fetchval(
-            "INSERT INTO images (image_name, image_uuid, bucket_path, created_at, created_by) VALUES ($1, $2, $3, $4, $5) RETURNING id",
-            "00_image_test.jpg", "123545634", "bucket-test", test_date, 0
         )
 
         # Login and get token
@@ -51,32 +47,31 @@ async def test_flow_ad_image(test_app):
             "X-API-Key": api_token,
         }
 
-        # Test create ad_image relation
-        new_ad_image = {
-            "ad_id": ad_id,
-            "image_id": image_id
+        # Test create user_ad relation
+        new_user_ad = {
+            "user_id": user_id,
+            "ad_id": ad_id
         }
-        response = test_app.post("/api/internal/postgresql/relation/ads_images", json=new_ad_image, headers=headers)
+        response = test_app.post("/api/internal/postgresql/relation/ads_users", json=new_user_ad, headers=headers)
         print_response_details(response)
         assert response.status_code == 200
-        assert response.json()["ad_id"] == new_ad_image["ad_id"]
-        assert response.json()["image_id"] == new_ad_image["image_id"]
+        assert response.json()["user_id"] == new_user_ad["user_id"]
+        assert response.json()["ad_id"] == new_user_ad["ad_id"]
 
-        # Test get ad_image relation
-        response = test_app.get(f"/api/internal/postgresql/relation/ads_images/{ad_id}", headers=headers)
+        # Test get user_ad relation
+        response = test_app.get(f"/api/internal/postgresql/relation/ads_users/{ad_id}", headers=headers)
         print_response_details(response)
         assert response.status_code == 200
-        assert response.json()[0]["image_id"] == image_id
         assert response.json()[0]["ad_id"] == ad_id
+        assert response.json()[0]["user_id"] == user_id
 
-        # Test delete ad_image relation
-        response = test_app.delete(f"/api/internal/postgresql/relation/ads_images/{ad_id}", headers=headers)
+        # Test delete user_ad relation
+        response = test_app.delete(f"/api/internal/postgresql/relation/ads_users/{ad_id}", headers=headers)
         print_response_details(response)
         assert response.status_code == 200
-        assert response.json()["message"] == "Ad-Image relation deleted successfully"
+        assert response.json()["message"] == "Ad-User relation deleted successfully"
 
         # Cleanup
-        await db.execute("DELETE FROM ads_images WHERE image_id = $1 AND ad_id = $2", image_id, ad_id)
+        await db.execute("DELETE FROM users_ads WHERE ad_id = $1 AND user_id = $2", ad_id, user_id)
         await db.execute("DELETE FROM ads WHERE id = $1", ad_id)
-        await db.execute("DELETE FROM images WHERE id = $1", image_id)
         await db.execute("DELETE FROM users WHERE id = $1", user_id)

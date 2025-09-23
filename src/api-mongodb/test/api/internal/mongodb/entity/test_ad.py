@@ -19,9 +19,8 @@ async def test_ad_flow():
     app = create_app(test_settings)
     client = TestClient(app)
 
-    # Step 1: Create a new user
     api_token = create_internal_api_access_token(data={"scope": "internal"}, settings=test_settings)
-    headers = {
+    headers_internal = {
         "Referer": test_settings.API_GATEWAY_HOST + test_settings.PROTECTED_ENDPOINT_URL,
         "X-API-Key": api_token,
     }
@@ -32,17 +31,19 @@ async def test_ad_flow():
             "email": "testuser@example.com",
             "password": "testpassword",
         },
-        headers=headers,
+        headers=headers_internal,
     )
     print_response_details(response)
     assert response.status_code == 200
     data = response.json()
-    user_id = data["user_id"]  # Get the user_id from the response
+    user_id = data["user_id"]
 
     login_response = client.post(
         "/token", data={"username": "testuser", "password": "testpassword"}
     )
+    assert login_response.status_code == 200, login_response.text
     token = login_response.json()["access_token"]
+
     api_token = create_internal_api_access_token(data={"scope": "internal"}, settings=test_settings)
     headers = {
         "Authorization": f"Bearer {token}",
@@ -50,30 +51,51 @@ async def test_ad_flow():
         "X-API-Key": api_token,
     }
 
-    # Test create_ad
-    payload = {"user": {"id": 1000, "username": "duck"},
-                   "designation": "newtitle", 
-                   "description": "vinyl", 
-                   "category": "musique",
-                   "images": ["00_image_1234.jpg", "01_image_456.jpg"], 
-                   "created_at": "2023-10-01T00:00:00Z",
-                   }
+    # --- CREATE ---
+    create_payload = {
+        "user": {"id": 1000, "username": "duck"},
+        "designation": "newtitle",
+        "description": "vinyl",
+        "category": "musique",
+        # New images hierarchy: array of objects {image_uuid, bucket_path}
+        "images": [
+            {
+                "image_uuid": "8a7c5f2e-1b9f-4e8a-9a8b-2b4d6c0f1a23",
+                "bucket_path": "raw-images/ads/8a7c5f2e.jpg",
+            },
+            {
+                "image_uuid": "1b2c3d4e-5f60-47a8-9abc-def012345678",
+                "bucket_path": "raw-images/ads/1b2c3d4e.jpg",
+            },
+        ],
+        "created_at": "2023-10-01T00:00:00Z",
+    }
 
-    response = client.post("/api/internal/mongodb/entity/ad", json=payload, headers=headers)
+    response = client.post("/api/internal/mongodb/entity/ad", json=create_payload, headers=headers)
+    print_response_details(response)
     assert response.status_code == 200
     data = response.json()
+
+    # Basic field checks
     assert data["user"]["id"] == 1000
     assert data["user"]["username"] == "duck"
     assert data["designation"] == "newtitle"
     assert data["description"] == "vinyl"
     assert data["category"] == "musique"
-    assert data["images"] == ["00_image_1234.jpg", "01_image_456.jpg"]
-    assert "ad_id" in data 
+
+    # Images structure & values
+    assert isinstance(data["images"], list) and len(data["images"]) == 2
+    assert {k for k in data["images"][0].keys()} == {"image_uuid", "bucket_path"}
+    assert data["images"][0]["image_uuid"] == "8a7c5f2e-1b9f-4e8a-9a8b-2b4d6c0f1a23"
+    assert data["images"][0]["bucket_path"] == "raw-images/ads/8a7c5f2e.jpg"
+
+    assert "ad_id" in data
     assert "created_at" in data
     ad_id = data["ad_id"]
 
-    # Test get_ad
+    # --- READ ---
     response = client.get(f"/api/internal/mongodb/entity/ad/{str(ad_id)}", headers=headers)
+    print_response_details(response)
     assert response.status_code == 200
     data = response.json()
     assert data["user"]["id"] == 1000
@@ -81,21 +103,36 @@ async def test_ad_flow():
     assert data["designation"] == "newtitle"
     assert data["description"] == "vinyl"
     assert data["category"] == "musique"
-    assert data["images"] == ["00_image_1234.jpg", "01_image_456.jpg"]
-    assert "ad_id" in data 
+    assert isinstance(data["images"], list)
+    assert {k for k in data["images"][0].keys()} == {"image_uuid", "bucket_path"}
+    assert "ad_id" in data
     assert "created_at" in data
 
-    # Test update_ad
-    payload_updated = {
-            "user": {"id": 1000, "username": "duckyduck"},
-            "designation": "newalbum", 
-            "description": "cd", 
-            "category": "musique_cd",
-            "images": ["10_image_1234.jpg", "11_image_456.jpg"], 
-            "created_at": "2024-10-01T00:00:00Z",
-            }
-        
-    response = client.put(f"/api/internal/mongodb/entity/ad/{str(ad_id)}", json=payload_updated, headers=headers)
+    # --- UPDATE ---
+    update_payload = {
+        "user": {"id": 1000, "username": "duckyduck"},
+        "designation": "newalbum",
+        "description": "cd",
+        "category": "musique_cd",
+        "images": [
+            {
+                "image_uuid": "10a7c5f2e-1b9f-4e8a-9a8b-2b4d6c0f1a23",
+                "bucket_path": "raw-images/ads/10a7c5f2e.jpg",
+            },
+            {
+                "image_uuid": "11b2c3d4e-5f60-47a8-9abc-def012345678",
+                "bucket_path": "raw-images/ads/11b2c3d4e.jpg",
+            },
+        ],
+        "created_at": "2024-10-01T00:00:00Z",
+    }
+
+    response = client.put(
+        f"/api/internal/mongodb/entity/ad/{str(ad_id)}",
+        json=update_payload,
+        headers=headers,
+    )
+    print_response_details(response)
     assert response.status_code == 200
     data = response.json()
     assert data["user"]["id"] == 1000
@@ -103,20 +140,23 @@ async def test_ad_flow():
     assert data["designation"] == "newalbum"
     assert data["description"] == "cd"
     assert data["category"] == "musique_cd"
-    assert data["images"] == ["10_image_1234.jpg", "11_image_456.jpg"]
-    assert "ad_id" in data 
+    assert isinstance(data["images"], list) and len(data["images"]) == 2
+    assert data["images"][0]["image_uuid"].startswith("10")
+    assert data["images"][1]["image_uuid"].startswith("11")
+    assert "ad_id" in data
     assert "created_at" in data
 
-    # Test deletion
+    # --- DELETE ---
     response = client.delete(f"/api/internal/mongodb/entity/ad/{str(ad_id)}", headers=headers)
+    print_response_details(response)
     assert response.status_code == 200
     assert response.json() == {"message": "Ad deleted successfully"}
 
-    # Verify deletion
+    # Verify deletion in DB
     async with get_db_client(test_settings) as db:
-        assert await db.ads.find_one({"_id": ad_id}) is None
+        assert await db.ads.find_one({"_id": ObjectId(ad_id)}) is None
 
-    # Delete the user
+    # Cleanup: delete the user
     delete_response = client.delete(
         f"/api/internal/mongodb/entity/user/{user_id}", headers=headers
     )

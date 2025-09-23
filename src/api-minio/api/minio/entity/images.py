@@ -12,11 +12,12 @@ import uuid
 from api.config.config import get_settings, Settings
 from botocore.exceptions import ClientError
 from fastapi import File, UploadFile, Form
+import base64
 
 router = APIRouter()
 
-TEMP_FOLDER = os.path.join("tmp")
-DATETIME_FORMAT = "%Y-%m-%d %H:%M%S:Z"
+TEMP_FOLDER = os.path.join("/tmp")
+DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
 CONTENT_RESPONSE_KEY = "Contents"
 
@@ -60,6 +61,7 @@ async def store_image(
     image: ImageRaw,
     settings: Annotated[Settings, Depends(get_settings)],
     tmp_folder: str = TEMP_FOLDER,
+    content_type: str = "image/jpeg"
 ):
     client = get_client(settings=settings)
     tmp_path, info = _store_temp_image_from_bytes(
@@ -69,7 +71,7 @@ async def store_image(
     exception = None
 
     try:
-        client.upload_file(tmp_path, bucket, info.image_id)
+        client.upload_file(tmp_path, bucket, info.image_id, ExtraArgs={'ContentType': content_type})
     except ClientError as e:
         exception = HTTPException(
             status_code=500,
@@ -96,6 +98,7 @@ async def store_image_multipart(
     file: UploadFile = File(...),
     settings: Settings = Depends(get_settings),
     tmp_folder: str = TEMP_FOLDER,
+    content_type: str = "image/jpeg"
 ):
     content = await file.read()
     if not content:
@@ -103,13 +106,16 @@ async def store_image_multipart(
     
     client = get_client(settings=settings)
     tmp_path, info = _store_temp_image_from_bytes(
-        file=content, bucket=bucket, tmp_folder=tmp_folder
+        file=content, 
+        bucket=bucket, 
+        tmp_folder=tmp_folder,
+        filename=file.filename,
     )
 
     exception = None
 
     try:
-        client.upload_file(tmp_path, bucket, info.image_id)
+        client.upload_file(tmp_path, bucket, info.image_id, ExtraArgs={'ContentType': content_type})
     except ClientError as e:
         exception = HTTPException(
             status_code=500,
@@ -117,7 +123,6 @@ async def store_image_multipart(
         )
     finally:
         _delete_temp_file(tmp_path=tmp_path)
-
     if exception is not None:
         raise exception
 
@@ -130,19 +135,24 @@ async def store_image_multipart(
     )
 
 def _store_temp_image_from_bytes(
-    file: bytes, bucket: str, tmp_folder: str, image_id: str = None
+    file: bytes, 
+    bucket: str, 
+    tmp_folder: str, 
+    image_id: str = None,
+    filename: str = None,
 ) -> tuple[str, ImageInfo]:
     if image_id is None:
         image_id = uuid.uuid4()
     # TODO: Accept other format on top of JPG
     image_path = os.path.join(bucket, f"{image_id}.jpg")
+    image_name = filename or f"{image_id}"
 
     stream = io.BytesIO(file)
     image = Image.open(stream)
     image_id = str(uuid.uuid4())
     info = ImageInfo(
         image_id=image_id,
-        image_name=image.filename,
+        image_name=image_name,
         bucket_path=image_path,
         created_at=datetime.now().strftime(format=DATETIME_FORMAT),
     )
@@ -151,7 +161,6 @@ def _store_temp_image_from_bytes(
     image.save(tmp_path)
 
     return tmp_path, info
-
 
 def _delete_temp_file(tmp_path: str):
     if os.path.exists(path=tmp_path):
@@ -188,7 +197,7 @@ async def list_files(
 
 
 @router.get(
-    "/api/internal/minio/entity/image/{image_id}",
+    "/api/internal/minio/entity/bucket/{bucket}/image/{image_id}",
     response_model=ImageContent,
 )
 async def get_image(
@@ -200,6 +209,7 @@ async def get_image(
     exception = None
     try:
         tmp_image_path = os.path.join(tmp_folder, f"{image_id}.jpg")
+
         client = get_client(settings=settings)
         client.download_file(
             Bucket=bucket,
@@ -219,11 +229,12 @@ async def get_image(
 
     if exception is not None:
         raise exception
+    content_b64 = base64.b64encode(content).decode("ascii")
 
-    return ImageContent(image_id=image_id, content=content)
+    return ImageContent(image_id=image_id, content=content_b64)
 
 
-@router.put("/api/internal/minio/entity/image/{image_id}", response_model=ImageResponse)
+@router.put("/api/internal/minio/entity/bucket/{bucket}/image/{image_id}", response_model=ImageResponse)
 async def update_image(
     bucket: str,
     update: ImageUpdateRaw,
@@ -263,7 +274,7 @@ async def update_image(
 
 
 @router.delete(
-    "/api/internal/minio/entity/image/{image_id}", response_model=ImageDeleted
+    "/api/internal/minio/entity/bucket/{bucket}/image/{image_id}", response_model=ImageDeleted
 )
 async def delete_image(
     bucket: str,

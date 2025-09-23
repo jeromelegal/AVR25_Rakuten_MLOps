@@ -16,7 +16,7 @@ router = APIRouter()
 
 class CategoryOut(BaseModel):
     id: int
-    code: str
+    code: int
     label: str
 
 class UserOut(BaseModel):
@@ -65,7 +65,7 @@ def read_psql_entity_by_id(table: str, entity_id: int, client, token) -> dict:
     try:
         logger.debug(f"Read '{table}' id={entity_id}")
         response = client.read_entity(token=token, table=table, entity_id=entity_id)
-        data = response.json()
+        data = response
         if not data:
             raise HTTPException(status_code=404, detail=f"{table} id={entity_id} not found")
         return data
@@ -78,8 +78,8 @@ def read_psql_entity_by_id(table: str, entity_id: int, client, token) -> dict:
 def read_psql_relation(table: str, relation_filter: dict, client, token) -> dict:
     try:
         logger.debug(f"Read relation '{table}' with {relation_filter}")
-        response = client.read_relation(token=token, table=table, relation_data=relation_filter)
-        data = response.json()
+        response = client.read_relation(token=token, table=table, relation_id=relation_filter)
+        data = response
         if not data:
             raise HTTPException(status_code=404, detail=f"{table} not found for {relation_filter}")
         return data
@@ -94,10 +94,11 @@ def read_image_minio(entity_id, minio_client):
         logger.debug(f"Pull image to bucket")
         response = minio_client.read_entity(token=None,
                                             object="image",
+                                            bucket=DEFAULT_BUCKET,
                                             entity_id=str(entity_id),
                                             )
         logger.debug(f"Minio response: {response}")
-        return response.json()
+        return response
     except Exception as e:
         logger.error(f"Error in api-minio: {str(e)}")
         raise HTTPException(
@@ -121,18 +122,18 @@ async def read_ad(
     postgresql_client = client_manager.get_client("postgresql")
 
     ### Reads ids ###
-    ad_cat = read_psql_relation("ads_cats", {"ad_id": ad_id}, postgresql_client, postgresql_token)
-    user_ad = read_psql_relation("users_ads", {"ad_id": ad_id}, postgresql_client, postgresql_token)
-    ad_img = read_psql_relation("ads_images", {"ad_id": ad_id}, postgresql_client, postgresql_token)
-    cat_id = ad_cat["cat_id"]
-    user_id = user_ad["user_id"]
-    image_id = ad_img["image_id"]
+    ad_cat = read_psql_relation("ads_cats", ad_id, postgresql_client, postgresql_token)
+    user_ad = read_psql_relation("ads_users", ad_id, postgresql_client, postgresql_token)
+    ad_image = read_psql_relation("ads_images", ad_id, postgresql_client, postgresql_token)
+    cat_id = ad_cat[0]["cat_id"]
+    user_id = user_ad[0]["user_id"]
+    image_id = ad_image[0]["image_id"] 
 
     ### Retrieves data ###
-    ad_row = read_psql_entity_by_id("ads", ad_id, postgresql_client, postgresql_token)
-    cat_row = read_psql_entity_by_id("categories", cat_id, postgresql_client, postgresql_token)
-    user_row = read_psql_entity_by_id("users", user_id, postgresql_client, postgresql_token)
-    image_row = read_psql_entity_by_id("images", image_id, postgresql_client, postgresql_token)
+    ad_row = read_psql_entity_by_id("ad", ad_id, postgresql_client, postgresql_token)
+    cat_row = read_psql_entity_by_id("category", cat_id, postgresql_client, postgresql_token)
+    user_row = read_psql_entity_by_id("user", user_id, postgresql_client, postgresql_token)
+    image_row = read_psql_entity_by_id("image", image_id, postgresql_client, postgresql_token)
 
     ### Retrieves image ###
     minio_image_id = image_row["image_uuid"]

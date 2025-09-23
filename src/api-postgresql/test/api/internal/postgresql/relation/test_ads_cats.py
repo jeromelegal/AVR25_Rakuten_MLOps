@@ -63,14 +63,14 @@ async def test_flow_ad_cat(test_app):
         assert response.json()["cat_id"] == new_ad_cat["cat_id"]
 
         # Test get ad_cat relation
-        response = test_app.get(f"/api/internal/postgresql/relation/ads_cats?cat_id={cat_id}&ad_id={ad_id}", headers=headers)
+        response = test_app.get(f"/api/internal/postgresql/relation/ads_cats/{ad_id}", headers=headers)
         print_response_details(response)
         assert response.status_code == 200
         assert response.json()[0]["cat_id"] == cat_id
         assert response.json()[0]["ad_id"] == ad_id
 
         # Test delete ad_cat relation
-        response = test_app.delete(f"/api/internal/postgresql/relation/ads_cats?cat_id={cat_id}&ad_id={ad_id}", headers=headers)
+        response = test_app.delete(f"/api/internal/postgresql/relation/ads_cats/{ad_id}", headers=headers)
         print_response_details(response)
         assert response.status_code == 200
         assert response.json()["message"] == "Ad-Cat relation deleted successfully"
