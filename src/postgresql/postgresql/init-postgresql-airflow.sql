@@ -25,3 +25,4 @@ GRANT CREATE ON SCHEMA public TO :"airflow_user";
 ALTER SCHEMA public OWNER TO :"airflow_user";
 ALTER ROLE :"airflow_user" CREATEDB;
 -- ALTER ROLE :"airflow_user" CREATEDB;
+ALTER USER :"airflow_user" SET search_path = public;

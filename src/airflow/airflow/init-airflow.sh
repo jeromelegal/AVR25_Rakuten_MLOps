@@ -67,6 +67,24 @@ else
     fi
 fi
 
+# Generate backend URI using DSN
+qs=$(python3 -c "import urllib.parse; \
+params = { \
+    \"host\": \"${POSTGRESQL_SERVICE_NAME}\", \
+    \"port\": \"${POSTGRESQL_SERVICE_PORT}\", \
+    \"user\": \"${POSTGRESQL_AIRFLOW_USER}\", \
+    \"password\": \"${POSTGRESQL_AIRFLOW_PASSWORD}\", \
+    \"dbname\": \"${POSTGRESQL_AIRFLOW_DATABASE}\", \
+    \"sslmode\": \"verify-full\", \
+    \"sslcert\": \"${POSTGRESQL_AIRFLOW_CERT_PATH}\", \
+    \"sslkey\": \"${POSTGRESQL_AIRFLOW_KEY_PATH}\", \
+    \"sslrootcert\": \"${POSTGRESQL_AIRFLOW_CA_PATH}\", \
+}; \
+print(urllib.parse.urlencode(params))" \
+)
+export AIRFLOW__DATABASE__SQL_ALCHEMY_CONN="postgresql+psycopg2:///?${qs}"
+echo "AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: ${AIRFLOW__DATABASE__SQL_ALCHEMY_CONN}"
+
 # Migration de la base de données Airflow
 info_msg "Migration de la base de données Airflow..."
 airflow db migrate
@@ -75,21 +93,61 @@ if [ $? -ne 0 ]; then
 fi
 success_msg "Migration de la base de données Airflow réussie."
 
-# Démarrage d'Airflow en mode standalone
-info_msg "Démarrage d'Airflow en mode standalone..."
-echo "{\"${AIRFLOW_USER}\":\"${AIRFLOW_PASSWORD}\"}" > /opt/airflow/simple_auth_manager_passwords.json.generated
-airflow standalone &
-if [ $? -ne 0 ]; then
-    error_exit "Échec du démarrage d'Airflow en mode standalone."
+info_msg "Création du user admin..."
+if ! airflow users list | grep -q "^${AIRFLOW_USER}\b"; then
+    airflow users create \
+      --username "${AIRFLOW_USER}" \
+      --firstname Admin \
+      --lastname Admin \
+      --password ${AIRFLOW_PASSWORD} \
+      --role Admin \
+      --email admin@example.org
+else
+    echo "User '${AIRFLOW_USER}' already exists, skipping creation."
 fi
-success_msg "Airflow a démarré en mode standalone."
+success_msg "Création de l'utilisateur réussie."
+
+info_msg "Création de l'API server..."
+airflow api-server \
+    --host $SERVICE_NAME \
+    --ssl-cert $AIRFLOW_AIRFLOW_CERT_PATH \
+    --ssl-key $AIRFLOW_AIRFLOW_KEY_PATH \
+    --port $SERVICE_PORT &
+
 
 # Attendre que le serveur Airflow soit disponible
 info_msg "Attente de la disponibilité du serveur Airflow..."
 URL=https://${SERVICE_NAME}:${SERVICE_PORT}/api/v2/monitor/health
-# Boucle until tous les statuts sont "healthy"
-until curl -s $URL | jq -e '.metadatabase.status == "healthy" and .scheduler.status == "healthy" and .triggerer.status == "healthy" and .dag_processor.status == "healthy"' > /dev/null; do
-    echo "Attente que tous les composants de Airflow soient healthy..."
+until curl -s $URL | jq -e '.metadatabase.status == "healthy"' > /dev/null; do
+    echo "Attente que le serveur Airflow soit healthy..."
     sleep 1  # Attendre 1 seconde avant de vérifier à nouveau
 done
-echo "Les composants d'Airflow sont healthy."
+success_msg "Le serveur d'Airflow est healthy"
+
+info_msg "Création du scheduler..."
+airflow scheduler &
+
+until curl -s $URL | jq -e '.metadatabase.status == "healthy" and .scheduler.status == "healthy"' > /dev/null; do
+    echo "Attente que le scheduler d'Airflow soit healthy..."
+    sleep 1  # Attendre 1 seconde avant de vérifier à nouveau
+done
+success_msg "Le scheduler d'Airflow est healthy"
+  
+info_msg "Création du DAG processor..."
+airflow dag-processor &
+
+until curl -s $URL | jq -e '.metadatabase.status == "healthy" and .scheduler.status == "healthy" and .dag_processor.status == "healthy"' > /dev/null; do
+    echo "Attente que le DAG creator d'Airflow soit healthy..."
+    sleep 1  # Attendre 1 seconde avant de vérifier à nouveau
+done
+success_msg "Le DAG creator d'Airflow est healthy"
+
+info_msg "Création du triggerer..."
+airflow triggerer &
+
+until curl -s $URL | jq -e '.metadatabase.status == "healthy" and .scheduler.status == "healthy" and .dag_processor.status == "healthy" and .triggerer.status == "healthy"' > /dev/null; do
+    echo "Attente que le triggerer d'Airflow soit healthy..."
+    sleep 1  # Attendre 1 seconde avant de vérifier à nouveau
+done
+success_msg "Le triggerer d'Airflow est healthy"
+

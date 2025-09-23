@@ -29,11 +29,16 @@ echo "Vault récupère les certificats ..."
 vault kv get -field=certificate secret/vault/ca > vault_ca.crt
 vault kv get -field=certificate secret/consul/ca > consul_ca.crt
 vault kv get -field=certificate secret/airflow/ca > airflow_ca.crt
+vault kv get -field=certificate secret/postgresql/ca > postgresql_ca.crt
 
 mkdir -p $(dirname $AIRFLOW_PEM_PATH)  
 mkdir -p $(dirname $AIRFLOW_CA_PATH)
 mkdir -p $(dirname $AIRFLOW_KEY_PATH)
 mkdir -p $(dirname $AIRFLOW_CERT_PATH)
+mkdir -p $(dirname $AIRFLOW_AIRFLOW_PEM_PATH)  
+mkdir -p $(dirname $AIRFLOW_AIRFLOW_CA_PATH)
+mkdir -p $(dirname $AIRFLOW_AIRFLOW_KEY_PATH)
+mkdir -p $(dirname $AIRFLOW_AIRFLOW_CERT_PATH)
 #mkdir -p $(dirname $AIRFLOW_FERNET_KEY_PATH)
 
 cp airflow_ca.crt $AIRFLOW_CA_PATH
@@ -42,6 +47,7 @@ cp airflow_ca.crt $AIRFLOW_CA_PATH
 cp vault_ca.crt /usr/local/share/ca-certificates/
 cp consul_ca.crt /usr/local/share/ca-certificates/
 cp airflow_ca.crt /usr/local/share/ca-certificates/
+cp postgresql_ca.crt /usr/local/share/ca-certificates/
 #cp airflow_fernet_key.txt /usr/local/share/ca-certificates/
 
 update-ca-certificates
@@ -137,6 +143,9 @@ fi
 # Vérifier si le certificat et la clé Vault existent déjà pour Airflow
 if vault kv get -field=cert secret/airflow/airflow/certs > /dev/null 2>&1 && vault kv get -field=key secret/airflow/airflow/certs > /dev/null 2>&1; then
   echo "Le certificat mTLS airflow pour le airflow existent déjà"
+  AIRFLOW_AIRFLOW_CA=$(vault kv get -field=ca secret/airflow/airflow/certs)
+  AIRFLOW_AIRFLOW_CERT=$(vault kv get -field=cert secret/airflow/airflow/certs)
+  AIRFLOW_AIRFLOW_KEY=$(vault kv get -field=key secret/airflow/airflow/certs)
 else
   # Générer le certificat et la clé
   echo "Générer le certificat et la clé"
