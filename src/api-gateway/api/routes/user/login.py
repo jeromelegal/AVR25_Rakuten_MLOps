@@ -7,12 +7,16 @@ from config.settings import Settings
 
 # Configurer le logger pour ce module
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.DEBUG)  # Configurez le niveau de logging approprié
+logging.basicConfig(level=logging.DEBUG)
 
 router = APIRouter()
 
 def get_settings(request: Request) -> Settings:
     return request.app.state.settings
+
+class InvalidCredentials(Exception):
+    """Raised when supplied credentials are invalid."""
+    pass
 
 @router.post("/login")
 async def login(
@@ -47,14 +51,24 @@ async def login(
         logger.debug(f"Backend Tokens: {backend_tokens}")
         logger.debug(f"Backend UIDs: {backend_uid}")
 
+        # STRONG SUCCESS CRITERIA
+        user_id = (user_data or {}).get("user_id") or (user_data or {}).get("id")
+        if not user_id:
+            logger.warning(f"No valid user_id for user: {form_data.username}")
+            raise InvalidCredentials()
+
+        if not backend_tokens or len(backend_tokens) == 0:
+            logger.warning(f"No backend tokens for user: {form_data.username}")
+            raise InvalidCredentials()
+
+        if any(not t or not isinstance(t, str) for t in backend_tokens.values()):
+            logger.warning(f"Invalid backend token values for user: {form_data.username}")
+            raise InvalidCredentials()
+
         # Vérifier si l'authentification a échoué
         if not user_data or any(token is None for token in backend_tokens.values()):
             logger.warning(f"Authentication failed for user: {form_data.username}")
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Incorrect username or password",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+            raise InvalidCredentials()
 
         logger.debug(f"Authentication successful for user: {form_data.username}")
 
@@ -71,6 +85,14 @@ async def login(
             "access_token": meta_token,
             "token_type": "bearer"
         }
+    except InvalidCredentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    except HTTPException as e:
+        raise e
     except Exception as e:
         logger.error(f"Authentication error: {str(e)}")
         raise HTTPException(
