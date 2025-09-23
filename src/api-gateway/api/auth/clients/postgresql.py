@@ -193,4 +193,20 @@ class PostgreSQLClient:
         response.raise_for_status()
 
         return response.json()
+    
+    def read_categories(self, token: str, table: str) -> Dict[str, Any]:
+        """ Liste les catégories en base. """
+        base_url = self.settings.API_POSTGRESQL_BASE_URL
+        headers = self.get_headers(token)
+        session = self.get_session()
+
+        endpoint = f"{base_url}/api/internal/postgresql/entity/{table}"
+        logger.debug(f"Request URL: {endpoint}")
+
+        response = session.get(endpoint, headers=headers)
+        logger.debug(f"Response Status Code: {response.status_code}")
+        logger.debug(f"Response Content: {response.text}")
+        response.raise_for_status()
+
+        return response.json()
 
