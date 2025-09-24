@@ -95,6 +95,8 @@ set_dynamic_env_variables() {
     export _AIRFLOW_WWW_USER_PASSWORD="${AIRFLOW_PASSWORD}"
     export AIRFLOW__API__SSL_CERT="/etc/ssl/${SERVICE_NAME}/${AIRFLOW_API_SERVER_SERVICE_NAME}_${SERVICE_NAME}.crt"
     export AIRFLOW__API__SSL_KEY="/etc/ssl/${SERVICE_NAME}/${AIRFLOW_API_SERVER_SERVICE_NAME}_${SERVICE_NAME}.key"
+
+    #TODO: Use vault to store the keys
     export AIRFLOW__API_AUTH__JWT_SECRET='ykJsrdqOKXTe14WM+zDScA=='    
     export AIRFLOW__API__SECRET_KEY='ykJsrdqOKXTe14WM+zDScA=='
 
