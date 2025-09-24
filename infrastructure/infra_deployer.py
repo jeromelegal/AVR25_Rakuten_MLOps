@@ -10,8 +10,8 @@ import pwd
 import time
 import json
 import base64
-from pathlib import Path
-from typing import Dict, List, Optional
+# from pathlib import Path
+from typing import Dict #, List, Optional
 
 # Chemins et constants
 ISO_DIR = "/var/lib/libvirt/isos"
@@ -27,13 +27,6 @@ env = jinja2.Environment(
     trim_blocks=True,
     lstrip_blocks=True
 )
-
-
-
-
-
-
-import base64
 
 def decode_base64_fields(data):
     """
@@ -55,9 +48,6 @@ def decode_base64_fields(data):
         return [decode_base64_fields(item) for item in data]
     else:
         return data
-
-
-
 
 class InfraDeployer:
     def __init__(self, yaml_file: str):
@@ -302,7 +292,6 @@ class InfraDeployer:
                 return
 
             # Chemin du script de configuration
-            # script_dest = "/tmp/clone/configure_vm.sh"
             script_dest = "/tmp/clone/configure_vm.py"
 
             # Donner les permissions d'exécution au script
@@ -335,8 +324,6 @@ class InfraDeployer:
 
         except Exception as e:
             print(f"  ✗ Erreur lors de l'exécution des commandes clone_init: {e}")
-
-
 
     def clone_vm(self, source_vm_name: str, target_vm: Dict):
         """Clone une VM existante."""
@@ -403,8 +390,6 @@ class InfraDeployer:
         except libvirt.libvirtError as e:
             print(f"  ✗ Erreur lors du clonage de la VM {target_vm['name']}: {e}")
             raise
-
-
 
     def create_vm(self, vm: Dict):
         """Crée ou configure une VM."""
@@ -706,8 +691,6 @@ class InfraDeployer:
             if not close_result['success']:
                 print(f"  ✗ Échec de la fermeture du fichier {dest_path}: {close_result['error']}")
 
-
-
     def _copy_directory_via_agent(self, vm_name: str, source_dir: str, dest_dir: str) -> bool:
         """Copie un répertoire (avec sous-répertoires) dans la VM."""
         try:
@@ -831,46 +814,6 @@ class InfraDeployer:
             self.copy_files_via_agent(vm)
             # Exécuter les scripts
             self.run_scripts_via_agent(vm)
-
-    def _get_disk_size(self, disk_path: str) -> int:
-        """Obtient la taille d'un disque en Go."""
-        result = subprocess.run(['qemu-img', 'info', '--output', 'json', disk_path], capture_output=True, text=True)
-        if result.returncode != 0:
-            raise RuntimeError(f"Erreur lors de la récupération de la taille du disque {disk_path}: {result.stderr}")
-        info = json.loads(result.stdout)
-        return int(int(info['virtual-size']) / (1024 ** 3))
-
-    # def _resize_disk(self, disk_path: str, new_size_gb: int):
-    #     """Agrandit un disque qcow2."""
-    #     print(f"  ✓ Agrandissement du disque {disk_path} à {new_size_gb} Go")
-        
-    #     subprocess.run(['qemu-img', 'resize', disk_path, f"{new_size_gb}G"], check=True)
-
-    def _resize_disk_by_machine_name(self, machine_name: str, new_size_gb: int):
-        """Agrandit un disque qcow2 en fonction du nom de la machine."""
-        # Lister les volumes dans le pool "images"
-        result = subprocess.run(['virsh', 'vol-list', 'images'], capture_output=True, text=True, check=True)
-        lines = result.stdout.splitlines()
-
-        # Ignorer les lignes d'en-tête et vides
-        lines = lines[2:]  # Ignorer les deux premières lignes (en-tête et séparation)
-
-        # Trouver le volume correspondant au nom de la machine
-        volume_path = None
-        for line in lines:
-            parts = line.split()
-            if len(parts) >= 2 and machine_name in parts[0]:
-                volume_path = parts[1]
-                break
-
-        if not volume_path:
-            raise ValueError(f"Volume non trouvé pour la machine {machine_name}")
-
-        print(f"  ✓ Agrandissement du disque {volume_path} à {new_size_gb} Go")
-
-        # Redimensionner le disque
-        subprocess.run(['qemu-img', 'resize', volume_path, f"{new_size_gb}G"], check=True)
-    
 
     def _create_cloud_init_iso(self, vm: Dict) -> str:
         """Génère une ISO cloud-init."""

@@ -38,16 +38,6 @@ class VMConfigurator:
             self.log("ERROR", f"Erreur configuration DNS: {e}")
             return False
 
-    def test_internet(self):
-        """Teste la connectivité internet"""
-        self.log("INFO", "Test de la connectivité Internet...")
-        try:
-            result = self.run_command("ping -c 4 google.com", check=False)
-            return "4 received" in result if result else False
-        except Exception as e:
-            self.log("ERROR", f"Erreur test Internet: {e}")
-            return False
-
     def install_package(self, package):
         """Installe un paquet"""
         self.log("INFO", f"Installation de {package}...")
@@ -224,9 +214,6 @@ class VMConfigurator:
             return
         # Configurer les composants
         self.configure_dns()
-        if self.test_internet():
-            self.install_package("yq")
-            self.install_package("cloud-guest-utils")
         self.configure_hostname(config)
         self.configure_network(config)
         self.configure_user(config)

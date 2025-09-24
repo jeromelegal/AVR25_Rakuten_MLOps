@@ -14,7 +14,7 @@ networks:
       domain: "app.local"
       servers: ["8.8.8.8"]
 vms:
-  - name: "frontend-origin"
+  - name: "virtual-machine-origin"
     cpu: 4
     ram: 12288
     disk_size: 20
@@ -24,14 +24,14 @@ vms:
     cloud_init:
       iso: "ubuntu-24.04.1-live-server-amd64.iso"
       meta_data:
-        instance-id: frontend-origin
-        local-hostname: frontend-origin
+        instance-id: virtual-machine-origin
+        local-hostname: virtual-machine-origin
       user_data:
         #cloud-config
         autoinstall:
           version: 1
           identity:
-            hostname: frontend-origin
+            hostname: virtual-machine-origin
             username: ubuntu
             password: "$6$azI.phbtXYmpiU7T$pNQ7Ogdk9KWYnhPw4G/7p/VnxQ.vMmI/Xs56wWvhDmoEe7VRMRoSRhiA6cONZOU./N9WxdQmxuefaJDG4qxwU."
           ssh:
@@ -54,6 +54,8 @@ vms:
             - nginx
             - fcgiwrap
             - qemu-guest-agent
+            - yq 
+            - cloud-guest-utils
           late-commands:
             - |
               cat << 'EOF' > /target/etc/systemd/system/start-ssh.service
@@ -130,16 +132,15 @@ vms:
             - chown root:root /target/etc/root_service.conf
       disks:
         - name: system
-          path: "/var/lib/libvirt/images/frontend-origin.qcow2"
+          path: "/var/lib/libvirt/images/virtual-machine-origin.qcow2"
           size: 20
     copy_files:
       - source: nginx/
-        destination: /opt/test/
+        destination: /opt/
     post_install_scripts:
-      - ssh/enable.sh
       - nginx/install.sh
 
-  - name: "frontend-clone"
+  - name: "virtual-machine-clone"
     cpu: 4
     ram: 12288
     disk_size: 20
@@ -147,19 +148,19 @@ vms:
       - name: "app-net"
         ip: "192.168.100.11"  # Adresse IP statique
     clone_init:
-      source_vm: "frontend-origin"
+      source_vm: "virtual-machine-origin"
       meta_data:
-        instance-id: frontend-clone
-        local-hostname: frontend-clone
+        instance-id: virtual-machine-clone
+        local-hostname: virtual-machine-clone
       user_data:
         #cloud-config
         autoinstall:
           version: 1
           identity:
-            hostname: frontend-clone
+            hostname: virtual-machine-clone
             username: ubuntu
-            password: "ubuntu"
-            # password: "$6$azI.phbtXYmpiU7T$pNQ7Ogdk9KWYnhPw4G/7p/VnxQ.vMmI/Xs56wWvhDmoEe7VRMRoSRhiA6cONZOU./N9WxdQmxuefaJDG4qxwU."
+            #TODO: chiffrer le mot de passe
+            password: ubuntu
           ssh:
             install-server: true
             authorized-keys:
@@ -191,5 +192,5 @@ vms:
             enable: true
       disks:
         - name: system
-          path: "/var/lib/libvirt/images/frontend-clone.qcow2"
+          path: "/var/lib/libvirt/images/virtual-machine-clone.qcow2"
           size: 40
