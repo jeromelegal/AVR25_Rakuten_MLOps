@@ -1,8 +1,4 @@
-FROM ubuntu:noble-20250127
-
-# Ajouter l'utilisateur et le groupe Redis
-RUN groupadd --gid 999 --system redis && \
-    useradd --uid 999 --system --gid redis --home-dir /home/redis redis
+FROM redis:7.2-bookworm
 
 # Définir les variables d'environnement pour Redis et Vault
 ENV SERVICE_NAME=${SERVICE_NAME:-"redis"}
@@ -48,10 +44,6 @@ RUN apt-get update && apt-get install -y \
     libcap2-bin \
     nginx && \
     rm -rf /var/lib/apt/lists/*
-
-# Install redis
-COPY redis/install-redis.sh /usr/local/bin/install-redis.sh
-RUN chmod +x /usr/local/bin/install-redis.sh && install-redis.sh
 
 # Ajouter le dépôt HashiCorp et installer Consul et Vault
 RUN wget -O - https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg && \

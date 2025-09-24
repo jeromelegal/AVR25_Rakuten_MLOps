@@ -78,7 +78,7 @@ chmod 400 $REDIS_PEM_PATH
 rm -f redis_cert.json
 
 #Liste des services pour lesquels générer les certificats
-services=("${SERVICE_NAME}")
+services=("${SERVICE_NAME}" "airflow-worker" "airflow-scheduler" "airflow-triggerer" "airflow-api-server" "airflow-dag-processor")
 
 # Boucle sur chaque service
 for service_name in "${services[@]}"; do

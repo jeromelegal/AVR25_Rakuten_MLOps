@@ -89,7 +89,7 @@ chmod 600 /etc/ssl/${SERVICE_NAME}/${SERVICE_NAME}-keyfile
 
 
 #Liste des services pour lesquels générer les certificats
-services=("${SERVICE_NAME}" "api-postgresql" "mlflow" "airflow")
+services=("${SERVICE_NAME}" "api-postgresql" "mlflow" "airflow-api-server" "airflow-scheduler" "airflow-worker" "airflow-dag-processor" "airflow-triggerer")
 
 # Boucle sur chaque service
 for service_name in "${services[@]}"; do
@@ -110,7 +110,7 @@ for service_name in "${services[@]}"; do
         vault write -format=json pki_${SERVICE_NAME}/issue/${SERVICE_NAME} common_name="db_manager_user" ttl="72h" > "${SERVICE_NAME}_${service_name}_cert.json"
     elif [[ "$service_name" == "mlflow" ]]; then
         vault write -format=json pki_${SERVICE_NAME}/issue/${SERVICE_NAME} common_name="${MLFLOW_USER}" ttl="72h" > "${SERVICE_NAME}_${service_name}_cert.json"
-    elif [[ "$service_name" == "airflow" ]]; then
+    elif [[ "$service_name" == airflow* ]]; then
         vault write -format=json pki_${SERVICE_NAME}/issue/${SERVICE_NAME} common_name="${AIRFLOW_USER}" ttl="72h" > "${SERVICE_NAME}_${service_name}_cert.json"
     else
         vault write -format=json pki_${SERVICE_NAME}/issue/${SERVICE_NAME} common_name="${service_name}" ttl="72h" > "${SERVICE_NAME}_${service_name}_cert.json"

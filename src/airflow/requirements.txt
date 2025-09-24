@@ -1,8 +1,8 @@
-apache-airflow
-psycopg2-binary
-asyncpg
-apache-airflow-providers-fab
-flask-limiter==3.3.0
-Flask
-Flask-AppBuilder
-apache-airflow-providers-amazon
+# apache-airflow[celery]
+# psycopg2-binary
+# apache-airflow-providers-fab
+# flask-limiter==3.3.0
+# Flask
+# Flask-AppBuilder
+# apache-airflow-providers-amazon
+# apache-airflow-providers-celery
