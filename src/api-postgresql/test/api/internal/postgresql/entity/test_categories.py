@@ -2,7 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 from main import create_app
 from config.db import get_db_client
-from api.auth import create_internal_api_access_token, hash_password
+from api.auth import create_internal_api_access_token
 from test.config.test_settings import test_settings
 
 def print_response_details(response):
@@ -12,7 +12,7 @@ def print_response_details(response):
         print(f"Response Body: {response.text}")
 
 @pytest.mark.asyncio
-async def test_role_flow():
+async def test_gest_categories():
     app = create_app(test_settings)
     client = TestClient(app)
 
@@ -51,55 +51,19 @@ async def test_role_flow():
         "X-API-Key": api_token,
     }
 
-    # Test create role
-    role_payload = {"name": "testrole"}
-    create_response = client.post(
-        "/api/internal/postgresql/entity/role",
-        json=role_payload,
-        headers=headers
-    )
-    print_response_details(create_response)
-    assert create_response.status_code == 200
-    role_data = create_response.json()
-    assert role_data["name"] == "testrole"
-    role_id = role_data["role_id"]
-
-    # Test get role
+    # Test get categories
     response = client.get(
-        f"/api/internal/postgresql/entity/role/{role_id}",
+        f"/api/internal/postgresql/entity/categories",
         headers=headers
     )
     print_response_details(response)
     assert response.status_code == 200
-    role_data = response.json()
-    assert role_data["name"] == "testrole"
-    assert role_data["role_id"] == role_id
-
-    # Test update role
-    update_payload = {"name": "updated_testrole"}
-    update_response = client.put(
-        f"/api/internal/postgresql/entity/role/{role_id}",
-        json=update_payload,
-        headers=headers
-    )
-    print_response_details(update_response)
-    assert update_response.status_code == 200
-    role_data = update_response.json()
-    assert role_data["name"] == "updated_testrole"
-
-    # Test delete role
-    delete_response = client.delete(
-        f"/api/internal/postgresql/entity/role/{role_id}",
-        headers=headers
-    )
-    print_response_details(delete_response)
-    assert delete_response.status_code == 200
-    assert delete_response.json() == {"message": "Role deleted successfully"}
-
+    categories_data = response.json()
+    assert "categories" in categories_data
+    categories = categories_data["categories"]
+    assert len(categories) >= 2
+    
     async with get_db_client(test_settings) as db:
-        # Verify role deletion
-        deleted_role_in_db = await db.fetchrow("SELECT * FROM roles WHERE id = $1", role_id)
-        assert deleted_role_in_db is None, "Role was not deleted from the database"
-
         # Cleanup
         await db.execute("DELETE FROM users WHERE id = $1", user_id)
+
