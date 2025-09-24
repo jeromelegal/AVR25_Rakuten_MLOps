@@ -44,3 +44,39 @@ sudo mkdir -p /var/lib/libvirt/shared
 sudo chown -R "$USERNAME:$USERNAME" /var/lib/libvirt/shared
 
 sudo chmod 666 /var/lib/libvirt/shared
+
+
+sudo usermod -aG kvm $USERNAME
+
+
+
+
+
+
+
+# Vérifier si l'utilisateur est root
+if [ "$(id -u)" != "0" ]; then
+   echo "Ce script doit être exécuté en tant que root" 1>&2
+   exit 1
+fi
+
+# Définir le nom de l'utilisateur courant
+USERNAME=$(logname)
+
+# Vérifier si le groupe libvirt existe
+if grep -q '^libvirt:' /etc/group; then
+    # Ajouter l'utilisateur au groupe libvirt
+    usermod -aG libvirt "$USERNAME"
+    echo "L'utilisateur $USERNAME a été ajouté au groupe libvirt."
+else
+    echo "Le groupe libvirt n'existe pas."
+fi
+
+# Configurer sudo pour permettre à l'utilisateur d'exécuter la commande qemu-img resize sur n'importe quel fichier sans mot de passe
+SUDOERS_FILE="/etc/sudoers"
+if ! grep -q "$USERNAME ALL=(root) NOPASSWD: /usr/bin/qemu-img resize *" "$SUDOERS_FILE"; then
+    echo "$USERNAME ALL=(root) NOPASSWD: /usr/bin/qemu-img resize *" >> "$SUDOERS_FILE"
+    echo "La règle sudo a été ajoutée pour permettre à $USERNAME d'exécuter la commande qemu-img resize sur n'importe quel fichier sans mot de passe."
+fi
+
+echo "Les permissions ont été configurées avec succès."
