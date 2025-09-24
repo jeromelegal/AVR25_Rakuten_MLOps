@@ -43,7 +43,7 @@ echo "Minio connection OK"
 
 # Generate bucket and exit if not possible
 echo "Creating Minio buckets..."
-declare -a arr=("raw-images" "processed-images" "raw-models" "models" "ci-results" "results" "train-images" "test-images")
+declare -a arr=("raw-images" "processed-images" "raw-models" "models" "ci-results" "results" "train-images" "test-images" "airflow" "airflow-logs")
 for i in "${arr[@]}"
 do
     echo "$i"

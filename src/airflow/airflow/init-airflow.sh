@@ -3,7 +3,6 @@
 
 args=$1
 echo "Airflow args: ${args}"
-echo "POSTGRESQL_AIRFLOW_CONN = $POSTGRESQL_AIRFLOW_CONN"
 
 source utils.sh
 set_dynamic_env_variables
@@ -62,9 +61,18 @@ else
     fi
 fi
 
-echo $AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
-shift
 if [[ "$args" == "api-server" ]]; then
+    info_msg "Check if we should create an Airflow user..."
+    res=$(airflow users list | grep "${AIRFLOW_USER}")
+
+    info_msg "Requesting to create user."
+    export _AIRFLOW_WWW_USER_CREATE='true'
+    export _AIRFLOW_WWW_USER_USERNAME=${AIRFLOW_USER}
+    export _AIRFLOW_WWW_USER_PASSWORD=${AIRFLOW_PASSWORD}
+
+    info_msg "Requesting to migrate database."
+    export _AIRFLOW_DB_MIGRATE='true'
+    
     # source init-api-server.sh
     exec /entrypoint airflow api-server &
 elif [[ "$args" == "triggerer" ]]; then

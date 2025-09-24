@@ -62,6 +62,7 @@ vault kv get -field=certificate secret/redis/ca > redis_ca.crt
 if [ ${SERVICE_NAME} != ${AIRFLOW_API_SERVER_SERVICE_NAME} ]; then
   vault kv get -field=certificate secret/${AIRFLOW_API_SERVER_SERVICE_NAME}/ca > ${AIRFLOW_API_SERVER_SERVICE_NAME}_ca.crt
 fi
+vault kv get -field=certificate secret/minio/ca > minio_ca.crt
 
 mkdir -p $(dirname $AIRFLOW_PEM_PATH)  
 mkdir -p $(dirname $AIRFLOW_CA_PATH)
@@ -81,6 +82,7 @@ cp consul_ca.crt /usr/local/share/ca-certificates/
 cp ${VAULT_USERNAME}_ca.crt /usr/local/share/ca-certificates/
 cp postgresql_ca.crt /usr/local/share/ca-certificates/
 cp redis_ca.crt /usr/local/share/ca-certificates/
+cp minio_ca.crt /usr/local/share/ca-certificates/
 #cp airflow_fernet_key.txt /usr/local/share/ca-certificates/
 if [ ${SERVICE_NAME} != ${AIRFLOW_API_SERVER_SERVICE_NAME} ]; then
   cp ${AIRFLOW_API_SERVER_SERVICE_NAME}_ca.crt /usr/local/share/ca-certificates/
@@ -89,6 +91,7 @@ fi
 
 cat ${VAULT_USERNAME}_ca.crt >> $(python -c "import certifi; print(certifi.where())")
 cat redis_ca.crt >> $(python -c "import certifi; print(certifi.where())")
+cat minio_ca.crt >> $(python -c "import certifi; print(certifi.where())")
 
 update-ca-certificates
 
