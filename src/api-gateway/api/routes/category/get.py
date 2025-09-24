@@ -6,10 +6,7 @@ from config.settings import Settings
 from api.auth.clients.manager import ClientManager, create_client_manager
 from api.auth.token.manager import TokenManager, create_token_manager
 
-
-# Configurer le logger pour ce module
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.DEBUG)  # Configurez le niveau de logging approprié
+logger = logging.getLogger("gateway")
 
 router = APIRouter()
 
@@ -44,8 +41,6 @@ def read_psql_entity(table: str, client, token) -> dict:
         if not data:
             raise HTTPException(status_code=404, detail=f"{table}")
         return data
-    except HTTPException:
-        raise
     except Exception as e:
         logger.error(f"Error read '{table}': {e}")
         raise HTTPException(status_code=500, detail=f"Error read '{table}': {e}")
@@ -56,7 +51,7 @@ async def read_ad(
     user_data: dict = Depends(get_user_data_from_token),
     client_manager: ClientManager = Depends(get_client_manager),
 ):
-    logger.info("Starting get categories...")
+    logger.debug("Getting categories...")
     
     postgresql_token = user_data.get('tokens', {}).get('postgresql') 
     if not postgresql_token:
@@ -66,7 +61,7 @@ async def read_ad(
 
     ### Retrieves categories ###
     data = read_psql_entity("categories", postgresql_client, postgresql_token)
-    payload = data.get("categories", data) if isinstance(data, dict) else data
+    payload = data.get("categories", data)
 
     categories = [Category.model_validate(item) for item in payload]
     return categories

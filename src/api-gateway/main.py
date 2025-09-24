@@ -15,7 +15,7 @@ import logging
 
 # Configurer le logging
 logging.basicConfig(level=logging.WARNING)
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("gateway")
 
 def create_app(settings: Settings):
     app = FastAPI()
