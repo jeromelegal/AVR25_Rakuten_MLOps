@@ -62,4 +62,8 @@ async def test_gest_categories():
     assert "categories" in categories_data
     categories = categories_data["categories"]
     assert len(categories) >= 2
+    
+    async with get_db_client(test_settings) as db:
+        # Cleanup
+        await db.execute("DELETE FROM users WHERE id = $1", user_id)
 
