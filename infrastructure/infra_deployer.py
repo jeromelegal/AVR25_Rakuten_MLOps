@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import base64
 import os
 import yaml
 import libvirt
@@ -17,7 +18,6 @@ ISO_DIR = "/var/lib/libvirt/isos"
 VM_IMAGES_DIR = "/var/lib/libvirt/images"
 CLOUD_INIT_ISO_DIR = "/var/lib/libvirt/cloud_init_isos"
 TEMPLATES_DIR = os.path.join(os.path.dirname(__file__), "templates")
-SHARED_DIR = "/var/lib/libvirt/shared"
 SCRIPTS_DIR = os.path.join(os.path.dirname(__file__), "scripts")
 FILES_DIR = os.path.join(os.path.dirname(__file__), "files")
 
@@ -27,6 +27,37 @@ env = jinja2.Environment(
     trim_blocks=True,
     lstrip_blocks=True
 )
+
+
+
+
+
+
+import base64
+
+def decode_base64_fields(data):
+    """
+    Décode les champs en base64 dans un dictionnaire de manière récursive.
+    """
+    if isinstance(data, dict):
+        decoded_dict = {}
+        for key, value in data.items():
+            if key in ['out-data', 'err-data'] and isinstance(value, str):
+                try:
+                    decoded_value = base64.b64decode(value).decode('utf-8')
+                    decoded_dict[key] = decoded_value
+                except (base64.binascii.Error, UnicodeDecodeError):
+                    decoded_dict[key] = value
+            else:
+                decoded_dict[key] = decode_base64_fields(value)
+        return decoded_dict
+    elif isinstance(data, list):
+        return [decode_base64_fields(item) for item in data]
+    else:
+        return data
+
+
+
 
 class InfraDeployer:
     def __init__(self, yaml_file: str):
@@ -72,14 +103,6 @@ class InfraDeployer:
                 errors.append("Impossible de se connecter à libvirt (vérifiez les permissions)")
         except Exception as e:
             errors.append(f"Erreur de connexion à libvirt: {e}")
-        if not os.path.exists(SHARED_DIR):
-            errors.append(f"Le répertoire {SHARED_DIR} n'existe pas")
-        else:
-            mode = os.stat(SHARED_DIR).st_mode
-            if not (mode & 0o777) == 0o777:
-                errors.append(f"Le répertoire {SHARED_DIR} n'a pas les permissions 777")
-        if errors:
-            raise RuntimeError("Prérequis non satisfaits:\n" + "\n".join(f"  - {e}" for e in errors))
 
     def load_infra(self):
         """Charge et valide le fichier YAML."""
@@ -209,6 +232,112 @@ class InfraDeployer:
         subprocess.run(cmd, check=True)
         print(f"  ✓ VM {vm['name']} installée avec autoinstall")
 
+
+    def apply_clone_init_via_agent(self, vm: Dict):
+        """Applique la configuration clone_init via qemu-guest-agent."""
+        if 'clone_init' not in vm:
+            print(f"  ! Pas de configuration clone_init pour la VM {vm['name']}")
+            return
+
+        try:
+            # Récupérer la configuration clone_init
+            clone_init = vm['clone_init']
+            print(f"  ✓ Configuration clone_init trouvée pour {vm['name']}")
+
+            # Commande pour lister les disques disponibles
+            get_disks_cmd = {
+                "execute": "guest-get-disks"
+            }
+            print(f"  🚀 Exécution de la commande: {get_disks_cmd}")
+            result = self.execute_via_qemu_agent(vm['name'], get_disks_cmd)
+            result_decoded = decode_base64_fields(result)
+            print(f"  📋 Résultat de la commande 'guest-get-disks': {result_decoded}")
+
+            # Commandes pour vérifier et monter le CD-ROM
+            commands_to_run = [
+                "lsblk",  # Lister tous les périphériques de bloc
+                "ls /dev/sr0",  # Vérifier si le périphérique CD-ROM existe
+                "mkdir -p /mnt",  # Créer un point de montage si nécessaire
+            ]
+
+            # Exécution des commandes via l'agent
+            for cmd in commands_to_run:
+                print(f"  🚀 Exécution de la commande: {cmd}")
+                result = self.execute_via_qemu_agent(vm['name'], cmd)
+                result_decoded = decode_base64_fields(result)
+                print(f"  📋 Résultat de la commande '{cmd}': {result_decoded}")
+
+            # Vérifier le système de fichiers du CD-ROM
+            blkid_cmd = "blkid /dev/sr0"
+            print(f"  🚀 Exécution de la commande: {blkid_cmd}")
+            result = self.execute_via_qemu_agent(vm['name'], blkid_cmd)
+            result_decoded = decode_base64_fields(result)
+            print(f"  📋 Résultat de la commande '{blkid_cmd}': {result_decoded}")
+
+            # Essayer de monter le CD-ROM avec des options spécifiques
+            mount_cmd = "mount -t iso9660 /dev/sr0 /mnt"
+            print(f"  🚀 Exécution de la commande: {mount_cmd}")
+            result = self.execute_via_qemu_agent(vm['name'], mount_cmd)
+            result_decoded = decode_base64_fields(result)
+            print(f"  📋 Résultat de la commande '{mount_cmd}': {result_decoded}")
+
+            if not result_decoded.get('success', False) or result_decoded.get('output', {}).get('return', {}).get('exitcode', 0) != 0:
+                print("  ⚠️ Échec du montage du CD-ROM avec des options spécifiques.")
+                return
+
+            # Lister le contenu du CD-ROM
+            ls_cmd = "ls /mnt"
+            print(f"  🚀 Exécution de la commande: {ls_cmd}")
+            result = self.execute_via_qemu_agent(vm['name'], ls_cmd)
+            result_decoded = decode_base64_fields(result)
+            print(f"  📋 Résultat de la commande '{ls_cmd}': {result_decoded}")
+
+
+            # Copier le répertoire clone depuis SCRIPTS_DIR vers la VM
+            clone_dir = os.path.join(SCRIPTS_DIR, "clone")
+            dest_dir = "/tmp"
+            print(f"  - Copie du répertoire {clone_dir} vers {dest_dir}")
+            if not self._copy_directory_via_agent(vm['name'], clone_dir, dest_dir):
+                print(f"  ✗ Échec de la copie du répertoire {clone_dir}")
+                return
+
+            # Chemin du script de configuration
+            # script_dest = "/tmp/clone/configure_vm.sh"
+            script_dest = "/tmp/clone/configure_vm.py"
+
+            # Donner les permissions d'exécution au script
+            chmod_cmd = {
+                "execute": "guest-exec",
+                "arguments": {
+                    "path": "/bin/chmod",
+                    "arg": ["+x", script_dest],
+                    "capture-output": True
+                }
+            }
+            chmod_result = self.execute_via_qemu_agent(vm['name'], chmod_cmd)
+            if not chmod_result['success']:
+                print(f"  ✗ Échec de la modification des permissions pour {script_dest}: {chmod_result['error']}")
+                return
+
+            # Exécuter le script
+            exec_cmd = {
+                "execute": "guest-exec",
+                "arguments": {
+                    "path": script_dest,
+                    "capture-output": True
+                }
+            }
+            exec_result = self.execute_via_qemu_agent(vm['name'], exec_cmd)
+            if exec_result['success']:
+                print(f"  ✓ Script {script_dest} exécuté sur {vm['name']}")
+            else:
+                print(f"  ✗ Erreur lors de l'exécution du script {script_dest}: {exec_result['error']}")
+
+        except Exception as e:
+            print(f"  ✗ Erreur lors de l'exécution des commandes clone_init: {e}")
+
+
+
     def clone_vm(self, source_vm_name: str, target_vm: Dict):
         """Clone une VM existante."""
         if self.vm_exists(target_vm['name']):
@@ -216,30 +345,66 @@ class InfraDeployer:
             return
         try:
             source_domain = self.conn.lookupByName(source_vm_name)
-        except libvirt.libvirtError:
-            print(f"  ✗ VM source {source_vm_name} non trouvée dans libvirt")
-            return
-        # Créer le disque pour la VM clonée
-        for disk in target_vm['clone_init'].get('disks', [{'name': 'system', 'path': f"{VM_IMAGES_DIR}/{target_vm['name']}.qcow2", 'size': target_vm['disk_size']}]):
-            source_disk_path = f"{VM_IMAGES_DIR}/{source_vm_name}.qcow2"
-            if not os.path.exists(source_disk_path):
-                print(f"  ✗ Disque source {source_disk_path} introuvable")
-                return
-            source_disk_size = self._get_disk_size(source_disk_path)
-            target_disk_size = disk.get('size', target_vm['disk_size'])
-            self._create_disk(disk['path'], target_disk_size)
-            subprocess.run(['qemu-img', 'create', '-f', 'qcow2', '-b', source_disk_path, '-F', 'qcow2', disk['path']], check=True)
-            if target_disk_size > source_disk_size:
-                self._resize_disk(disk['path'], target_disk_size)
-        # Créer le XML pour la VM clonée
-        template = env.get_template('vm.xml.j2')
-        vm_xml = template.render(vm=target_vm, vm_images_dir=VM_IMAGES_DIR)
-        try:
-            self.conn.defineXML(vm_xml)
+            # Vérifier si la VM source est allumée et l'éteindre si nécessaire
+            was_active = False
+            if source_domain.isActive():
+                was_active = True
+                print(f"  ⏳ Extinction de la VM source {source_vm_name}...")
+                source_domain.shutdown()
+                # Attendre que la VM source soit éteinte
+                if not self.wait_for_vm_shutdown(source_vm_name):
+                    print(f"  ✗ Impossible d'éteindre la VM source {source_vm_name}")
+                    return
+            # Utiliser virt-clone pour cloner la VM
+            cmd = [
+                "virt-clone",
+                "--original", source_vm_name,
+                "--name", target_vm['name'],
+                "--auto-clone"
+            ]
+            subprocess.run(cmd, check=True)
+            # Créer l'ISO clone_init
+            clone_init_iso = self._create_clone_init_iso(target_vm)
+            # Attacher l'ISO à la VM clonée en utilisant un contrôleur SATA
+            cmd = [
+                "virsh",
+                "attach-disk",
+                target_vm['name'],
+                clone_init_iso,
+                "--type", "cdrom",
+                "--target", "sdc",  # Utiliser un périphérique SATA différent
+                "--persistent"
+            ]
+            subprocess.run(cmd, check=True)
             print(f"  ✓ VM {target_vm['name']} clonée à partir de {source_vm_name}")
+            # Démarrer la VM pour appliquer la configuration clone_init
+            domain = self.conn.lookupByName(target_vm['name'])
+            domain.create()
+            print(f"  ✓ VM {target_vm['name']} démarrée")
+            # Attendre que l'agent QEMU soit disponible
+            if not self.wait_for_agent(target_vm['name']):
+                print(f"  ✗ Timeout atteint en attendant qemu-guest-agent pour {target_vm['name']}")
+                return
+            # Agrandir le disque à la taille spécifiée
+            for disk in target_vm['clone_init'].get('disks', [{'name': 'system', 'path': f"{VM_IMAGES_DIR}/{target_vm['name']}.qcow2", 'size': target_vm['disk_size']}]):
+                disk_path = disk['path']
+                new_size_gb = disk.get('size', target_vm['disk_size'])
+                # Utiliser virsh blockresize pour agrandir le disque
+                cmd = [
+                    "virsh",
+                    "blockresize",
+                    target_vm['name'],
+                    "--path", disk_path,
+                    "--size", f"{new_size_gb}G"
+                ]
+                subprocess.run(cmd, check=True)
+            # Appliquer la configuration clone_init
+            self.apply_clone_init_via_agent(target_vm)
         except libvirt.libvirtError as e:
             print(f"  ✗ Erreur lors du clonage de la VM {target_vm['name']}: {e}")
             raise
+
+
 
     def create_vm(self, vm: Dict):
         """Crée ou configure une VM."""
@@ -259,7 +424,7 @@ class InfraDeployer:
                 print(f"  ✗ Erreur lors de la configuration de la VM {vm['name']}: {e}")
                 raise
 
-    def wait_for_vm_shutdown(self, name: str, timeout: int = 300, interval: int = 1):
+    def wait_for_vm_shutdown(self, name: str, timeout: int = 3000, interval: int = 1) -> bool:
         """Attend qu'une VM s'éteigne."""
         start_time = time.time()
         print(f"\n⏳ Attente de l'extinction de la VM {name}...")
@@ -286,260 +451,375 @@ class InfraDeployer:
             print(f"  ✗ Erreur lors du démarrage de la VM {name}: {e}")
             raise
 
-    def execute_via_qemu_agent(self, vm_name: str, command: Dict, timeout: int = 30) -> str:
-        """Exécute une commande dans une VM via qemu-guest-agent."""
+
+    def execute_via_qemu_agent(self, vm_name: str, command, username: str = "root", wait_for_completion: bool = True, timeout: int = 30) -> Dict:
+        """
+        Exécute une commande dans une VM via qemu-guest-agent avec l'utilisateur spécifié et retourne si elle s'est bien exécutée ou non.
+        """
         try:
+            # Liste des commandes internes qui ne doivent pas être modifiées
+            internal_commands = ["guest-ping", "guest-sync", "guest-get-users", "guest-exec-status", "guest-info", "guest-get-fsinfo", "guest-get-disks", "guest-network-get-interfaces", "guest-file-open", "guest-file-write", "guest-file-close"]
+            # Si la commande est une commande interne, ne pas la modifier
+            if isinstance(command, dict) and command.get("execute") in internal_commands:
+                command_dict = command
+            elif isinstance(command, str) and command in internal_commands:
+                command_dict = {"execute": command}
+            else:
+                # Si la commande est une chaîne de caractères, la traiter comme une commande normale
+                if isinstance(command, str):
+                    parts = command.split()
+                    path = parts[0]
+                    args = parts[1:] if len(parts) > 1 else []
+                    command_dict = {
+                        "execute": "guest-exec",
+                        "arguments": {
+                            "path": path,
+                            "arg": args,
+                            "capture-output": True
+                        }
+                    }
+                elif isinstance(command, dict):
+                    # Si la commande est déjà un dictionnaire, l'utiliser directement
+                    command_dict = command
+                else:
+                    raise ValueError("La commande doit être une chaîne de caractères ou un dictionnaire")
+
+            # Exécution de la commande
             cmd = [
                 "virsh",
                 "qemu-agent-command",
                 vm_name,
-                json.dumps(command)
+                json.dumps(command_dict)
             ]
-            print(f"Exécutant la commande: {' '.join(cmd)}")
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
             if result.returncode != 0:
-                print(f"Erreur lors de l'exécution de la commande: {result.stderr}")
-                raise RuntimeError(f"Erreur lors de l'exécution de la commande dans {vm_name}: {result.stderr}")
-            print(f"Résultat brut: {result.stdout}")
-            return result.stdout
+                return {
+                    'success': False,
+                    'output': None,
+                    'error': f"Erreur lors de l'exécution de la commande: {result.stderr}",
+                    'pid': None
+                }
+            try:
+                output = json.loads(result.stdout)
+            except json.JSONDecodeError:
+                return {
+                    'success': False,
+                    'output': None,
+                    'error': f"Réponse invalide de l'agent: {result.stdout}",
+                    'pid': None
+                }
+
+            # Vérifier si la commande est de type guest-exec et si nous devons attendre la fin de l'exécution
+            if command_dict.get("execute") == "guest-exec" and 'return' in output and 'pid' in output['return'] and wait_for_completion:
+                pid = output['return']['pid']
+                # Attendre que la commande se termine
+                while True:  # Attendre indéfiniment si timeout est désactivé
+                    time.sleep(1)
+                    status_cmd = {
+                        "execute": "guest-exec-status",
+                        "arguments": {
+                            "pid": pid
+                        }
+                    }
+                    status_result = subprocess.run([
+                        "virsh",
+                        "qemu-agent-command",
+                        vm_name,
+                        json.dumps(status_cmd)
+                    ], capture_output=True, text=True, timeout=10)
+                    if status_result.returncode != 0:
+                        continue
+                    try:
+                        status_output = json.loads(status_result.stdout)
+                        if 'return' in status_output and status_output['return'].get('exited', False):
+                            return {
+                                'success': True,
+                                'output': status_output,
+                                'error': None,
+                                'pid': pid
+                            }
+                    except json.JSONDecodeError:
+                        continue
+            # Vérifier si la commande a été exécutée avec succès
+            elif 'return' in output:
+                return {
+                    'success': True,
+                    'output': output,
+                    'error': None,
+                    'pid': None
+                }
+            else:
+                return {
+                    'success': False,
+                    'output': output,
+                    'error': "La commande n'a pas retourné de résultat valide",
+                    'pid': None
+                }
         except subprocess.TimeoutExpired:
-            print(f"Timeout lors de l'exécution de la commande dans {vm_name}")
-            raise
-        except subprocess.CalledProcessError as e:
-            print(f"Erreur appelée: {e.stderr}")
-            raise RuntimeError(f"Erreur lors de l'exécution de la commande dans {vm_name}: {e.stderr}")
+            return {
+                'success': False,
+                'output': None,
+                'error': "Timeout atteint après 30 secondes",
+                'pid': None
+            }
         except Exception as e:
-            print(f"Autre erreur: {str(e)}")
-            raise RuntimeError(f"Erreur lors de l'exécution de la commande dans {vm_name}: {str(e)}")
+            return {
+                'success': False,
+                'output': None,
+                'error': str(e),
+                'pid': None
+            }
 
 
-    def wait_for_agent(self, vm_name: str, timeout: int = 60) -> bool:
+    def wait_for_agent(self, vm_name: str, timeout: int = 600) -> bool:
         """Attend que le qemu-guest-agent soit disponible."""
         start_time = time.time()
-        print(f"Attente de l'agent QEMU pour {vm_name} (timeout: {timeout}s)...")
-
         while time.time() - start_time < timeout:
-            try:
-                test_cmd = {"execute": "guest-ping"}
-                print(f"Tentative de ping de l'agent...")
-                result = self.execute_via_qemu_agent(vm_name, test_cmd)
-                print(f"Réponse brute: {result}")
-
-                try:
-                    output = json.loads(result)
-                    print(f"Réponse JSON: {output}")
-                    if 'return' in output and output.get('return') == {}:
-                        print("Agent QEMU disponible !")
-                        return True
-                except json.JSONDecodeError as e:
-                    print(f"Erreur de décodage JSON: {e}")
-                    print(f"Réponse non-JSON: {result}")
-
-                time.sleep(1)
-            except Exception as e:
-                print(f"Erreur lors de la tentative de ping: {str(e)}")
-                time.sleep(1)
-
+            print("Waiting for agent...")
+            # Essayer guest-ping
+            test_cmd = "guest-ping"
+            result = self.execute_via_qemu_agent(vm_name, test_cmd)
+            if result['success'] and result['output'].get('return') == {}:
+                print("Agent QEMU disponible !")
+                return True
+            if result['error'] and "not configured" in result['error']:
+                print(f"Le canal QEMU Guest Agent n'est pas configuré pour {vm_name}")
+                return False
+            time.sleep(1)
         print(f"Timeout atteint pour l'agent QEMU de {vm_name}")
         return False
 
-
     def copy_files_via_agent(self, vm: Dict):
-        """Copie des fichiers/répertoires dans la VM."""
+        """Copie des fichiers dans la VM via qemu-guest-agent."""
         if 'copy_files' not in vm:
             return
-
         for file_item in vm['copy_files']:
             source_path = os.path.join(FILES_DIR, file_item['source'])
             if not os.path.exists(source_path):
                 print(f"  ✗ Source introuvable: {source_path}")
                 continue
-
-            # Vérifier que le chemin est absolu
-            if not os.path.isabs(source_path):
-                print(f"  ! Attention: {source_path} n'est pas un chemin absolu")
-                continue
-
+            dest_path = file_item['destination']
             if os.path.isdir(source_path):
-                self._copy_directory_via_agent(vm['name'], source_path, file_item['destination'])
+                self._copy_directory_via_agent(vm['name'], source_path, dest_path)
             else:
-                self._copy_file_via_agent(vm['name'], source_path, file_item['destination'])
+                self._copy_file_via_agent(vm['name'], source_path, dest_path)
 
-    def _copy_file_via_agent(self, vm_name: str, source_path: str, dest_path: str):
-        """Copie un fichier unique dans la VM."""
+    def _create_directory_via_agent(self, vm_name: str, path: str) -> bool:
+        """Crée un répertoire dans la VM via guest-exec."""
+        path = os.path.normpath(path)
+        if not path.startswith('/'):
+            path = '/' + path
+        cmd = f"/bin/mkdir -p {path}"
+        result = self.execute_via_qemu_agent(vm_name, cmd)
+        if result['success']:
+            print(f"  ✓ Répertoire {path} créé dans {vm_name}")
+            return True
+        else:
+            print(f"  ✗ Erreur lors de la création du répertoire {path}: {result['error']}")
+            return False
+
+    def _copy_file_via_agent(self, vm_name: str, source_path: str, dest_path: str) -> bool:
+        """Copie un fichier dans la VM."""
         try:
+            # Créer le répertoire parent si nécessaire
             dest_dir = os.path.dirname(dest_path)
-            if dest_dir:
-                mkdir_cmd = {
-                    "execute": "guest-exec",
-                    "arguments": {
-                        "path": "/bin/mkdir",
-                        "arg": ["-p", dest_dir],
-                        "capture-output": True
-                    }
-                }
-                self.execute_via_qemu_agent(vm_name, mkdir_cmd)
-
+            if dest_dir and dest_dir != '/' and not self._create_directory_via_agent(vm_name, dest_dir):
+                return False
+            # Lire le contenu du fichier source
             with open(source_path, 'rb') as f:
                 content = f.read()
-
             content_b64 = base64.b64encode(content).decode('utf-8')
-            cmd = {
-                "execute": "guest-exec",
-                "arguments": {
-                    "path": "/bin/bash",
-                    "arg": [f"echo '{content_b64}' | base64 -d > '{dest_path}'"],
-                    "capture-output": True
-                }
-            }
-            self.execute_via_qemu_agent(vm_name, cmd)
-            print(f"  ✓ Fichier {source_path} copié vers {dest_path}")
+            # Écrire le fichier
+            file_handle = None
+            try:
+                # Ouvrir le fichier
+                open_cmd = f"guest-file-open {dest_path} w"
+                open_result = self.execute_via_qemu_agent(vm_name, open_cmd)
+                if not open_result['success']:
+                    raise RuntimeError(f"Erreur lors de l'ouverture du fichier: {open_result['error']}")
+                file_handle = open_result['output']['return']
+                # Écrire le contenu par blocs
+                chunk_size = 4 * 1024 * 1024  # 4MB
+                for i in range(0, len(content_b64), chunk_size):
+                    chunk = content_b64[i:i+chunk_size]
+                    write_cmd = f"guest-file-write {file_handle} {chunk}"
+                    write_result = self.execute_via_qemu_agent(vm_name, write_cmd)
+                    if not write_result['success']:
+                        raise RuntimeError(f"Erreur lors de l'écriture: {write_result['error']}")
+                print(f"  ✓ Fichier {source_path} copié vers {dest_path}")
+                return True
+            finally:
+                if file_handle is not None:
+                    close_cmd = f"guest-file-close {file_handle}"
+                    self.execute_via_qemu_agent(vm_name, close_cmd)
         except Exception as e:
             print(f"  ✗ Erreur lors de la copie du fichier {source_path}: {e}")
+            return False
 
-    def _copy_directory_via_agent(self, vm_name: str, source_dir: str, dest_dir: str):
+    def _write_file_via_agent(self, vm_name: str, dest_path: str, content_b64: str) -> bool:
+        """Écrit un fichier dans la VM via guest-file-open et guest-file-write."""
+        # Créer le répertoire parent si nécessaire
+        dest_dir = os.path.dirname(dest_path)
+        if dest_dir and dest_dir != '/' and not self._create_directory_via_agent(vm_name, dest_dir):
+            print(f"  ✗ Échec de la création du répertoire parent {dest_dir}")
+            return False
+
+        # Ouvrir le fichier
+        open_cmd = {
+            "execute": "guest-file-open",
+            "arguments": {
+                "path": dest_path,
+                "mode": "w"
+            }
+        }
+        open_result = self.execute_via_qemu_agent(vm_name, open_cmd)
+        if not open_result['success']:
+            print(f"  ✗ Échec de l'ouverture du fichier {dest_path}: {open_result['error']}")
+            return False
+        file_handle = open_result['output']['return']
+
+        try:
+            # Écrire le contenu par morceaux
+            chunk_size = 4 * 1024 * 1024  # 4MB
+            for i in range(0, len(content_b64), chunk_size):
+                chunk = content_b64[i:i+chunk_size]
+                write_cmd = {
+                    "execute": "guest-file-write",
+                    "arguments": {
+                        "handle": file_handle,
+                        "buf-b64": chunk
+                    }
+                }
+                write_result = self.execute_via_qemu_agent(vm_name, write_cmd)
+                if not write_result['success']:
+                    print(f"  ✗ Échec de l'écriture du fichier {dest_path}: {write_result['error']}")
+                    return False
+            return True
+        finally:
+            close_cmd = {
+                "execute": "guest-file-close",
+                "arguments": {
+                    "handle": file_handle
+                }
+            }
+            close_result = self.execute_via_qemu_agent(vm_name, close_cmd)
+            if not close_result['success']:
+                print(f"  ✗ Échec de la fermeture du fichier {dest_path}: {close_result['error']}")
+
+
+
+    def _copy_directory_via_agent(self, vm_name: str, source_dir: str, dest_dir: str) -> bool:
         """Copie un répertoire (avec sous-répertoires) dans la VM."""
         try:
             # Normaliser les chemins
             source_dir = os.path.normpath(source_dir)
-            dir_name = os.path.basename(source_dir)
-
-            # Vérifier que le répertoire existe et n'est pas vide
+            dest_dir = os.path.normpath(dest_dir)
+            # Vérifier que le répertoire source existe
             if not os.path.exists(source_dir):
                 print(f"  ✗ Répertoire source {source_dir} introuvable")
-                return
-
-            if not os.listdir(source_dir):
-                print(f"  ! Répertoire {source_dir} est vide, ignoré")
-                return
-
+                return False
             # Créer une archive tar.gz
             tar_path = "/tmp/copy_dir.tar.gz"
             parent_dir = os.path.dirname(source_dir)
-
+            dir_name = os.path.basename(source_dir)
             subprocess.run([
                 "tar", "czf", tar_path,
                 "-C", parent_dir,
                 dir_name
             ], check=True)
-
-            # Lire et envoyer l'archive
+            # Lire l'archive
             with open(tar_path, 'rb') as f:
                 tar_content = f.read()
-
             tar_content_b64 = base64.b64encode(tar_content).decode('utf-8')
-
-            # Commande pour la VM
-            cmd = {
-                "execute": "guest-exec",
-                "arguments": {
-                    "path": "/bin/bash",
-                    "arg": [
-                        f"echo '{tar_content_b64}' | base64 -d > /tmp/copy_dir.tar.gz && "
-                        f"mkdir -p '{os.path.dirname(dest_dir)}' && "
-                        f"tar xzf /tmp/copy_dir.tar.gz -C '{os.path.dirname(dest_dir)}' && "
-                        "rm /tmp/copy_dir.tar.gz"
-                    ],
-                    "capture-output": True
-                }
-            }
-
-            self.execute_via_qemu_agent(vm_name, cmd)
+            # Créer le répertoire de destination
+            if not self._create_directory_via_agent(vm_name, dest_dir):
+                return False
+            # Écrire l'archive dans la VM
+            archive_dest = f"{dest_dir}/archive.tar.gz"
+            if not self._write_file_via_agent(vm_name, archive_dest, tar_content_b64):
+                return False
+            # Extraire l'archive
+            extract_cmd = f"/bin/tar xzf {archive_dest} -C {dest_dir}"
+            extract_result = self.execute_via_qemu_agent(vm_name, extract_cmd)
+            if not extract_result['success']:
+                print(f"  ✗ Erreur lors de l'extraction de l'archive: {extract_result['error']}")
+                return False
+            # Supprimer l'archive
+            rm_cmd = f"/bin/rm -f {archive_dest}"
+            self.execute_via_qemu_agent(vm_name, rm_cmd)
             print(f"  ✓ Répertoire {source_dir} copié vers {dest_dir}")
+            return True
         except subprocess.CalledProcessError as e:
             print(f"  ✗ Erreur lors de la création de l'archive: {e}")
-            print(f"  ! Commande tar échouée pour {source_dir}")
+            return False
         except Exception as e:
             print(f"  ✗ Erreur lors de la copie du répertoire {source_dir}: {e}")
+            return False
         finally:
-            # Nettoyer l'archive temporaire
-            if os.path.exists(tar_path):
+            if 'tar_path' in locals() and os.path.exists(tar_path):
                 try:
                     os.remove(tar_path)
                 except:
                     pass
 
-    def apply_clone_init_via_agent(self, vm: Dict):
-        """Applique la configuration clone_init."""
-        clone_init_iso = self._create_clone_init_iso(vm)
-        with open(clone_init_iso, 'rb') as f:
-            iso_content = f.read()
-
-        iso_content_b64 = base64.b64encode(iso_content).decode('utf-8')
-        cmd = {
-            "execute": "guest-exec",
-            "arguments": {
-                "path": "/bin/bash",
-                "arg": [
-                    f"echo '{iso_content_b64}' | base64 -d > /tmp/clone-init.iso && "
-                    "mkdir -p /mnt && "
-                    "mount -o loop /tmp/clone-init.iso /mnt && "
-                    "cp -r /mnt/* /opt/ && "
-                    "umount /mnt && "
-                    "rm /tmp/clone-init.iso"
-                ],
-                "capture-output": True
-            }
-        }
-        try:
-            self.execute_via_qemu_agent(vm['name'], cmd)
-            print(f"  ✓ Configuration clone_init appliquée à {vm['name']}")
-        except Exception as e:
-            print(f"  ✗ Erreur lors de l'application de la configuration clone_init: {e}")
 
     def run_scripts_via_agent(self, vm: Dict):
-        """Copie et exécute tous les scripts dans la VM."""
-        scripts = vm.get('post_install_scripts', [])
-
-        # Ajouter le script de configuration s'il existe
-        config_script = os.path.join(SCRIPTS_DIR, "configure_vm.sh")
-        if os.path.exists(config_script):
-            scripts.append("configure_vm.sh")
-
-        if not scripts:
+        """Exécute les scripts dans la VM."""
+        if 'post_install_scripts' not in vm:
             print(f"  ! Aucun script à exécuter pour {vm['name']}")
             return
-
-        for script in scripts:
+        for script in vm['post_install_scripts']:
             script_path = os.path.join(SCRIPTS_DIR, script)
             if not os.path.exists(script_path):
                 print(f"  ✗ Script introuvable: {script_path}")
                 continue
-
-            # 1. Copier le script dans la VM
+            # Chemin de destination
             script_dest = f"/tmp/{os.path.basename(script_path)}"
-            self._copy_file_via_agent(vm['name'], script_path, script_dest)
-
-            # 2. Exécuter le script dans la VM
-            cmd = {
+            print(f"  - Copie du script {script_path} vers {script_dest}")
+            # Lire le contenu du script
+            with open(script_path, 'rb') as f:
+                script_content = f.read()
+            script_content_b64 = base64.b64encode(script_content).decode('utf-8')
+            # Écrire le script dans la VM
+            if not self._write_file_via_agent(vm['name'], script_dest, script_content_b64):
+                print(f"  ✗ Échec de l'écriture du script {script} dans {vm['name']}")
+                continue
+            # Donner les permissions d'exécution
+            chmod_cmd = {
                 "execute": "guest-exec",
                 "arguments": {
-                    "path": "/bin/bash",
-                    "arg": [
-                        f"chmod +x {script_dest} && "
-                        f"{script_dest}"
-                    ],
+                    "path": "/bin/chmod",
+                    "arg": ["+x", script_dest],
                     "capture-output": True
                 }
             }
-            try:
-                self.execute_via_qemu_agent(vm['name'], cmd)
+            chmod_result = self.execute_via_qemu_agent(vm['name'], chmod_cmd)
+            if not chmod_result['success']:
+                print(f"  ✗ Échec de la modification des permissions pour {script_dest}: {chmod_result['error']}")
+                continue
+            # Exécuter le script
+            exec_cmd = {
+                "execute": "guest-exec",
+                "arguments": {
+                    "path": script_dest,
+                    "capture-output": True
+                }
+            }
+            exec_result = self.execute_via_qemu_agent(vm['name'], exec_cmd)
+            if exec_result['success']:
                 print(f"  ✓ Script {script} exécuté sur {vm['name']}")
-            except Exception as e:
-                print(f"  ✗ Erreur lors de l'exécution du script {script}: {e}")
+            else:
+                print(f"  ✗ Erreur lors de l'exécution du script {script}: {exec_result['error']}")
 
     def deploy_vms_via_agent(self):
-        """Déploie les VMs en utilisant exclusivement qemu-guest-agent."""
+        """Déploie les VMs en utilisant les fonctionnalités avancées de l'agent."""
         for vm in self.infra['vms']:
-            print(f"Déploiement de la VM {vm['name']}...")
-
+            print(f"\nDéploiement de la VM {vm['name']}...")
             # Créer la VM
             self.create_vm(vm)
-
             # Attendre que la VM s'éteigne après l'installation
             if 'cloud_init' in vm:
                 self.wait_for_vm_shutdown(vm['name'])
-
             # Démarrer la VM
             self.start_vm(vm['name'])
             # Attendre que l'agent soit disponible
@@ -547,14 +827,9 @@ class InfraDeployer:
                 print(f"  ❌ Timeout atteint en attendant qemu-guest-agent pour {vm['name']}")
                 continue
 
-            # Configurer la VM
-            if 'clone_init' in vm:
-                self.apply_clone_init_via_agent(vm)
-
-            # Copier les fichiers via l'agent
+            # Copier les fichiers
             self.copy_files_via_agent(vm)
-
-            # Exécuter tous les scripts via l'agent
+            # Exécuter les scripts
             self.run_scripts_via_agent(vm)
 
     def _get_disk_size(self, disk_path: str) -> int:
@@ -565,10 +840,37 @@ class InfraDeployer:
         info = json.loads(result.stdout)
         return int(int(info['virtual-size']) / (1024 ** 3))
 
-    def _resize_disk(self, disk_path: str, new_size_gb: int):
-        """Agrandit un disque qcow2."""
-        print(f"  ✓ Agrandissement du disque {disk_path} à {new_size_gb} Go")
-        subprocess.run(['qemu-img', 'resize', disk_path, f"{new_size_gb}G"], check=True)
+    # def _resize_disk(self, disk_path: str, new_size_gb: int):
+    #     """Agrandit un disque qcow2."""
+    #     print(f"  ✓ Agrandissement du disque {disk_path} à {new_size_gb} Go")
+        
+    #     subprocess.run(['qemu-img', 'resize', disk_path, f"{new_size_gb}G"], check=True)
+
+    def _resize_disk_by_machine_name(self, machine_name: str, new_size_gb: int):
+        """Agrandit un disque qcow2 en fonction du nom de la machine."""
+        # Lister les volumes dans le pool "images"
+        result = subprocess.run(['virsh', 'vol-list', 'images'], capture_output=True, text=True, check=True)
+        lines = result.stdout.splitlines()
+
+        # Ignorer les lignes d'en-tête et vides
+        lines = lines[2:]  # Ignorer les deux premières lignes (en-tête et séparation)
+
+        # Trouver le volume correspondant au nom de la machine
+        volume_path = None
+        for line in lines:
+            parts = line.split()
+            if len(parts) >= 2 and machine_name in parts[0]:
+                volume_path = parts[1]
+                break
+
+        if not volume_path:
+            raise ValueError(f"Volume non trouvé pour la machine {machine_name}")
+
+        print(f"  ✓ Agrandissement du disque {volume_path} à {new_size_gb} Go")
+
+        # Redimensionner le disque
+        subprocess.run(['qemu-img', 'resize', volume_path, f"{new_size_gb}G"], check=True)
+    
 
     def _create_cloud_init_iso(self, vm: Dict) -> str:
         """Génère une ISO cloud-init."""

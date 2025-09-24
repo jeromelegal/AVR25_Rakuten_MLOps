@@ -1,6 +1,8 @@
 #!/bin/bash
-source /etc/environment
 
+
+
+source /etc/environment
 
 #capture tous les noms de domaine
 export SERVICE_NAME="$(hostname)"

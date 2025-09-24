@@ -17,6 +17,10 @@
   <on_poweroff>destroy</on_poweroff>
   <on_reboot>restart</on_reboot>
   <on_crash>restart</on_crash>
+  <channel type='unix'>
+    <source mode='bind' path='/var/lib/libvirt/qemu/{{ vm.name }}.agent'/>
+    <target type='virtio' name='org.qemu.guest_agent.0'/>
+  </channel>
   <devices>
     <!-- Disques -->
     {% if 'cloud_init' in vm %}
