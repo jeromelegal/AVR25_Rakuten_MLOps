@@ -51,8 +51,8 @@ def _create_ad(headers):
         data = {
             "designation": "Produit flow",
             "description": "Desc flow init",
-            "category_code": 1000,
-            "category_label": "CAT1",
+            "category_code": 10,
+            "category_label": "Livre occasion",
         }
         response = client.post(
             f"{test_settings.PROTECTED_ENDPOINT_URL}/create_ad",

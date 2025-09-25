@@ -55,8 +55,8 @@ CREATE TABLE categories (
 -- Créer une table images
 CREATE TABLE images (
     id SERIAL PRIMARY KEY,
-    image_name VARCHAR(50),
-    image_uuid VARCHAR(50) UNIQUE,
+    image_name VARCHAR(100),
+    image_uuid VARCHAR(100) UNIQUE,
     bucket_path VARCHAR(100),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_by INT NOT NULL

@@ -143,20 +143,20 @@ def _store_temp_image_from_bytes(
 ) -> tuple[str, ImageInfo]:
     if image_id is None:
         image_id = uuid.uuid4()
-    # TODO: Accept other format on top of JPG
-    image_path = os.path.join(bucket, f"{image_id}.jpg")
+    
+    image_path = os.path.join(bucket, str(image_id))
     image_name = filename or f"{image_id}"
 
     stream = io.BytesIO(file)
     image = Image.open(stream)
-    image_id = str(uuid.uuid4())
+    #image_id = str(uuid.uuid4())
     info = ImageInfo(
-        image_id=image_id,
+        image_id=str(image_id),
         image_name=image_name,
         bucket_path=image_path,
         created_at=datetime.now().strftime(format=DATETIME_FORMAT),
     )
-
+    # TODO: Accept other format on top of JPG
     tmp_path = os.path.join(tmp_folder, f"{image_id}.jpg")
     image.save(tmp_path)
 

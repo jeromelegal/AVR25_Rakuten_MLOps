@@ -39,7 +39,7 @@ async def create_category(request: Request, data: Category, current_user: dict =
             data_dict["created_at"],
             data_dict["created_by"]
         )
-        data_dict["id"] = str(category_id)
+        data_dict["id"] = category_id
         return CategoryResponse(**data_dict)
 
 @router.get("/api/internal/postgresql/entity/category/{category_id}", response_model=CategoryResponse)
@@ -105,5 +105,24 @@ async def delete_category(category_id: int, current_user: Dict = Depends(get_cur
             return {"message": "Category deleted successfully"}
         raise HTTPException(status_code=404, detail="Category not found")
 
+@router.get("/api/internal/postgresql/entity/category/by-code/{code}", response_model=CategoryResponse)
+async def get_category_by_code(code: int, current_user: Dict = Depends(get_current_user), request: Request = None):
+    settings: Settings = request.app.state.settings
 
+    #TODO SETUP ROLE
+    # if "superadmin" not in current_user.get("roles", []):
+    #     raise HTTPException(status_code=403, detail="Not enough permissions")
+
+    async with get_db_client(settings) as conn:
+        result = await conn.fetchrow(
+            """
+            SELECT id, code, label, created_at, created_by
+            FROM categories
+            WHERE code = $1
+            """,
+            code
+        )
+        if result:
+            return CategoryResponse(**result)
+        raise HTTPException(status_code=404, detail="Category not found")
 
