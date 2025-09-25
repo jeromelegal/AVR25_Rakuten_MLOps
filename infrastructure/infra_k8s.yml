@@ -1,0 +1,346 @@
+version: "1.0"
+name: "infra-k8s"
+description: "Infrastructure Kubernetes multi-master"
+networks:
+  - name: "k8s-net"
+    description: "Réseau pour le cluster Kubernetes"
+    type: "nat"
+    subnet: "192.168.200.1/24"
+    dhcp:
+      start: "192.168.200.2"
+      end: "192.168.200.200"
+    dns:
+      enabled: true
+      domain: "k8s.local"
+      servers: ["8.8.8.8", "8.8.4.4"]
+
+vms:
+  - name: "k8s-master1"
+    cpu: 2
+    ram: 8192
+    disk_size: 20
+    networks:
+      - name: "k8s-net"
+        ip: "192.168.200.11"
+    clone_init:
+      source_vm: "kubernetes-origin"
+      meta_data:
+        instance-id: k8s-master1
+        local-hostname: k8s-master1
+      user_data:
+        #cloud-config
+        autoinstall:
+          version: 1
+          identity:
+            hostname: k8s-master1
+            username: ubuntu
+            password: ubuntu
+          ssh:
+            install-server: true
+            authorized-keys:
+              - "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDBCp7UHEy9aOkk7N6NixYu+gxnyuUHEyjKKE3qk7YijR2dKZHWREsWVr/H6ibL50iZx8ubbTCyNCwhEnyX8J2DipJHtlfw0c2CYj1JW4DMnhQ7P6Cur0dMnPOhu3l1fg9WeEEAfKPm6D9OszWCg/A6Q6dDXDYv0T5WlUiEpnGvJsAlQqOJ64wx75LwwBXEqC089T5lZE50gisDXjkwNf9HFvEPLdUmxKG5s9ttcR8M5/BHJNB0kR+pGaY9QPG67CFchgSFpPtj+Kn/go4uDuv4TrpxWrcvOuLRK7w3ssEGREyVIOmhEJytKkOBnkgAPTadm0LY4UmnJQTH2n2ywkVm51WrgJbwsZ/6YonewGJxJLGsuQ/BSQ8VYrVZQ9Vu6q9mOJd1ORhRjjvtEpk1PpbAGmKESDEbElk19OY1W1WhREVrTjKlmn5sXjngYDQlkBuQfolIbx+7mqAsbIt6LU0UE886WIdyhXUY1ZoBpVNXlntS7WgR+kCcjL8jzxhUdtTCKFHjJhtQDUgEjkCez4lyVB7PRQRDX3Hp6qydL+wsC8LuuJfOb1CbkTFBqYZp1ZTYK1Thfy9USdYzQ3S+/wcUTlOCLzTtfPaY8oVhrBoPITcZsd+aut1QW+71L9h7eRwKYEK9O1NmQUDAagrfisPDjZahPD6aLwnAm5mmJICNiQ== Philippe-RM@github/131196788"
+          storage:
+            layout:
+              name: lvm
+          network:
+            version: 2
+            ethernets:
+              enp1s0:
+                dhcp4: false
+                addresses: [192.168.200.11/24]
+                gateway4: 192.168.200.1
+                nameservers:
+                  addresses: [8.8.8.8, 8.8.4.4]
+          shutdown: poweroff
+          resize_partition:
+            enable: true
+            partition: '/dev/vda3'
+            disk: '/dev/vda'
+          resize_partition_with_fdisk:
+            enable: true
+          resize_logical_volume:
+            enable: true
+      disks:
+        - name: system
+          path: "/var/lib/libvirt/images/k8s-master1.qcow2"
+          size: 40
+    copy_files:
+      - source: nginx/
+        destination: /opt/
+    post_install_scripts:
+      - nginx/install.sh
+
+  - name: "k8s-master2"
+    cpu: 2
+    ram: 8192
+    disk_size: 20
+    networks:
+      - name: "k8s-net"
+        ip: "192.168.200.12"
+    clone_init:
+      source_vm: "kubernetes-origin"
+      meta_data:
+        instance-id: k8s-master2
+        local-hostname: k8s-master2
+      user_data:
+        #cloud-config
+        autoinstall:
+          version: 1
+          identity:
+            hostname: k8s-master2
+            username: ubuntu
+            password: ubuntu
+          ssh:
+            install-server: true
+            authorized-keys:
+              - "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDBCp7UHEy9aOkk7N6NixYu+gxnyuUHEyjKKE3qk7YijR2dKZHWREsWVr/H6ibL50iZx8ubbTCyNCwhEnyX8J2DipJHtlfw0c2CYj1JW4DMnhQ7P6Cur0dMnPOhu3l1fg9WeEEAfKPm6D9OszWCg/A6Q6dDXDYv0T5WlUiEpnGvJsAlQqOJ64wx75LwwBXEqC089T5lZE50gisDXjkwNf9HFvEPLdUmxKG5s9ttcR8M5/BHJNB0kR+pGaY9QPG67CFchgSFpPtj+Kn/go4uDuv4TrpxWrcvOuLRK7w3ssEGREyVIOmhEJytKkOBnkgAPTadm0LY4UmnJQTH2n2ywkVm51WrgJbwsZ/6YonewGJxJLGsuQ/BSQ8VYrVZQ9Vu6q9mOJd1ORhRjjvtEpk1PpbAGmKESDEbElk19OY1W1WhREVrTjKlmn5sXjngYDQlkBuQfolIbx+7mqAsbIt6LU0UE886WIdyhXUY1ZoBpVNXlntS7WgR+kCcjL8jzxhUdtTCKFHjJhtQDUgEjkCez4lyVB7PRQRDX3Hp6qydL+wsC8LuuJfOb1CbkTFBqYZp1ZTYK1Thfy9USdYzQ3S+/wcUTlOCLzTtfPaY8oVhrBoPITcZsd+aut1QW+71L9h7eRwKYEK9O1NmQUDAagrfisPDjZahPD6aLwnAm5mmJICNiQ== Philippe-RM@github/131196788"
+          storage:
+            layout:
+              name: lvm
+          network:
+            version: 2
+            ethernets:
+              enp1s0:
+                dhcp4: false
+                addresses: [192.168.200.12/24]
+                gateway4: 192.168.200.1
+                nameservers:
+                  addresses: [8.8.8.8, 8.8.4.4]
+          shutdown: poweroff
+          resize_partition:
+            enable: true
+            partition: '/dev/vda3'
+            disk: '/dev/vda'
+          resize_partition_with_fdisk:
+            enable: true
+          resize_logical_volume:
+            enable: true
+      disks:
+        - name: system
+          path: "/var/lib/libvirt/images/k8s-master2.qcow2"
+          size: 40
+    copy_files:
+      - source: nginx/
+        destination: /opt/
+    post_install_scripts:
+      - nginx/install.sh
+
+  - name: "k8s-master3"
+    cpu: 2
+    ram: 8192
+    disk_size: 20
+    networks:
+      - name: "k8s-net"
+        ip: "192.168.200.13"
+    clone_init:
+      source_vm: "kubernetes-origin"
+      meta_data:
+        instance-id: k8s-master3
+        local-hostname: k8s-master3
+      user_data:
+        #cloud-config
+        autoinstall:
+          version: 1
+          identity:
+            hostname: k8s-master3
+            username: ubuntu
+            password: ubuntu
+          ssh:
+            install-server: true
+            authorized-keys:
+              - "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDBCp7UHEy9aOkk7N6NixYu+gxnyuUHEyjKKE3qk7YijR2dKZHWREsWVr/H6ibL50iZx8ubbTCyNCwhEnyX8J2DipJHtlfw0c2CYj1JW4DMnhQ7P6Cur0dMnPOhu3l1fg9WeEEAfKPm6D9OszWCg/A6Q6dDXDYv0T5WlUiEpnGvJsAlQqOJ64wx75LwwBXEqC089T5lZE50gisDXjkwNf9HFvEPLdUmxKG5s9ttcR8M5/BHJNB0kR+pGaY9QPG67CFchgSFpPtj+Kn/go4uDuv4TrpxWrcvOuLRK7w3ssEGREyVIOmhEJytKkOBnkgAPTadm0LY4UmnJQTH2n2ywkVm51WrgJbwsZ/6YonewGJxJLGsuQ/BSQ8VYrVZQ9Vu6q9mOJd1ORhRjjvtEpk1PpbAGmKESDEbElk19OY1W1WhREVrTjKlmn5sXjngYDQlkBuQfolIbx+7mqAsbIt6LU0UE886WIdyhXUY1ZoBpVNXlntS7WgR+kCcjL8jzxhUdtTCKFHjJhtQDUgEjkCez4lyVB7PRQRDX3Hp6qydL+wsC8LuuJfOb1CbkTFBqYZp1ZTYK1Thfy9USdYzQ3S+/wcUTlOCLzTtfPaY8oVhrBoPITcZsd+aut1QW+71L9h7eRwKYEK9O1NmQUDAagrfisPDjZahPD6aLwnAm5mmJICNiQ== Philippe-RM@github/131196788"
+          storage:
+            layout:
+              name: lvm
+          network:
+            version: 2
+            ethernets:
+              enp1s0:
+                dhcp4: false
+                addresses: [192.168.200.13/24]
+                gateway4: 192.168.200.1
+                nameservers:
+                  addresses: [8.8.8.8, 8.8.4.4]
+          shutdown: poweroff
+          resize_partition:
+            enable: true
+            partition: '/dev/vda3'
+            disk: '/dev/vda'
+          resize_partition_with_fdisk:
+            enable: true
+          resize_logical_volume:
+            enable: true
+      disks:
+        - name: system
+          path: "/var/lib/libvirt/images/k8s-master3.qcow2"
+          size: 40
+    copy_files:
+      - source: nginx/
+        destination: /opt/
+    post_install_scripts:
+      - nginx/install.sh
+
+  - name: "k8s-worker1"
+    cpu: 2
+    ram: 8192
+    disk_size: 20
+    networks:
+      - name: "k8s-net"
+        ip: "192.168.200.21"
+    clone_init:
+      source_vm: "kubernetes-origin"
+      meta_data:
+        instance-id: k8s-worker1
+        local-hostname: k8s-worker1
+      user_data:
+        #cloud-config
+        autoinstall:
+          version: 1
+          identity:
+            hostname: k8s-worker1
+            username: ubuntu
+            password: ubuntu
+          ssh:
+            install-server: true
+            authorized-keys:
+              - "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDBCp7UHEy9aOkk7N6NixYu+gxnyuUHEyjKKE3qk7YijR2dKZHWREsWVr/H6ibL50iZx8ubbTCyNCwhEnyX8J2DipJHtlfw0c2CYj1JW4DMnhQ7P6Cur0dMnPOhu3l1fg9WeEEAfKPm6D9OszWCg/A6Q6dDXDYv0T5WlUiEpnGvJsAlQqOJ64wx75LwwBXEqC089T5lZE50gisDXjkwNf9HFvEPLdUmxKG5s9ttcR8M5/BHJNB0kR+pGaY9QPG67CFchgSFpPtj+Kn/go4uDuv4TrpxWrcvOuLRK7w3ssEGREyVIOmhEJytKkOBnkgAPTadm0LY4UmnJQTH2n2ywkVm51WrgJbwsZ/6YonewGJxJLGsuQ/BSQ8VYrVZQ9Vu6q9mOJd1ORhRjjvtEpk1PpbAGmKESDEbElk19OY1W1WhREVrTjKlmn5sXjngYDQlkBuQfolIbx+7mqAsbIt6LU0UE886WIdyhXUY1ZoBpVNXlntS7WgR+kCcjL8jzxhUdtTCKFHjJhtQDUgEjkCez4lyVB7PRQRDX3Hp6qydL+wsC8LuuJfOb1CbkTFBqYZp1ZTYK1Thfy9USdYzQ3S+/wcUTlOCLzTtfPaY8oVhrBoPITcZsd+aut1QW+71L9h7eRwKYEK9O1NmQUDAagrfisPDjZahPD6aLwnAm5mmJICNiQ== Philippe-RM@github/131196788"
+          storage:
+            layout:
+              name: lvm
+          network:
+            version: 2
+            ethernets:
+              enp1s0:
+                dhcp4: false
+                addresses: [192.168.200.21/24]
+                gateway4: 192.168.200.1
+                nameservers:
+                  addresses: [8.8.8.8, 8.8.4.4]
+          shutdown: poweroff
+          resize_partition:
+            enable: true
+            partition: '/dev/vda3'
+            disk: '/dev/vda'
+          resize_partition_with_fdisk:
+            enable: true
+          resize_logical_volume:
+            enable: true
+      disks:
+        - name: system
+          path: "/var/lib/libvirt/images/k8s-worker1.qcow2"
+          size: 40
+    copy_files:
+      - source: nginx/
+        destination: /opt/
+    post_install_scripts:
+      - nginx/install.sh
+
+  - name: "k8s-worker2"
+    cpu: 2
+    ram: 8192
+    disk_size: 20
+    networks:
+      - name: "k8s-net"
+        ip: "192.168.200.22"
+    clone_init:
+      source_vm: "kubernetes-origin"
+      meta_data:
+        instance-id: k8s-worker2
+        local-hostname: k8s-worker2
+      user_data:
+        #cloud-config
+        autoinstall:
+          version: 1
+          identity:
+            hostname: k8s-worker2
+            username: ubuntu
+            password: ubuntu
+          ssh:
+            install-server: true
+            authorized-keys:
+              - "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDBCp7UHEy9aOkk7N6NixYu+gxnyuUHEyjKKE3qk7YijR2dKZHWREsWVr/H6ibL50iZx8ubbTCyNCwhEnyX8J2DipJHtlfw0c2CYj1JW4DMnhQ7P6Cur0dMnPOhu3l1fg9WeEEAfKPm6D9OszWCg/A6Q6dDXDYv0T5WlUiEpnGvJsAlQqOJ64wx75LwwBXEqC089T5lZE50gisDXjkwNf9HFvEPLdUmxKG5s9ttcR8M5/BHJNB0kR+pGaY9QPG67CFchgSFpPtj+Kn/go4uDuv4TrpxWrcvOuLRK7w3ssEGREyVIOmhEJytKkOBnkgAPTadm0LY4UmnJQTH2n2ywkVm51WrgJbwsZ/6YonewGJxJLGsuQ/BSQ8VYrVZQ9Vu6q9mOJd1ORhRjjvtEpk1PpbAGmKESDEbElk19OY1W1WhREVrTjKlmn5sXjngYDQlkBuQfolIbx+7mqAsbIt6LU0UE886WIdyhXUY1ZoBpVNXlntS7WgR+kCcjL8jzxhUdtTCKFHjJhtQDUgEjkCez4lyVB7PRQRDX3Hp6qydL+wsC8LuuJfOb1CbkTFBqYZp1ZTYK1Thfy9USdYzQ3S+/wcUTlOCLzTtfPaY8oVhrBoPITcZsd+aut1QW+71L9h7eRwKYEK9O1NmQUDAagrfisPDjZahPD6aLwnAm5mmJICNiQ== Philippe-RM@github/131196788"
+          storage:
+            layout:
+              name: lvm
+          network:
+            version: 2
+            ethernets:
+              enp1s0:
+                dhcp4: false
+                addresses: [192.168.200.22/24]
+                gateway4: 192.168.200.1
+                nameservers:
+                  addresses: [8.8.8.8, 8.8.4.4]
+          shutdown: poweroff
+          resize_partition:
+            enable: true
+            partition: '/dev/vda3'
+            disk: '/dev/vda'
+          resize_partition_with_fdisk:
+            enable: true
+          resize_logical_volume:
+            enable: true
+      disks:
+        - name: system
+          path: "/var/lib/libvirt/images/k8s-worker2.qcow2"
+          size: 40
+    copy_files:
+      - source: nginx/
+        destination: /opt/
+    post_install_scripts:
+      - nginx/install.sh
+
+  - name: "k8s-worker3"
+    cpu: 2
+    ram: 8192
+    disk_size: 20
+    networks:
+      - name: "k8s-net"
+        ip: "192.168.200.23"
+    clone_init:
+      source_vm: "kubernetes-origin"
+      meta_data:
+        instance-id: k8s-worker3
+        local-hostname: k8s-worker3
+      user_data:
+        #cloud-config
+        autoinstall:
+          version: 1
+          identity:
+            hostname: k8s-worker3
+            username: ubuntu
+            password: ubuntu
+          ssh:
+            install-server: true
+            authorized-keys:
+              - "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDBCp7UHEy9aOkk7N6NixYu+gxnyuUHEyjKKE3qk7YijR2dKZHWREsWVr/H6ibL50iZx8ubbTCyNCwhEnyX8J2DipJHtlfw0c2CYj1JW4DMnhQ7P6Cur0dMnPOhu3l1fg9WeEEAfKPm6D9OszWCg/A6Q6dDXDYv0T5WlUiEpnGvJsAlQqOJ64wx75LwwBXEqC089T5lZE50gisDXjkwNf9HFvEPLdUmxKG5s9ttcR8M5/BHJNB0kR+pGaY9QPG67CFchgSFpPtj+Kn/go4uDuv4TrpxWrcvOuLRK7w3ssEGREyVIOmhEJytKkOBnkgAPTadm0LY4UmnJQTH2n2ywkVm51WrgJbwsZ/6YonewGJxJLGsuQ/BSQ8VYrVZQ9Vu6q9mOJd1ORhRjjvtEpk1PpbAGmKESDEbElk19OY1W1WhREVrTjKlmn5sXjngYDQlkBuQfolIbx+7mqAsbIt6LU0UE886WIdyhXUY1ZoBpVNXlntS7WgR+kCcjL8jzxhUdtTCKFHjJhtQDUgEjkCez4lyVB7PRQRDX3Hp6qydL+wsC8LuuJfOb1CbkTFBqYZp1ZTYK1Thfy9USdYzQ3S+/wcUTlOCLzTtfPaY8oVhrBoPITcZsd+aut1QW+71L9h7eRwKYEK9O1NmQUDAagrfisPDjZahPD6aLwnAm5mmJICNiQ== Philippe-RM@github/131196788"
+          storage:
+            layout:
+              name: lvm
+          network:
+            version: 2
+            ethernets:
+              enp1s0:
+                dhcp4: false
+                addresses: [192.168.200.23/24]
+                gateway4: 192.168.200.1
+                nameservers:
+                  addresses: [8.8.8.8, 8.8.4.4]
+          shutdown: poweroff
+          resize_partition:
+            enable: true
+            partition: '/dev/vda3'
+            disk: '/dev/vda'
+          resize_partition_with_fdisk:
+            enable: true
+          resize_logical_volume:
+            enable: true
+      disks:
+        - name: system
+          path: "/var/lib/libvirt/images/k8s-worker3.qcow2"
+          size: 40
+    copy_files:
+      - source: nginx/
+        destination: /opt/
+    post_install_scripts:
+      - nginx/install.sh

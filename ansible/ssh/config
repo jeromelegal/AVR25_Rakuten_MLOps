@@ -1,0 +1,29 @@
+Host master1
+    HostName 192.168.200.10
+    User ubuntu
+    IdentityFile /home/ubuntu/.ssh/id_rsa
+
+Host master2
+    HostName 192.168.200.11
+    User ubuntu
+    IdentityFile /home/ubuntu/.ssh/id_rsa
+
+Host master3
+    HostName 192.168.200.12
+    User ubuntu
+    IdentityFile /home/ubuntu/.ssh/id_rsa
+
+Host worker1
+    HostName 192.168.200.20
+    User ubuntu
+    IdentityFile /home/ubuntu/.ssh/id_rsa
+
+Host worker2
+    HostName 192.168.200.21
+    User ubuntu
+    IdentityFile /home/ubuntu/.ssh/id_rsa
+
+Host worker3
+    HostName 192.168.200.22
+    User ubuntu
+    IdentityFile /home/ubuntu/.ssh/id_rsa

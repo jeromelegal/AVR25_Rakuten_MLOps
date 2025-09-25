@@ -2,8 +2,8 @@ version: "1.0"
 name: "infra-webapp"
 description: "Infrastructure pour une application web avec base de données"
 networks:
-  - name: "app-net"
-    description: "Réseau pour l'application"
+  - name: "ori-k8s"
+    description: "Réseau pour le cluster Kubernetes"
     type: "nat"
     subnet: "192.168.100.1/24"
     dhcp:
@@ -11,27 +11,28 @@ networks:
       end: "192.168.100.200"
     dns:
       enabled: true
-      domain: "app.local"
-      servers: ["8.8.8.8"]
+      domain: "k8s.local"
+      servers: ["8.8.8.8", "8.8.4.4"]
+
 vms:
-  - name: "virtual-machine-origin"
+  - name: kubernetes-origin
     cpu: 4
     ram: 12288
     disk_size: 20
     networks:
-      - name: "app-net"
+      - name: "ori-k8s"
         ip: "192.168.100.10"  # Adresse IP statique
     cloud_init:
       iso: "ubuntu-24.04.1-live-server-amd64.iso"
       meta_data:
-        instance-id: virtual-machine-origin
-        local-hostname: virtual-machine-origin
+        instance-id: kubernetes-origin
+        local-hostname: kubernetes-origin
       user_data:
         #cloud-config
         autoinstall:
           version: 1
           identity:
-            hostname: virtual-machine-origin
+            hostname: kubernetes-origin
             username: ubuntu
             password: "$6$azI.phbtXYmpiU7T$pNQ7Ogdk9KWYnhPw4G/7p/VnxQ.vMmI/Xs56wWvhDmoEe7VRMRoSRhiA6cONZOU./N9WxdQmxuefaJDG4qxwU."
           ssh:
@@ -41,6 +42,7 @@ vms:
           storage:
             layout:
               name: lvm
+              sizing-policy: all
           network:
             version: 2
             ethernets:
@@ -56,6 +58,7 @@ vms:
             - qemu-guest-agent
             - yq 
             - cloud-guest-utils
+            - docker.io
           late-commands:
             - |
               cat << 'EOF' > /target/etc/systemd/system/start-ssh.service
@@ -132,65 +135,10 @@ vms:
             - chown root:root /target/etc/root_service.conf
       disks:
         - name: system
-          path: "/var/lib/libvirt/images/virtual-machine-origin.qcow2"
-          size: 20
+          path: "/var/lib/libvirt/images/kubernetes-origin.qcow2"
+          size: 30
     copy_files:
       - source: nginx/
         destination: /opt/
     post_install_scripts:
       - nginx/install.sh
-
-  - name: "virtual-machine-clone"
-    cpu: 4
-    ram: 12288
-    disk_size: 20
-    networks:
-      - name: "app-net"
-        ip: "192.168.100.11"  # Adresse IP statique
-    clone_init:
-      source_vm: "virtual-machine-origin"
-      meta_data:
-        instance-id: virtual-machine-clone
-        local-hostname: virtual-machine-clone
-      user_data:
-        #cloud-config
-        autoinstall:
-          version: 1
-          identity:
-            hostname: virtual-machine-clone
-            username: ubuntu
-            #TODO: chiffrer le mot de passe
-            password: ubuntu
-          ssh:
-            install-server: true
-            authorized-keys:
-              - "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDBCp7UHEy9aOkk7N6NixYu+gxnyuUHEyjKKE3qk7YijR2dKZHWREsWVr/H6ibL50iZx8ubbTCyNCwhEnyX8J2DipJHtlfw0c2CYj1JW4DMnhQ7P6Cur0dMnPOhu3l1fg9WeEEAfKPm6D9OszWCg/A6Q6dDXDYv0T5WlUiEpnGvJsAlQqOJ64wx75LwwBXEqC089T5lZE50gisDXjkwNf9HFvEPLdUmxKG5s9ttcR8M5/BHJNB0kR+pGaY9QPG67CFchgSFpPtj+Kn/go4uDuv4TrpxWrcvOuLRK7w3ssEGREyVIOmhEJytKkOBnkgAPTadm0LY4UmnJQTH2n2ywkVm51WrgJbwsZ/6YonewGJxJLGsuQ/BSQ8VYrVZQ9Vu6q9mOJd1ORhRjjvtEpk1PpbAGmKESDEbElk19OY1W1WhREVrTjKlmn5sXjngYDQlkBuQfolIbx+7mqAsbIt6LU0UE886WIdyhXUY1ZoBpVNXlntS7WgR+kCcjL8jzxhUdtTCKFHjJhtQDUgEjkCez4lyVB7PRQRDX3Hp6qydL+wsC8LuuJfOb1CbkTFBqYZp1ZTYK1Thfy9USdYzQ3S+/wcUTlOCLzTtfPaY8oVhrBoPITcZsd+aut1QW+71L9h7eRwKYEK9O1NmQUDAagrfisPDjZahPD6aLwnAm5mmJICNiQ== Philippe-RM@github/131196788"
-          storage:
-            layout:
-              name: lvm
-          network:
-            version: 2
-            ethernets:
-              enp1s0:
-                dhcp4: false
-                addresses: [192.168.100.11/24]
-                gateway4: 192.168.100.1
-                nameservers:
-                  addresses: [8.8.8.8, 8.8.4.4]
-          packages:
-            - nginx
-            - fcgiwrap
-            - qemu-guest-agent
-          shutdown: poweroff
-          resize_partition:
-            enable: true
-            partition: '/dev/vda3'
-            disk: '/dev/vda'
-          resize_partition_with_fdisk:
-            enable: true
-          resize_logical_volume:
-            enable: true
-      disks:
-        - name: system
-          path: "/var/lib/libvirt/images/virtual-machine-clone.qcow2"
-          size: 40

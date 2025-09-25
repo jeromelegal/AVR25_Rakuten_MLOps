@@ -1,6 +1,6 @@
 <network>
   <name>{{ network.name }}</name>
-  <bridge name="{{ network.get('bridge_name', 'virbr' + network.name[-3:]) }}" />
+  <bridge name="virbr-{{ network.name }}" />
   {% if network.type == 'nat' %}
   <forward mode='nat'>
     <nat>

@@ -160,6 +160,7 @@ class InfraDeployer:
                 return True
         return False
 
+
     def create_network(self, network: Dict):
         """Crée un réseau."""
         if self.network_exists(network['name']):
@@ -173,6 +174,7 @@ class InfraDeployer:
         except libvirt.libvirtError as e:
             print(f"  ✗ Erreur lors de la création du réseau {network['name']}: {e}")
             raise
+
 
     def start_network(self, name: str):
         """Active un réseau."""
@@ -304,19 +306,39 @@ class InfraDeployer:
                 }
             }
             chmod_result = self.execute_via_qemu_agent(vm['name'], chmod_cmd)
+            result_decoded = decode_base64_fields(chmod_result)
+            print(f"  📋 Résultat de la commande '{chmod_cmd}': {result_decoded}")
+
             if not chmod_result['success']:
                 print(f"  ✗ Échec de la modification des permissions pour {script_dest}: {chmod_result['error']}")
                 return
+
+
+            # Donner les permissions d'exécution au script
+            chmod_cmd = {
+                "execute": "guest-exec",
+                "arguments": {
+                    "path": "exec chpst -u root /bin/id",
+                    "arg": ["-u"],
+                    "capture-output": True
+                }
+            }
+            chmod_result = self.execute_via_qemu_agent(vm['name'], chmod_cmd)
+            result_decoded = decode_base64_fields(chmod_result)
+            print(f"  📋 Résultat de la commande '{chmod_cmd}': {result_decoded}")
 
             # Exécuter le script
             exec_cmd = {
                 "execute": "guest-exec",
                 "arguments": {
-                    "path": script_dest,
+                    "path": f"{script_dest}",
+                    # "arg": [" > ", f"{script_dest}.log"],
                     "capture-output": True
                 }
             }
             exec_result = self.execute_via_qemu_agent(vm['name'], exec_cmd)
+            result_decoded = decode_base64_fields(exec_result)
+            print(f"  📋 Résultat de la commande '{exec_cmd}': {result_decoded}")            
             if exec_result['success']:
                 print(f"  ✓ Script {script_dest} exécuté sur {vm['name']}")
             else:
@@ -327,6 +349,7 @@ class InfraDeployer:
 
     def clone_vm(self, source_vm_name: str, target_vm: Dict):
         """Clone une VM existante."""
+        #TODO: démarrrer le réseau de la machine source pour permettre le clonage 
         if self.vm_exists(target_vm['name']):
             print(f"  ! VM {target_vm['name']} existe déjà, ignorée")
             return
@@ -798,7 +821,7 @@ class InfraDeployer:
         """Déploie les VMs en utilisant les fonctionnalités avancées de l'agent."""
         for vm in self.infra['vms']:
             print(f"\nDéploiement de la VM {vm['name']}...")
-            # Créer la VM
+            # # Créer la VM
             self.create_vm(vm)
             # Attendre que la VM s'éteigne après l'installation
             if 'cloud_init' in vm:

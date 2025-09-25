@@ -1,0 +1,6 @@
+---
+- name: Deploy Kubernetes
+  hosts: k8s
+  become: yes
+  roles:
+    - kubernetes
