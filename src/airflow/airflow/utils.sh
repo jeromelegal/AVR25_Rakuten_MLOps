@@ -111,5 +111,4 @@ set_dynamic_env_variables() {
           \"endpoint_url\": \"https://${AIRFLOW__LOGGING__LOG_SERVER_HOST}\" \
         } \
       }"
-    
 }

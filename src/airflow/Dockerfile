@@ -100,7 +100,7 @@ COPY requirements.txt requirements.txt
 
 # Installer les dépendances en contournant la restriction
 USER airflow
-RUN pip install --break-system-packages --force-reinstall -r requirements.txt
+RUN pip install --no-cache-dir "apache-airflow==${AIRFLOW_VERSION}" -r requirements.txt
 
 USER root
 # Mettre à jour la liste des paquets et installer wget, gpg et lsb-release
@@ -122,7 +122,7 @@ ENV AWS_SECRET_ACCESS_KEY=${MINIO_AIRFLOW_PASSWORD}
 ENV AWS_CA_BUNDLE=${MINIO_AIRFLOW_CA_PATH}
 # ENV REQUESTS_CA_BUNDLE=${AIRFLOW_PEM_PATH}
 # Copie des DAGs et scripts
-COPY dags/ /opt/airflow/dags
+COPY --chown=airflow:root dags/ /opt/airflow/dags
 # Script d'entrée pour obtenir les certificats depuis Vault et démarrer Uvicorn
 COPY vault/vault.sh /usr/local/bin/vault.sh
 COPY custom-entrypoint.sh /usr/local/bin/custom-entrypoint.sh

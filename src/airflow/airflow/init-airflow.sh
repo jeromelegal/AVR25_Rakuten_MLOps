@@ -74,20 +74,20 @@ if [[ "$args" == "api-server" ]]; then
     export _AIRFLOW_DB_MIGRATE='true'
     
     # source init-api-server.sh
-    exec /entrypoint airflow api-server &
+    su airflow -c "exec /entrypoint airflow api-server " &
 elif [[ "$args" == "triggerer" ]]; then
     # source init-triggerer.sh
-    exec /entrypoint airflow triggerer &
+    su airflow -c "exec /entrypoint airflow triggerer" &
 elif [[ "$args" == "dag-processor" ]]; then
     # source init-dag-processor.sh
-    exec /entrypoint airflow dag-processor &
+    su airflow -c "exec /entrypoint airflow dag-processor" &
 elif [[ "$args" == "worker" ]]; then
     echo "DUMB_INIT_SETSID=${DUMB_INIT_SETSID}"
     # source init-worker.sh
-    exec /entrypoint airflow celery worker &
+    su airflow -c "exec /entrypoint airflow celery worker" &
 elif [[ "$args" == "scheduler" ]]; then
     # source init-scheduler.sh
-    exec /entrypoint airflow scheduler &
+    su airflow -c "exec /entrypoint airflow scheduler" &
 else
     error_exit "Commande $args non gérée"
     exit 1

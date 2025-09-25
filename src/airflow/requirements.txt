@@ -6,3 +6,5 @@
 # Flask-AppBuilder
 # apache-airflow-providers-amazon
 # apache-airflow-providers-celery
+numpy
+Pillow

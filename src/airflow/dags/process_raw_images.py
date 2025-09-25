@@ -1,12 +1,14 @@
 from datetime import datetime, timedelta
+import io
 from typing import List
 from airflow.sdk import DAG, Asset
 from airflow.decorators import task
 from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 from airflow.timetables.assets import AssetOrTimeSchedule
 from airflow.timetables.trigger import CronTriggerTimetable
-import io
-import logging
+import numpy as np
+from PIL import Image, ImageFile
+
 
 # Constants
 INIT_NUMBER_OF_FILES_TO_TRIGGER_PROCESS = 5
@@ -21,6 +23,7 @@ METADATA_KEYS = [METADATA_CONTENT_TYPE_KEY, METADATA_SIZE_KEY, METADATA_KEY_KEY]
 ALLOWED_CONTENT_TYPES = ["image/jpeg"]
 STATE_FILE_NAME = "processed_images.json"
 PROCESSED_TAG = "processed"
+DESIRED_IMAGE_DIMENSION = (500, 500)
 
 raw_images = Asset(f"s3://{RAW_BUCKET}")
 processed_images = Asset(f"s3://{PROCESSED_BUCKET}")
@@ -48,9 +51,29 @@ def check_fn(
     return len(candidates) >= number_of_files_threshold
 
 
-# Dummy image processing function
-def process_image(content: bytes) -> bytes:
-    return content[::-1]
+def _image_from_bytes(key: str, content: bytes) -> ImageFile:
+    stream = io.BytesIO(content)
+    img = Image.open(stream)
+    info_msg = f"Initial image size for image {key}: {img.size}"
+    print(info_msg)
+    return img
+
+
+def _resize_image(img: ImageFile) -> ImageFile:
+    return img.resize(DESIRED_IMAGE_DIMENSION)
+
+
+def _image_to_bytes(img: ImageFile) -> bytes:
+    img_byte_arr = io.BytesIO()
+    img.save(img_byte_arr, format="JPEG")
+    return img_byte_arr.getvalue()
+
+
+def process_image(key: str, content: bytes) -> bytes:
+    img = _image_from_bytes(key=key, content=content)
+    resized_img = _resize_image(img=img)
+    img_bytes = _image_to_bytes(img=resized_img)
+    return img_bytes
 
 
 # ----- DAG -----
@@ -58,18 +81,18 @@ default_args = {
     "owner": "airflow",
     "retries": 1,
     "retry_delay": timedelta(minutes=5),
+    "start_date": datetime.now(),
 }
 
 with DAG(
     dag_id="s3_image_processing_assets",
     default_args=default_args,
     description="Process new images from raw-images to processed-images",
-    start_date=datetime(2023, 1, 1),
     catchup=False,
     tags=["s3", "images", "assets", "preprocessing"],
     schedule=AssetOrTimeSchedule(
         timetable=CronTriggerTimetable(
-            "0/5 * * * *", timezone="UTC"
+            "0/2 * * * *", timezone="UTC"
         ),  # TODO: set to every 30 minutes
         assets=(raw_images | state_file),
     ),
@@ -90,13 +113,15 @@ with DAG(
         candidates = []
         for page in page_iterator:
             page_elements = page.get("Contents", [])
-
+            print(f"page_elements: {page_elements}")
             if force_process:
                 filtered_objects = [obj["Key"] for obj in page_elements]
             else:
                 filtered_objects = []
                 for key in [obj["Key"] for obj in page_elements]:
+                    print(f"page_elements->key: {key}")
                     tags = s3.get_object_tagging(Bucket=RAW_BUCKET, Key=key)
+                    print(f"tags: {tags}")
                     if (
                         tags is None
                         or tags == {}
@@ -106,6 +131,7 @@ with DAG(
                             not in [tag.get("Key") for tag in tags["TagSet"]]
                         )
                     ):
+                        print(f"To filtered_objects #1: {key}")
                         filtered_objects.append(key)
                         continue
 
@@ -114,16 +140,16 @@ with DAG(
                             tag.get("Key") == PROCESSED_TAG
                             and tag.get("Value") == "False"
                         ):
+                            print(f"To filtered_objects #2: {key}")
                             filtered_objects.append(key)
                             break
 
             for key in filtered_objects:
-                if (
-                    s3.head_object(Bucket=RAW_BUCKET, Key=key).get(
-                        METADATA_CONTENT_TYPE_KEY
-                    )
-                    in ALLOWED_CONTENT_TYPES
-                ):
+                content_type = s3.head_object(Bucket=RAW_BUCKET, Key=key).get(
+                    METADATA_CONTENT_TYPE_KEY
+                )
+                print(f"content_type: {content_type}")
+                if content_type in ALLOWED_CONTENT_TYPES:
                     candidates += [key]
 
         # Load processed state
@@ -141,7 +167,7 @@ with DAG(
             return new_files
         return []
 
-    @task(outlets=[state_file])
+    @task(outlets=[processed_images])
     def process_and_store(files: list):
         """Process each new file and upload results + update state file."""
         if not files:
@@ -157,7 +183,7 @@ with DAG(
             obj = s3.get_object(Bucket=RAW_BUCKET, Key=key)
             raw_content = obj["Body"].read()
 
-            processed_content = process_image(raw_content)
+            processed_content = process_image(key=key, content=raw_content)
 
             # Upload processed result
             s3.put_object(
