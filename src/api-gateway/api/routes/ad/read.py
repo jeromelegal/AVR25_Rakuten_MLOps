@@ -165,3 +165,18 @@ async def read_ad(
         ),
     )
 
+@router.get("/list_ids/{table}", response_model=ReadAdResponse)
+async def get_list(
+    table: str,
+    request: Request,
+    user_data: dict = Depends(get_user_data_from_token),
+    client_manager: ClientManager = Depends(get_client_manager),
+):
+    logger.info("Getting ids list.")
+    
+    postgresql_token = user_data.get('tokens', {}).get('postgresql') 
+    if not postgresql_token:
+        raise HTTPException(status_code=401, detail="Missing PostgreSQL token")
+    
+    postgresql_client = client_manager.get_client("postgresql")
+    
