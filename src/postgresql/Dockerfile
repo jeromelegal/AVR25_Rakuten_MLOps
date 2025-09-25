@@ -83,7 +83,7 @@ RUN apt-get update
 RUN apt-get install -y postgresql postgresql-client
 
 # Ajouter le chemin de l'exécutable postgres à la variable PATH
-ENV PATH="/usr/lib/postgresql/17/bin:${PATH}"
+ENV POSTGRES_VERSION=$(ls /usr/lib/postgresql/) && PATH="/usr/lib/postgresql/${POSTGRES_VERSION}/bin:${PATH}"
 
 RUN postgres --version 
 
