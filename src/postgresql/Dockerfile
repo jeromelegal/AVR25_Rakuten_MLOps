@@ -44,6 +44,10 @@ ENV POSTGRESQL_MLFLOW_PEM_PATH=${POSTGRESQL_MLFLOW_PEM_PATH:-"/etc/ssl/postgresq
 ENV POSTGRESQL_MLFLOW_KEY_PATH=${POSTGRESQL_MLFLOW_KEY_PATH:-"/etc/ssl/postgresql/postgresql_mlflow.key"}
 ENV POSTGRESQL_MLFLOW_CERT_PATH=${POSTGRESQL_MLFLOW_CERT_PATH:-"/etc/ssl/postgresql/postgresql_mlflow.crt"}
 ENV POSTGRESQL_MLFLOW_CA_PATH=${POSTGRESQL_MLFLOW_CA_PATH:-"/etc/ssl/postgresql/postgresql_mlflow_ca.crt"}
+ENV AIRFLOW_DATABASE=${AIRFLOW_DATABASE:-"airflow"}
+ENV AIRFLOW_SCHEMA=${AIRFLOW_SCHEMA:-"airflow_schema"}
+ENV AIRFLOW_USER=${AIRFLOW_USER:-"airflow_user"}
+ENV AIRFLOW_USER_PASSWORD=${AIRFLOW_USER_PASSWORD:-"airflow_user_password"}
 
 RUN mkdir -p $DB_PATH
 RUN chown -R postgresql:postgresql $DB_PATH
@@ -99,6 +103,7 @@ RUN consul --version && vault --version
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY postgresql/init-postgresql.sql /usr/local/bin/init-postgresql.sql
 COPY postgresql/init-postgresql-mlflow.sql /usr/local/bin/init-postgresql-mlflow.sql
+COPY postgresql/init-postgresql-airflow.sql /usr/local/bin/init-postgresql-airflow.sql
 COPY postgresql/init-postgresql.sh /usr/local/bin/init-postgresql.sh
 COPY postgresql/init-categories.sql /usr/local/bin/init-categories.sql
 COPY postgresql/generate-config.sh /usr/local/bin/generate-config.sh

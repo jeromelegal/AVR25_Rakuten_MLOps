@@ -16,7 +16,7 @@ jobs:
     runs-on: [self-hosted, phil-host]
     strategy:
       matrix:
-        service: [vault, consul, mongodb, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio, api-processing, api-image-processing, api-text-processing, mlflow, prometheus, grafana, alertmanager]
+        service: [vault, consul, mongodb, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio, api-processing, api-image-processing, api-text-processing, mlflow, prometheus, grafana, alertmanager, redis, airflow-worker,airflow-scheduler,airflow-triggerer,airflow-api-server,airflow-dag-processor]
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
@@ -64,7 +64,7 @@ jobs:
     needs: [clear-containers]
     strategy:
       matrix:
-        service: [vault, consul, mongodb, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio, api-processing, api-image-processing, api-text-processing, mlflow, prometheus, grafana, alertmanager]
+        service: [vault, consul, mongodb, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio, api-processing, api-image-processing, api-text-processing, mlflow, prometheus, grafana, alertmanager, redis, airflow-worker,airflow-scheduler,airflow-triggerer,airflow-api-server,airflow-dag-processor]
     permissions:
       contents: 'read'
       id-token: 'write'
@@ -88,7 +88,11 @@ jobs:
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
           BRANCH_NAME=${BRANCH_NAME//\//-}
           TAG="${BRANCH_NAME}-${VERSION}"
-          cd src/${{ matrix.service }}
+          if [[ ${{ matrix.service }} == airflow* ]]; then
+            cd src/airflow
+          else
+            cd src/${{ matrix.service }}
+          fi
           docker build -t ${{ matrix.service }}:$TAG .
 
   start-containers:
@@ -96,7 +100,7 @@ jobs:
     needs: [create-network, build]
     strategy:
       matrix:
-        service: [vault, consul, mongodb, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio, api-processing, api-image-processing, api-text-processing, mlflow, prometheus, grafana, alertmanager]
+        service: [vault, consul, mongodb, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio, api-processing, api-image-processing, api-text-processing, mlflow, prometheus, grafana, alertmanager, redis, airflow-worker,airflow-scheduler,airflow-triggerer,airflow-api-server,airflow-dag-processor]
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
@@ -140,15 +144,20 @@ jobs:
               done
           fi
 
+          COMMAND=$(yq eval ".command" <<< "$CONFIG")
+          if [ -z "$COMMAND" ] || [ "$COMMAND" = "null" ]; then
+            COMMAND=""
+          fi
+
           RUN_AS_ROOT=$(yq eval ".run_as_root" <<< "$CONFIG")
           if [ -z "$RUN_AS_ROOT" ] || [ "$RUN_AS_ROOT" = "null" ]; then
             RUN_AS_ROOT=false
           fi
 
           if [ "$RUN_AS_ROOT" = true ]; then
-            docker run -d --user root $CAP_OPTIONS --name $CONTAINER_NAME  $EXPOSE_OPTIONS $ENV_VARS ${{ matrix.service }}:$TAG
+            docker run -d --user root $CAP_OPTIONS --name $CONTAINER_NAME  $EXPOSE_OPTIONS $ENV_VARS ${{ matrix.service }}:$TAG $COMMAND
           else
-            docker run -d $CAP_OPTIONS --name $CONTAINER_NAME $ENV_VARS ${{ matrix.service }}:$TAG
+            docker run -d $CAP_OPTIONS --name $CONTAINER_NAME $ENV_VARS ${{ matrix.service }}:$TAG $COMMAND
           fi
 
           NETWORK_ALIASES=$(yq eval ".network-alias // []" <<< "$CONFIG" || echo "")
@@ -173,7 +182,7 @@ jobs:
     needs: start-containers
     strategy:
       matrix:
-        service: [vault, consul, mongodb, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio, api-processing, api-image-processing, api-text-processing, mlflow, prometheus, grafana, alertmanager]
+        service: [vault, consul, mongodb, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio, api-processing, api-image-processing, api-text-processing, mlflow, prometheus, grafana, alertmanager, redis, airflow-worker,airflow-scheduler,airflow-triggerer,airflow-api-server,airflow-dag-processor]
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
@@ -270,7 +279,7 @@ jobs:
     if: always()
     strategy:
       matrix:
-        service: [vault, consul, mongodb, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio, api-processing, api-image-processing, api-text-processing, mlflow, prometheus, grafana, alertmanager]
+        service: [vault, consul, mongodb, api-mongodb, postgresql, api-postgresql, api-gateway, frontend, reverse-proxy, minio, api-minio, api-processing, api-image-processing, api-text-processing, mlflow, prometheus, grafana, alertmanager, redis, airflow-worker,airflow-scheduler,airflow-triggerer,airflow-api-server,airflow-dag-processor]
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4

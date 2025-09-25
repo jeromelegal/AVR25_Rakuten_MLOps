@@ -161,12 +161,63 @@ else
   rm -f vault_service_cert.json
 fi
 
-cat <<EOF > $MINIO_MLFLOW_PEM_PATH
-$(printf "%s" "$MINIO_MLFLOW_KEY")
-$(printf "%s" "$MINIO_MLFLOW_CERT")
+#Liste des services Airflow pour lesquels générer les certificats
+services=("airflow-worker" "airflow-scheduler" "airflow-triggerer" "airflow-api-server" "airflow-dag-processor")
+
+# Boucle sur chaque service
+for service_name in "${services[@]}"; do
+  echo "Traitement du service : $service_name"
+
+  # Vérifier si le certificat et la clé Vault existent déjà
+  if vault kv get -field=cert "secret/${SERVICE_NAME}/${service_name}/certs" > /dev/null 2>&1 && \
+     vault kv get -field=key "secret/${SERVICE_NAME}/${service_name}/certs" > /dev/null 2>&1; then
+    echo "Le certificat mTLS ${SERVICE_NAME} pour le ${service_name} existe déjà"
+    CA=$(vault kv get -field=ca "secret/${SERVICE_NAME}/${service_name}/certs")
+    CERT=$(vault kv get -field=cert "secret/${SERVICE_NAME}/${service_name}/certs")
+    KEY=$(vault kv get -field=key "secret/${SERVICE_NAME}/${service_name}/certs")
+  else
+    # Générer le certificat et la clé pour Vault
+    echo "Générer le certificat et la clé pour Vault pour ${service_name}"
+    vault write -format=json pki_${SERVICE_NAME}/issue/${SERVICE_NAME} common_name="${SERVICE_NAME}" ttl="72h" > "${SERVICE_NAME}_${service_name}_cert.json"
+
+    # Extraire le certificat et la clé privée
+    CA=$(jq -r '.data.ca_chain[0]' "${SERVICE_NAME}_${service_name}_cert.json")
+    CERT=$(jq -r '.data.certificate' "${SERVICE_NAME}_${service_name}_cert.json")
+    KEY=$(jq -r '.data.private_key' "${SERVICE_NAME}_${service_name}_cert.json")
+
+    # Enregistrer le certificat et la clé privée dans Vault
+    vault kv put "secret/${SERVICE_NAME}/${service_name}/certs" cert="$CERT" key="$KEY" ca="$CA"
+
+    # Nettoyage des fichiers temporaires
+    rm -f "${SERVICE_NAME}_${service_name}_cert.json"
+  fi
+  
+  
+  # Écrire les fichiers de certificats et clés
+  KEY_PATH="/etc/ssl/${SERVICE_NAME}/${SERVICE_NAME}_${service_name}.key"
+  CERT_PATH="/etc/ssl/${SERVICE_NAME}/${SERVICE_NAME}_${service_name}.crt"
+  PEM_PATH="/etc/ssl/${SERVICE_NAME}/${SERVICE_NAME}_${service_name}.pem"
+  CA_PATH="/etc/ssl/${SERVICE_NAME}/${SERVICE_NAME}_${service_name}_ca.crt"
+
+  cat <<EOF > "${KEY_PATH}"
+$(printf "%s" "$KEY")
 EOF
 
-printf "%s" $MINIO_MLFLOW_CA > $MINIO_MLFLOW_CA_PATH
+  cat <<EOF > "${CERT_PATH}"
+$(printf "%s" "$CERT")
+EOF
+
+  cat <<EOF > "${PEM_PATH}"
+$(printf "%s" "$KEY")
+$(printf "%s" "$CERT")
+EOF
+
+  cat <<EOF > "${CA_PATH}"
+$(printf "%s" "$CA")
+EOF
+
+  echo "Traitement terminé pour le service : $service_name"
+done
 
 # Vérifier si le certificat et la clé Vault existent déjà pour le model downloader
 if vault kv get -field=cert secret/minio/model-downloader/certs > /dev/null 2>&1 && vault kv get -field=key secret/minio/model-downloader/certs > /dev/null 2>&1; then

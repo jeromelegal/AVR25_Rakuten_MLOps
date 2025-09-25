@@ -1,5 +1,6 @@
 #!/bin/bash
 
+
 # Appeler le script Vault pour récupérer les certificats et la clé privée
 HTTP_CODE=$(curl -k -o /dev/null -s -w "%{http_code}\n" https://$VAULT_SERVICE_NAME/health)
 # Vous pouvez ajouter une logique conditionnelle ici
@@ -12,23 +13,26 @@ done
 # Se connecter à Vault et récupérer un token
 export VAULT_SKIP_VERIFY="1"
 
-mkdir -p  /etc/ssl/${SERVICE_NAME}
+mkdir -p $(dirname $REDIS_PEM_PATH)  $(dirname $REDIS_CA_PATH) $(dirname $REDIS_REDIS_PEM_PATH) $(dirname $REDIS_REDIS_CA_PATH) # $(dirname $REDIS_MLFLOW_PEM_PATH) $(dirname $REDIS_MLFLOW_CA_PATH) 
 
 until vault login -method=userpass username=$VAULT_USERNAME password=$VAULT_PASSWORD > /dev/null; do
-    echo "Échec de l'authentification. Nouvelle tentative dans 1 seconde..."
+    echo "Échec de l'authentification. Nouvelle tentative dans 1 secondes..."
     sleep 1
 done
 
+# Récupérer les CA à ajouter aux magasins
+vault kv get -field=certificate secret/vault/ca > vault_ca.crt
+vault kv get -field=certificate secret/consul/ca > consul_ca.crt
+vault kv get -field=certificate secret/redis/ca > redis_ca.crt
+# vault kv get -field=certificate secret/mlflow/ca > mlflow_ca.crt
 
-services=("${SERVICE_NAME}" "vault" "consul")
+cp redis_ca.crt $REDIS_CA_PATH
 
-# Boucle sur chaque service
-for service_name in "${services[@]}"; do
-  vault kv get -field=certificate secret/${service_name}/ca > ${service_name}_ca.crt
-  cp ${service_name}_ca.crt /usr/local/share/ca-certificates/
-done
-
-cp ${SERVICE_NAME}_ca.crt /etc/ssl/${SERVICE_NAME}/
+# Ajouter les CA aux magasins de certificats
+cp vault_ca.crt /usr/local/share/ca-certificates/
+cp consul_ca.crt /usr/local/share/ca-certificates/
+cp redis_ca.crt /usr/local/share/ca-certificates/
+# cp mlflow_ca.crt /usr/local/share/ca-certificates/
 
 update-ca-certificates
 
@@ -47,49 +51,34 @@ for ip in $ips; do
   fi
 done
 
-vault write -format=json pki_${SERVICE_NAME}/issue/${SERVICE_NAME} common_name="${SERVICE_NAME}" ip_sans="$ip_list" alt_names="$SERVICE_NAME" ttl="72h" > ${SERVICE_NAME}_cert.json
+vault write -format=json pki_redis/issue/redis common_name="redis" ip_sans="$ip_list" alt_names="$SERVICE_NAME" ttl="72h" > redis_cert.json
 
-cat <<EOF > /etc/ssl/${SERVICE_NAME}/${SERVICE_NAME}.pem
-$(jq -r '.data.private_key' ${SERVICE_NAME}_cert.json)
-$(jq -r '.data.certificate' ${SERVICE_NAME}_cert.json)
+cat <<EOF > $REDIS_PEM_PATH
+$(jq -r '.data.private_key' redis_cert.json)
+$(jq -r '.data.certificate' redis_cert.json)
+$(jq -r '.data.issuing_ca' redis_cert.json)
 EOF
 
 # Extraire le certificat et la clé privée
 
-
-cat <<EOF > /etc/ssl/${SERVICE_NAME}/${SERVICE_NAME}.crt
-$(jq -r '.data.certificate' ${SERVICE_NAME}_cert.json)
+echo "REDIS_CERT_PATH = $REDIS_CERT_PATH"
+cat <<EOF > $REDIS_CERT_PATH
+$(jq -r '.data.certificate' redis_cert.json)
 EOF
-cat <<EOF > /etc/ssl/${SERVICE_NAME}/${SERVICE_NAME}.key
-$(jq -r '.data.private_key' ${SERVICE_NAME}_cert.json)
-EOF
-cat <<EOF > /etc/ssl/${SERVICE_NAME}/${SERVICE_NAME}_ca.crt
-$(jq -r '.data.ca_chain[0]' ${SERVICE_NAME}_cert.json)
+echo "REDIS_KEY_PATH = $REDIS_KEY_PATH"
+cat <<EOF > $REDIS_KEY_PATH
+$(jq -r '.data.private_key' redis_cert.json)
 EOF
 
 # Définir les permissions pour les fichiers de certificat et de clé
-chown ${SERVICE_NAME}:${SERVICE_NAME} /etc/ssl/${SERVICE_NAME}/${SERVICE_NAME}.pem
-chmod 400 /etc/ssl/${SERVICE_NAME}/${SERVICE_NAME}.pem
+chown redis:redis $REDIS_PEM_PATH
+chmod 400 $REDIS_PEM_PATH
 
 # Nettoyage des fichiers temporaires
-rm -f ${SERVICE_NAME}_cert.json
-
-key_value=$(openssl rand -base64 741 | tr -d '\n')
-
-vault kv put secret/${SERVICE_NAME}/keyfile value=$key_value
-
-retrieve=$(vault kv get -field=value secret/${SERVICE_NAME}/keyfile)
-
-mkdir -p /etc/ssl/${SERVICE_NAME}/
-echo $retrieve > /etc/ssl/${SERVICE_NAME}/${SERVICE_NAME}-keyfile
-chmod 600 /etc/ssl/${SERVICE_NAME}/${SERVICE_NAME}-keyfile
-
-
-
-
+rm -f redis_cert.json
 
 #Liste des services pour lesquels générer les certificats
-services=("${SERVICE_NAME}" "api-postgresql" "mlflow" "airflow-api-server" "airflow-scheduler" "airflow-worker" "airflow-dag-processor" "airflow-triggerer")
+services=("${SERVICE_NAME}" "airflow-worker" "airflow-scheduler" "airflow-triggerer" "airflow-api-server" "airflow-dag-processor")
 
 # Boucle sur chaque service
 for service_name in "${services[@]}"; do
@@ -105,16 +94,7 @@ for service_name in "${services[@]}"; do
   else
     # Générer le certificat et la clé pour Vault
     echo "Générer le certificat et la clé pour Vault pour ${service_name}"
-
-    if [[ "$service_name" == "api-postgresql" ]]; then
-        vault write -format=json pki_${SERVICE_NAME}/issue/${SERVICE_NAME} common_name="db_manager_user" ttl="72h" > "${SERVICE_NAME}_${service_name}_cert.json"
-    elif [[ "$service_name" == "mlflow" ]]; then
-        vault write -format=json pki_${SERVICE_NAME}/issue/${SERVICE_NAME} common_name="${MLFLOW_USER}" ttl="72h" > "${SERVICE_NAME}_${service_name}_cert.json"
-    elif [[ "$service_name" == airflow* ]]; then
-        vault write -format=json pki_${SERVICE_NAME}/issue/${SERVICE_NAME} common_name="${AIRFLOW_USER}" ttl="72h" > "${SERVICE_NAME}_${service_name}_cert.json"
-    else
-        vault write -format=json pki_${SERVICE_NAME}/issue/${SERVICE_NAME} common_name="${service_name}" ttl="72h" > "${SERVICE_NAME}_${service_name}_cert.json"
-    fi
+    vault write -format=json pki_${SERVICE_NAME}/issue/${SERVICE_NAME} common_name="${SERVICE_NAME}" ttl="72h" > "${SERVICE_NAME}_${service_name}_cert.json"
 
     # Extraire le certificat et la clé privée
     CA=$(jq -r '.data.ca_chain[0]' "${SERVICE_NAME}_${service_name}_cert.json")
@@ -135,12 +115,6 @@ for service_name in "${services[@]}"; do
   PEM_PATH="/etc/ssl/${SERVICE_NAME}/${SERVICE_NAME}_${service_name}.pem"
   CA_PATH="/etc/ssl/${SERVICE_NAME}/${SERVICE_NAME}_${service_name}_ca.crt"
 
-echo "KEY_PATH $KEY_PATH"
-echo "CERT_PATH $CERT_PATH"
-echo "PEM_PATH $PEM_PATH"
-echo "CA_PATH $CA_PATH"
-
-
   cat <<EOF > "${KEY_PATH}"
 $(printf "%s" "$KEY")
 EOF
@@ -160,9 +134,3 @@ EOF
 
   echo "Traitement terminé pour le service : $service_name"
 done
-
-
-
-
-
-
