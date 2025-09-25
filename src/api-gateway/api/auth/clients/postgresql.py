@@ -210,3 +210,18 @@ class PostgreSQLClient:
 
         return response.json()
 
+    def get_category_id(self, token: str, table: str, code: int) -> Dict[str, Any]:
+        """ Récupère l'id d'une catégorie. """
+        base_url = self.settings.API_POSTGRESQL_BASE_URL
+        headers = self.get_headers(token)
+        session = self.get_session()
+
+        endpoint = f"{base_url}/api/internal/postgresql/entity/category/{table}/{code}"
+        logger.debug(f"Request URL: {endpoint}")
+
+        response = session.get(endpoint, headers=headers)
+        logger.debug(f"Response Status Code: {response.status_code}")
+        logger.debug(f"Response Content: {response.text}")
+        response.raise_for_status()
+
+        return response.json()

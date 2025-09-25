@@ -5,6 +5,7 @@ from typing import Optional, Dict, cast
 from config.settings import Settings
 from api.auth.clients.manager import ClientManager, create_client_manager
 from api.auth.token.manager import TokenManager, create_token_manager
+from pathlib import Path
 
 DEFAULT_BUCKET = "raw-images"
 
@@ -43,6 +44,11 @@ def get_user_data_from_token(
     logger.info("Extracting user data from token...")
     return token_manager.get_user_data_from_token(authorization)
 
+def get_id_category(code, table, client, token):
+    response = client.get_category_id(token=token, table=table, code=code)
+    logger.debug(f"PostgreSQL get id_category '{table}' response: {response}")
+    return response
+
 def insert_psql_table(data, table, client, token, relation=False):
     """ Insert data in PostgreSQL """
     try:
@@ -69,8 +75,8 @@ def insert_entities(ad_data, cat_data, image_data,
     ad_response = insert_psql_table(ad_data, "ad", 
                                     postgresql_client, postgresql_token)
     ad_id = ad_response["id"]
-    # Insert in 'categories' on PostgreSQL
-    cat_response = insert_psql_table(cat_data, "category", 
+    # Get 'category' ID on PostgreSQL
+    cat_response = get_id_category(int(cat_data["code"]), "by-code", 
                                      postgresql_client, postgresql_token)
     cat_id = cat_response["id"]
     # Insert in 'image' on PostgreSQL
