@@ -13,17 +13,24 @@ const ProductCategoryModal = ({ show, onHide, onSelect }) => {
 
 
   const handleValidate = () => {
-    let selected;
-  if (changingCategory && selectedCategory) {
-    // Find the category object by id
-    selected = categoriesToShow.find(cat => String(cat.id) === String(selectedCategory));
-  } else {
-    // Use the proposal as a fallback (find by name)
-    selected = categoriesToShow.find(cat => cat.name === categoryProposal) || { name: categoryProposal };
-  }
-  onSelect(selected);
-  setChangingCategory(false);
-  setSelectedCategory('');
+    let categoryObject;
+    if (changingCategory && selectedCategory) {
+      // Find the category object by id
+      categoryObject = categoriesToShow.find(cat => String(cat.id) === String(selectedCategory));
+    } else {
+      // Use the proposal as a fallback (find by name)
+      categoryObject = categoriesToShow.find(cat => cat.name === categoryProposal) || { name: categoryProposal };
+    }
+
+    if (categoryObject){
+      const selected = {
+        id: categoryObject.id,
+        name: categoryObject.name
+      };
+      onSelect(selected);
+    }
+    setChangingCategory(false);
+    setSelectedCategory('');
   };
 
   const handleChangeCategoryClick = () => {
