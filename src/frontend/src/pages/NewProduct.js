@@ -5,9 +5,15 @@ import ProductTitleInput from '../components/ProductTitleInput';
 import ProductCategoryButton from '../components/ProductCategoryButton';
 import ProductCategoryModal from '../components/ProductCategoryModal';
 import ValidateButton from '../components/ValidateButton';
-import { handleValidateAll } from './handlers/handleValidateAll';
+import axios from 'axios';
+import { getAuthToken } from '../services/authService'; // Import the token getter
+// import qs from 'qs';
+// import { handleValidateAll } from './handlers/handleValidateAll';
+
+const API_BASE = `/api/protected`
 
 const NewProduct = () => {
+  //const accessToken = getAuthToken();
   const [description, setDescription] = useState('');
   const [picture, setPicture] = useState(null);
   const [title, setTitle] = useState('');
@@ -33,11 +39,44 @@ const NewProduct = () => {
 
    // Example save handler
   const onValidateClick = async () => {
+     const accessToken = getAuthToken();
+      if (!accessToken) {
+        alert("You must be logged in to create a product.");
+        return;
+      }
+
     try {
-      await handleValidateAll({ title, description, picture });
-      // Show success message or redirect
-    } catch (error) {
-      // Show error message
+      const formData = new FormData();
+      formData.append("designation", title);
+      formData.append("description", description);
+      formData.append("category_code", selectedCategory.id);
+      formData.append("category_label", selectedCategory.name);
+      formData.append("file", picture);
+
+      const headers = {
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
+      };
+      
+      const res = await axios.post(`${API_BASE}/create_ad`, formData, {
+        headers,
+      });
+       // axios puts payload in res.data and status in res.status
+      console.log("Annonce créée:", res.data);
+      const adId = res?.data?.ad?.id ?? res?.data?.id ?? 'unknown';
+      alert(`Annonce créée avec ID: ${adId}`);
+
+    } catch (err) {
+       // Better error surfacing
+      const status = err.response?.status;
+      const detail = err.response?.data?.detail || err.message;
+      console.error("Erreur lors de la création:", err);
+       // Provide more specific feedback for auth errors
+      if (status === 401 || status === 422) {
+        alert(`Authentication failed: ${JSON.stringify(detail)}. Please log in again.`);
+      } else {
+        alert(`Failed to create ad${status ? ` (HTTP ${status})` : ''}: ${detail}`);
+      }
     }
   };
 

@@ -1,20 +1,21 @@
 // frontend/src/services/authService.js
 import axios from 'axios';
-import qs from 'qs';
+
+const TOKEN_KEY = 'access_token';
 
 // Fonction pour récupérer le token du localStorage
 export const getAuthToken = () => {
-  return localStorage.getItem('authToken');
+  return localStorage.getItem(TOKEN_KEY);
 };
 
 // Fonction pour stocker le token dans le localStorage
 export const storeToken = (token) => {
-  localStorage.setItem('authToken', JSON.stringify(token));
+  localStorage.setItem(TOKEN_KEY, token);
 };
 
 // Fonction pour supprimer le token du localStorage et réinitialiser les préférences de l'utilisateur
 export const logout = () => {
-  localStorage.removeItem('authToken');
+  localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem('username');
   localStorage.removeItem('userSettings'); // Réinitialiser les préférences de l'utilisateur
 };
@@ -27,43 +28,33 @@ export const isAuthenticated = () => {
 
 // Fonction pour obtenir le nom d'utilisateur
 export const getUsername = () => {
-  let username = localStorage.getItem('username');
-  if (username) {
-    return username;
-  }
-
-  const token = getAuthToken();
-  if (!token) return null;
-
-  try {
-    const tokenData = JSON.parse(token);
-    username = tokenData.username;
-    if (username) {
-      localStorage.setItem('username', username);
-    }
-    return username;
-  } catch (error) {
-    console.error('Invalid token:', error);
-    return null;
-  }
+  return localStorage.getItem('username');
 };
 
-// Autres fonctions existantes...
 export const login = async (username, password) => {
   try {
-    const response = await axios.post(`/api/protected/login`, qs.stringify({
-      username,
-      password,
-      grant_type: 'password',
-    }), {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-    });
+    const formData = new URLSearchParams();
+    formData.append('username', username);
+    formData.append('password', password);
+    formData.append('grant_type', 'password');
 
-    const token = response.data.access_token;
-    storeToken(token);
-
+    const response = await axios.post(
+      `/api/protected/login`,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+      }
+    );
+    const { access_token, username: responseUsername } = response.data;
+    if (access_token) {
+      storeToken(access_token);
+      // Ensure the username from the response is stored in localStorage
+      if (responseUsername) {
+        localStorage.setItem('username', responseUsername);
+      }
+    }
     return { success: true, data: response.data };
   } catch (error) {
     console.error('Login failed:', error);
