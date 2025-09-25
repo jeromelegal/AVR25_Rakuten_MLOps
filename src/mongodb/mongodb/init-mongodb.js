@@ -54,6 +54,7 @@ db.getSiblingDB('file_storage').createCollection("ads", {
             username: { bsonType: "string" }
           }
         },
+        ad_id: { bsonType: "int"}, 
         designation: { bsonType: "string" },
         description: { bsonType: ["string", "null"] },
         category: { bsonType: "string" },
@@ -69,29 +70,23 @@ db.getSiblingDB('file_storage').createCollection("ads", {
             }
           }
         },
-        created_at: { bsonType: "string" }
+        created_at: { bsonType: "date" }
       }
     }
   }
 });
 
-// Create index
-db.getSiblingDB('file_storage').ads.createIndex(
+// Create searching index
+db.ads.createIndex(
+  { designation: "text", description: "text" },
   {
-    designation: 'text',
-    description: 'text',
-    category:  'text',
-    images:      'text',
-    'user.username': 'text'
-  },
-  {
-    weights: {
-      designation: 10,
-      description: 10,
-      category: 5,
-      images: 1,
-      'user.username': 1,
-    },
-    name: 'ads_search'
+    default_language: "french",
+    weights: { designation: 8, description: 5 },
+    name: "ads_search"
   }
 );
+// Create filters index
+db.ads.createIndex({ ad_id: 1 }, { unique: true, name: "ad_id_unique" });
+db.ads.createIndex({ category: 1, created_at: -1 }, { name: "cat_created" });
+db.ads.createIndex({ "user.username": 1 }, { name: "username" });
+db.ads.createIndex({ created_at: -1 }, { name: "created_desc" });
