@@ -178,16 +178,25 @@ class InfraDeployer:
 
     def start_network(self, name: str):
         """Active un réseau."""
-        if self.network_is_active(name):
-            print(f"  ! Réseau {name} est déjà actif")
-            return
         try:
+            print(f"  ✓ Tentative d'activation du réseau {name}...")
             net = self.conn.networkLookupByName(name)
+            if net.isActive():
+                print(f"  ! Réseau {name} est déjà actif")
+                return
+            print(f"  ✓ Démarrage du réseau {name}...")
             net.create()
             print(f"  ✓ Réseau {name} activé")
+            # Vérifier à nouveau l'état du réseau
+            if net.isActive():
+                print(f"  ✓ Réseau {name} est maintenant actif")
+            else:
+                print(f"  ✗ Réseau {name} n'a pas pu être activé")
         except libvirt.libvirtError as e:
             print(f"  ✗ Erreur lors de l'activation du réseau {name}: {e}")
             raise
+
+
 
     def deploy_networks(self):
         """Déploie tous les réseaux."""
@@ -347,24 +356,41 @@ class InfraDeployer:
         except Exception as e:
             print(f"  ✗ Erreur lors de l'exécution des commandes clone_init: {e}")
 
+
+
     def clone_vm(self, source_vm_name: str, target_vm: Dict):
         """Clone une VM existante."""
-        #TODO: démarrrer le réseau de la machine source pour permettre le clonage 
         if self.vm_exists(target_vm['name']):
             print(f"  ! VM {target_vm['name']} existe déjà, ignorée")
             return
+
+        # Vérifier si la VM source existe
+        if not self.vm_exists(source_vm_name):
+            print(f"  ✗ VM source {source_vm_name} non trouvée")
+            return
+
+        import xml.etree.ElementTree as ET
+        import time
+
+        # Vérifier si la VM source est allumée et l'éteindre si nécessaire
+        source_domain = self.conn.lookupByName(source_vm_name)
+        if source_domain.isActive():
+            print(f"  ⏳ Éteindre la VM source {source_vm_name}...")
+            source_domain.shutdown()
+            # Attendre que la VM soit éteinte
+            while source_domain.isActive():
+                time.sleep(1)
+
+        # Vérifier si le réseau de la VM source est actif et le démarrer si nécessaire
+        source_networks = source_domain.XMLDesc(0)
+        root = ET.fromstring(source_networks)
+        # Trouver le nom du réseau
+        network_name = root.find('.//interface/source').get('network')
+        if network_name and not self.network_is_active(network_name):
+            print(f"  ⏳ Démarrage du réseau {network_name}...")
+            self.start_network(network_name)
+
         try:
-            source_domain = self.conn.lookupByName(source_vm_name)
-            # Vérifier si la VM source est allumée et l'éteindre si nécessaire
-            was_active = False
-            if source_domain.isActive():
-                was_active = True
-                print(f"  ⏳ Extinction de la VM source {source_vm_name}...")
-                source_domain.shutdown()
-                # Attendre que la VM source soit éteinte
-                if not self.wait_for_vm_shutdown(source_vm_name):
-                    print(f"  ✗ Impossible d'éteindre la VM source {source_vm_name}")
-                    return
             # Utiliser virt-clone pour cloner la VM
             cmd = [
                 "virt-clone",
@@ -373,8 +399,33 @@ class InfraDeployer:
                 "--auto-clone"
             ]
             subprocess.run(cmd, check=True)
+
+            # Obtenir la configuration XML de la VM clonée
+            domain = self.conn.lookupByName(target_vm['name'])
+            xml_config = domain.XMLDesc(0)
+            root = ET.fromstring(xml_config)
+
+            # Modifier la configuration XML pour utiliser le nouveau réseau
+            for network in target_vm['networks']:
+                # Trouver l'interface réseau dans la configuration XML
+                interface = root.find('.//interface')
+                if interface is not None:
+                    source = interface.find('source')
+                    if source is not None:
+                        source.set('network', network['name'])
+
+            # Appliquer la nouvelle configuration XML à la VM clonée
+            new_xml_config = ET.tostring(root, encoding='unicode')
+            domain = self.conn.defineXML(new_xml_config)
+
+            # Redéfinir le réseau de la VM clonée
+            for network in target_vm['networks']:
+                #self.create_network(network)
+                self.start_network(network['name'])
+
             # Créer l'ISO clone_init
             clone_init_iso = self._create_clone_init_iso(target_vm)
+
             # Attacher l'ISO à la VM clonée en utilisant un contrôleur SATA
             cmd = [
                 "virsh",
@@ -387,14 +438,17 @@ class InfraDeployer:
             ]
             subprocess.run(cmd, check=True)
             print(f"  ✓ VM {target_vm['name']} clonée à partir de {source_vm_name}")
+
             # Démarrer la VM pour appliquer la configuration clone_init
             domain = self.conn.lookupByName(target_vm['name'])
             domain.create()
             print(f"  ✓ VM {target_vm['name']} démarrée")
+
             # Attendre que l'agent QEMU soit disponible
             if not self.wait_for_agent(target_vm['name']):
                 print(f"  ✗ Timeout atteint en attendant qemu-guest-agent pour {target_vm['name']}")
                 return
+
             # Agrandir le disque à la taille spécifiée
             for disk in target_vm['clone_init'].get('disks', [{'name': 'system', 'path': f"{VM_IMAGES_DIR}/{target_vm['name']}.qcow2", 'size': target_vm['disk_size']}]):
                 disk_path = disk['path']
@@ -408,11 +462,14 @@ class InfraDeployer:
                     "--size", f"{new_size_gb}G"
                 ]
                 subprocess.run(cmd, check=True)
+
             # Appliquer la configuration clone_init
             self.apply_clone_init_via_agent(target_vm)
         except libvirt.libvirtError as e:
             print(f"  ✗ Erreur lors du clonage de la VM {target_vm['name']}: {e}")
             raise
+
+
 
     def create_vm(self, vm: Dict):
         """Crée ou configure une VM."""
