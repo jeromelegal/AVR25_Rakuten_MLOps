@@ -1,5 +1,30 @@
 ---
-- name: Install CSI plugin (NFS)
-  command: kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/csi-driver-nfs/v4.6.0/deploy/install-driver.sh | bash
+- name: Add OpenEBS Helm repository
+  command: helm repo add openebs https://openebs.github.io/charts
   when: inventory_hostname == 'master1'
   become: yes
+  tags: csi
+
+- name: Update Helm repositories
+  command: helm repo update
+  when: inventory_hostname == 'master1'
+  become: yes
+  tags: csi
+
+- name: Install Mayastor using Helm
+  command: helm install mayastor openebs/mayastor --namespace mayastor --create-namespace --version 2.6.0
+  when: inventory_hostname == 'master1'
+  become: yes
+  tags: csi
+
+- name: Install Mayastor Control Plane
+  command: kubectl apply -f https://raw.githubusercontent.com/openebs/mayastor/master/deploy/mayastor-control-plane.yaml
+  when: inventory_hostname == 'master1'
+  become: yes
+  tags: csi
+
+- name: Install Mayastor Data Plane
+  command: kubectl apply -f https://raw.githubusercontent.com/openebs/mayastor/master/deploy/mayastor-data-plane.yaml
+  when: inventory_hostname == 'master1'
+  become: yes
+  tags: csi

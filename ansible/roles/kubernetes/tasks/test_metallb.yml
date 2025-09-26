@@ -1,0 +1,53 @@
+---
+- name: Check MetalLB pods status
+  command: kubectl -n metallb-system get pods
+  register: metallb_pods
+  when: inventory_hostname == 'master1'
+  become: yes
+  tags: test_metallb
+
+- name: Display MetalLB pods status
+  debug:
+    var: metallb_pods.stdout_lines
+  when: inventory_hostname == 'master1'
+  tags: test_metallb
+
+- name: Check MetalLB configuration
+  command: kubectl -n metallb-system get ipaddresspools
+  register: metallb_config
+  when: inventory_hostname == 'master1'
+  become: yes
+  tags: test_metallb
+
+- name: Display MetalLB configuration
+  debug:
+    var: metallb_config.stdout_lines
+  when: inventory_hostname == 'master1'
+  tags: test_metallb
+
+- name: Check LoadBalancer service status
+  command: kubectl get svc kubernetes-master
+  register: loadbalancer_service
+  when: inventory_hostname == 'master1'
+  become: yes
+  tags: test_metallb
+
+- name: Display LoadBalancer service status
+  debug:
+    var: loadbalancer_service.stdout_lines
+  when: inventory_hostname == 'master1'
+  tags: test_metallb
+
+- name: Test connectivity to Kubernetes API via LoadBalancer
+  command: curl -k https://{{ (loadbalancer_service.stdout | regex_search('192.168.200.[0-9]+')) }}:6443
+  register: connectivity_test
+  when: inventory_hostname == 'master1' and loadbalancer_service.stdout is defined
+  become: yes
+  ignore_errors: yes
+  tags: test_metallb
+
+- name: Display connectivity test result
+  debug:
+    var: connectivity_test.stdout_lines
+  when: inventory_hostname == 'master1'
+  tags: test_metallb
