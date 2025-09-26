@@ -20,7 +20,7 @@ METADATA_CONTENT_TYPE_KEY = "ContentType"
 METADATA_SIZE_KEY = "Size"
 METADATA_KEY_KEY = "Key"
 METADATA_KEYS = [METADATA_CONTENT_TYPE_KEY, METADATA_SIZE_KEY, METADATA_KEY_KEY]
-ALLOWED_CONTENT_TYPES = ["image/jpeg"]
+ALLOWED_CONTENT_TYPES = ["image/jpeg", "image/webp"]
 STATE_FILE_NAME = "processed_images.json"
 PROCESSED_TAG = "processed"
 DESIRED_IMAGE_DIMENSION = (500, 500)
@@ -96,11 +96,10 @@ with DAG(
         ),  # TODO: set to every 30 minutes
         assets=(raw_images | state_file),
     ),
+    is_paused_upon_creation=False,
 ) as dag:
-    print(f"raw_images.name: {raw_images.name}")
-    print(f"RAW_BUCKET: {RAW_BUCKET}")
 
-    @task
+    @task(task_display_name="Get the raw files from Minio")
     def get_new_files(force_process: bool = False) -> list:
         """Find new files in raw-images bucket compared to state in airflow bucket."""
         hook = S3Hook(aws_conn_id=CONN_ID)
@@ -167,9 +166,22 @@ with DAG(
             return new_files
         return []
 
-    @task(outlets=[processed_images])
-    def process_and_store(files: list):
+    @task.branch(
+        task_id="branch_task",
+        task_display_name="Check if there are files to process and store",
+    )
+    def branch_func(files: List):
+        if files:
+            return "process_and_store"
+        return []
+
+    @task(
+        outlets=[processed_images],
+        task_display_name="Process and store the selected images",
+    )
+    def process_and_store(ti=None):
         """Process each new file and upload results + update state file."""
+        files = ti.xcom_pull(task_ids="get_new_files")
         if not files:
             return "No new files to process."
         print(f"files: {files}")
@@ -212,4 +224,5 @@ with DAG(
         return f"Processed {len(files)} files."
 
     files = get_new_files()
-    process_and_store(files=files)
+    # process_and_store.expand(files=files)
+    branch_func(files) >> [process_and_store()]

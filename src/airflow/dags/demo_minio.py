@@ -30,6 +30,7 @@ with DAG(
     start_date=datetime(2023, 1, 1),
     schedule=None,
     catchup=False,
+    is_paused_upon_creation=True,
     tags=["test", "minio"],
 ) as dag:
 

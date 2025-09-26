@@ -65,6 +65,8 @@ ENV API_MINIO_API_GATEWAY_CA_PATH=${API_MINIO_API_GATEWAY_CA_PATH:-"/etc/ssl/api
 ENV API_MINIO_API_GATEWAY_KEY_PATH=${API_MINIO_API_GATEWAY_KEY_PATH:-"/etc/ssl/api-gateway/api-minio_api-gateway.key"}
 ENV API_MINIO_API_GATEWAY_CERT_PATH=${API_MINIO_API_GATEWAY_CERT_PATH:-"/etc/ssl/api-gateway/api-minio_api-gateway.crt"}
 
+ENV AIRFLOW_USER=${AIRFLOW_USER:-"airflow-user"}
+
 # Ajouter l'utilisateur et le groupe api-gateway
 RUN groupadd --gid 999 --system api-gateway && \
     useradd --uid 999 --system --gid api-gateway --home-dir /home/api-gateway api-gateway && \
