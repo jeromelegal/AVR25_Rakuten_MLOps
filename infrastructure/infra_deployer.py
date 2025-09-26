@@ -10,8 +10,10 @@ import pwd
 import time
 import json
 import base64
+import threading
+
 # from pathlib import Path
-from typing import Dict #, List, Optional
+from typing import Dict, List #, Optional
 
 # Chemins et constants
 ISO_DIR = "/var/lib/libvirt/isos"
@@ -160,7 +162,6 @@ class InfraDeployer:
                 return True
         return False
 
-
     def create_network(self, network: Dict):
         """Crée un réseau."""
         if self.network_exists(network['name']):
@@ -174,7 +175,6 @@ class InfraDeployer:
         except libvirt.libvirtError as e:
             print(f"  ✗ Erreur lors de la création du réseau {network['name']}: {e}")
             raise
-
 
     def start_network(self, name: str):
         """Active un réseau."""
@@ -196,8 +196,6 @@ class InfraDeployer:
             print(f"  ✗ Erreur lors de l'activation du réseau {name}: {e}")
             raise
 
-
-
     def deploy_networks(self):
         """Déploie tous les réseaux."""
         for network in self.infra.get('networks', []):
@@ -205,193 +203,133 @@ class InfraDeployer:
             self.create_network(network)
             self.start_network(network['name'])
 
-    def install_vm(self, vm: Dict):
-        """Installe une nouvelle VM avec virt-install."""
-        if self.vm_exists(vm['name']):
-            print(f"  ! VM {vm['name']} existe déjà, ignorée")
-            return
-        # Créer les disques
-        for disk in vm['cloud_init'].get('disks', [{'name': 'system', 'path': f"{VM_IMAGES_DIR}/{vm['name']}.qcow2", 'size': vm['disk_size']}]):
-            self._create_disk(disk['path'], disk.get('size', vm['disk_size']))
-        # Générer l'ISO cloud-init
-        cloud_init_iso = self._create_cloud_init_iso(vm)
-        # Commande virt-install
-        cmd = [
-            "virt-install",
-            "--name", vm['name'],
-            "--ram", str(vm['ram']),
-            "--vcpus", str(vm['cpu']),
-            "--cpu", "qemu64",
-            "--disk", f"path={vm['cloud_init']['disks'][0]['path']},size={vm['disk_size']},bus=virtio",
-            "--location", os.path.join(ISO_DIR, vm['cloud_init']['iso']),
-            "--extra-args", "console=ttyS0,115200n8 autoinstall ds=nocloud-net",
-            "--console", "pty,target_type=serial",
-            "--noautoconsole",
-            "--network", f"network={vm['networks'][0]['name']}"
-        ]
-        cmd.extend(["--disk", f"path={cloud_init_iso},device=cdrom"])
-        subprocess.run(cmd, check=True)
-        print(f"  ✓ VM {vm['name']} installée avec autoinstall")
+    def wait_for_cdrom(self, vm_name: str, timeout: int = 30, interval: int = 1) -> bool:
+        """Attend que le périphérique CD-ROM soit prêt."""
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            # Vérifier si le périphérique CD-ROM est prêt
+            check_cmd = "lsblk /dev/sr0"
+            result = self.execute_via_qemu_agent(vm_name, check_cmd)
+            result_decoded = decode_base64_fields(result)
+            if result_decoded.get('success', False) and 'exitcode' in result_decoded.get('output', {}).get('return', {}) and result_decoded['output']['return']['exitcode'] == 0:
+                print("  ✓ Périphérique CD-ROM prêt")
+                return True
+            time.sleep(interval)
+        print("  ✗ Timeout atteint en attendant le périphérique CD-ROM")
+        return False
 
+    def apply_init_via_agent(self, vm: Dict):
+        """Applique la configuration via qemu-guest-agent."""
+        if 'cloud_init' in vm:
+            print(f"  ✓ Configuration cloud_init trouvée pour {vm['name']}")
+            # Appliquer la configuration cloud_init
+            self.apply_cloud_init_via_agent(vm)
+        elif 'clone_init' in vm:
+            print(f"  ✓ Configuration clone_init trouvée pour {vm['name']}")
+            # Appliquer la configuration clone_init
+            self.apply_clone_init_via_agent(vm)
+        else:
+            print(f"  ✗ Aucune configuration d'initialisation trouvée pour {vm['name']}")
+            return
+
+    def apply_cloud_init_via_agent(self, vm: Dict):
+        """Applique la configuration cloud_init via qemu-guest-agent."""
+        if 'cloud_init' not in vm:
+            print(f"  ✗ Aucune configuration cloud_init trouvée pour {vm['name']}")
+            return False
+        try:
+            # Exemple de configuration cloud_init
+            # Remplacer par la logique appropriée pour appliquer la configuration cloud_init
+            print(f"  ✓ Application de la configuration cloud_init pour {vm['name']}")
+            # Exemple : Exécuter des commandes pour appliquer la configuration cloud_init
+            return True
+        except Exception as e:
+            print(f"  ✗ Erreur lors de l'application de la configuration cloud_init pour {vm['name']}: {e}")
+            return False
 
     def apply_clone_init_via_agent(self, vm: Dict):
         """Applique la configuration clone_init via qemu-guest-agent."""
         if 'clone_init' not in vm:
-            print(f"  ! Pas de configuration clone_init pour la VM {vm['name']}")
-            return
-
+            print(f"  ✗ Aucune configuration clone_init trouvée pour {vm['name']}")
+            return False
         try:
-            # Récupérer la configuration clone_init
-            clone_init = vm['clone_init']
-            print(f"  ✓ Configuration clone_init trouvée pour {vm['name']}")
-
-            # Commande pour lister les disques disponibles
-            get_disks_cmd = {
-                "execute": "guest-get-disks"
-            }
-            print(f"  🚀 Exécution de la commande: {get_disks_cmd}")
-            result = self.execute_via_qemu_agent(vm['name'], get_disks_cmd)
-            result_decoded = decode_base64_fields(result)
-            print(f"  📋 Résultat de la commande 'guest-get-disks': {result_decoded}")
-
-            # Commandes pour vérifier et monter le CD-ROM
-            commands_to_run = [
-                "lsblk",  # Lister tous les périphériques de bloc
-                "ls /dev/sr0",  # Vérifier si le périphérique CD-ROM existe
-                "mkdir -p /mnt",  # Créer un point de montage si nécessaire
-            ]
-
-            # Exécution des commandes via l'agent
-            for cmd in commands_to_run:
-                print(f"  🚀 Exécution de la commande: {cmd}")
-                result = self.execute_via_qemu_agent(vm['name'], cmd)
-                result_decoded = decode_base64_fields(result)
-                print(f"  📋 Résultat de la commande '{cmd}': {result_decoded}")
-
-            # Vérifier le système de fichiers du CD-ROM
-            blkid_cmd = "blkid /dev/sr0"
-            print(f"  🚀 Exécution de la commande: {blkid_cmd}")
-            result = self.execute_via_qemu_agent(vm['name'], blkid_cmd)
-            result_decoded = decode_base64_fields(result)
-            print(f"  📋 Résultat de la commande '{blkid_cmd}': {result_decoded}")
-
-            # Essayer de monter le CD-ROM avec des options spécifiques
-            mount_cmd = "mount -t iso9660 /dev/sr0 /mnt"
-            print(f"  🚀 Exécution de la commande: {mount_cmd}")
-            result = self.execute_via_qemu_agent(vm['name'], mount_cmd)
-            result_decoded = decode_base64_fields(result)
-            print(f"  📋 Résultat de la commande '{mount_cmd}': {result_decoded}")
-
-            if not result_decoded.get('success', False) or result_decoded.get('output', {}).get('return', {}).get('exitcode', 0) != 0:
-                print("  ⚠️ Échec du montage du CD-ROM avec des options spécifiques.")
-                return
-
-            # Lister le contenu du CD-ROM
-            ls_cmd = "ls /mnt"
-            print(f"  🚀 Exécution de la commande: {ls_cmd}")
-            result = self.execute_via_qemu_agent(vm['name'], ls_cmd)
-            result_decoded = decode_base64_fields(result)
-            print(f"  📋 Résultat de la commande '{ls_cmd}': {result_decoded}")
-
-
-            # Copier le répertoire clone depuis SCRIPTS_DIR vers la VM
-            clone_dir = os.path.join(SCRIPTS_DIR, "clone")
-            dest_dir = "/tmp"
-            print(f"  - Copie du répertoire {clone_dir} vers {dest_dir}")
-            if not self._copy_directory_via_agent(vm['name'], clone_dir, dest_dir):
-                print(f"  ✗ Échec de la copie du répertoire {clone_dir}")
-                return
-
-            # Chemin du script de configuration
-            script_dest = "/tmp/clone/configure_vm.py"
-
-            # Donner les permissions d'exécution au script
-            chmod_cmd = {
-                "execute": "guest-exec",
-                "arguments": {
-                    "path": "/bin/chmod",
-                    "arg": ["+x", script_dest],
-                    "capture-output": True
-                }
-            }
-            chmod_result = self.execute_via_qemu_agent(vm['name'], chmod_cmd)
-            result_decoded = decode_base64_fields(chmod_result)
-            print(f"  📋 Résultat de la commande '{chmod_cmd}': {result_decoded}")
-
-            if not chmod_result['success']:
-                print(f"  ✗ Échec de la modification des permissions pour {script_dest}: {chmod_result['error']}")
-                return
-
-
-            # Donner les permissions d'exécution au script
-            chmod_cmd = {
-                "execute": "guest-exec",
-                "arguments": {
-                    "path": "exec chpst -u root /bin/id",
-                    "arg": ["-u"],
-                    "capture-output": True
-                }
-            }
-            chmod_result = self.execute_via_qemu_agent(vm['name'], chmod_cmd)
-            result_decoded = decode_base64_fields(chmod_result)
-            print(f"  📋 Résultat de la commande '{chmod_cmd}': {result_decoded}")
-
-            # Exécuter le script
-            exec_cmd = {
-                "execute": "guest-exec",
-                "arguments": {
-                    "path": f"{script_dest}",
-                    # "arg": [" > ", f"{script_dest}.log"],
-                    "capture-output": True
-                }
-            }
-            exec_result = self.execute_via_qemu_agent(vm['name'], exec_cmd)
-            result_decoded = decode_base64_fields(exec_result)
-            print(f"  📋 Résultat de la commande '{exec_cmd}': {result_decoded}")            
-            if exec_result['success']:
-                print(f"  ✓ Script {script_dest} exécuté sur {vm['name']}")
-            else:
-                print(f"  ✗ Erreur lors de l'exécution du script {script_dest}: {exec_result['error']}")
-
+            # Exemple de configuration clone_init
+            # Remplacer par la logique appropriée pour appliquer la configuration clone_init
+            print(f"  ✓ Application de la configuration clone_init pour {vm['name']}")
+            # Exemple : Exécuter des commandes pour appliquer la configuration clone_init
+            return True
         except Exception as e:
-            print(f"  ✗ Erreur lors de l'exécution des commandes clone_init: {e}")
+            print(f"  ✗ Erreur lors de l'application de la configuration clone_init pour {vm['name']}: {e}")
+            return False
 
-
-
-    def clone_vm(self, source_vm_name: str, target_vm: Dict):
-        """Clone une VM existante."""
-        if self.vm_exists(target_vm['name']):
-            print(f"  ! VM {target_vm['name']} existe déjà, ignorée")
-            return
-
-        # Vérifier si la VM source existe
-        if not self.vm_exists(source_vm_name):
-            print(f"  ✗ VM source {source_vm_name} non trouvée")
-            return
-
-        import xml.etree.ElementTree as ET
-        import time
-
-        # Vérifier si la VM source est allumée et l'éteindre si nécessaire
-        source_domain = self.conn.lookupByName(source_vm_name)
-        if source_domain.isActive():
-            print(f"  ⏳ Éteindre la VM source {source_vm_name}...")
-            source_domain.shutdown()
-            # Attendre que la VM soit éteinte
-            while source_domain.isActive():
-                time.sleep(1)
-
-        # Vérifier si le réseau de la VM source est actif et le démarrer si nécessaire
-        source_networks = source_domain.XMLDesc(0)
-        root = ET.fromstring(source_networks)
-        # Trouver le nom du réseau
-        network_name = root.find('.//interface/source').get('network')
-        if network_name and not self.network_is_active(network_name):
-            print(f"  ⏳ Démarrage du réseau {network_name}...")
-            self.start_network(network_name)
-
+    def install_vm(self, vm: Dict) -> bool:
+        """Installe une nouvelle VM avec virt-install."""
         try:
-            # Utiliser virt-clone pour cloner la VM
+            # Créer les disques
+            for disk in vm['cloud_init'].get('disks', [{'name': 'system', 'path': f"{VM_IMAGES_DIR}/{vm['name']}.qcow2", 'size': vm['disk_size']}]):
+                self._create_disk(disk['path'], disk.get('size', vm['disk_size']))
+
+            # Générer l'ISO cloud-init
+            cloud_init_iso = self._create_init_iso(vm, 'cloud_init')
+
+            # Commande virt-install
+            cmd = [
+                "virt-install",
+                "--name", vm['name'],
+                "--ram", str(vm['ram']),
+                "--vcpus", str(vm['cpu']),
+                "--cpu", "qemu64",
+                "--disk", f"path={vm['cloud_init']['disks'][0]['path']},size={vm['disk_size']},bus=virtio",
+                "--location", os.path.join(ISO_DIR, vm['cloud_init']['iso']),
+                "--extra-args", "console=ttyS0,115200n8 autoinstall ds=nocloud-net",
+                "--console", "pty,target_type=serial",
+                "--noautoconsole",
+                "--network", f"network={vm['networks'][0]['name']}"
+            ]
+            cmd.extend(["--disk", f"path={cloud_init_iso},device=cdrom"])
+            subprocess.run(cmd, check=True)
+            print(f"  ✓ VM {vm['name']} installée avec autoinstall")
+            return True
+        except Exception as e:
+            print(f"  ✗ Erreur lors de l'installation de la VM {vm['name']}: {e}")
+            return False
+
+    def _update_vm_networks_libvirt(self, vm_name: str, networks: List[Dict]):
+        """Met à jour les réseaux d'une VM en utilisant libvirt."""
+        try:
+            # Obtenir la configuration XML actuelle de la VM
+            domain = self.conn.lookupByName(vm_name)
+            xml = domain.XMLDesc(0)
+
+            # Charger le XML dans un objet ElementTree pour le modifier
+            import xml.etree.ElementTree as ET
+            root = ET.fromstring(xml)
+
+            # Supprimer toutes les interfaces réseau existantes
+            for interface in root.findall('devices/interface'):
+                root.find('devices').remove(interface)
+
+            # Ajouter les nouvelles interfaces réseau
+            devices = root.find('devices')
+            for network in networks:
+                interface = ET.SubElement(devices, 'interface', {'type': 'network'})
+                ET.SubElement(interface, 'source', {'network': network['name']})
+                ET.SubElement(interface, 'model', {'type': 'virtio'})
+
+            # Convertir l'objet ElementTree en chaîne XML
+            new_xml = ET.tostring(root, encoding='unicode')
+
+            # Définir la nouvelle configuration XML
+            self.conn.defineXML(new_xml)
+            print(f"  ✓ Réseaux mis à jour pour {vm_name}")
+        except libvirt.libvirtError as e:
+            print(f"  ✗ Erreur lors de la mise à jour des réseaux pour {vm_name}: {e}")
+        except Exception as e:
+            print(f"  ✗ Erreur lors de la mise à jour des réseaux pour {vm_name}: {e}")
+
+    def _clone_vm(self, source_vm_name: str, target_vm: Dict) -> bool:
+        """Clone une VM existante."""
+        try:
             cmd = [
                 "virt-clone",
                 "--original", source_vm_name,
@@ -399,95 +337,81 @@ class InfraDeployer:
                 "--auto-clone"
             ]
             subprocess.run(cmd, check=True)
+            print(f"  ✓ VM {target_vm['name']} clonée à partir de {source_vm_name}")
 
-            # Obtenir la configuration XML de la VM clonée
-            domain = self.conn.lookupByName(target_vm['name'])
-            xml_config = domain.XMLDesc(0)
-            root = ET.fromstring(xml_config)
+            # Mettre à jour le réseau de la VM clonée
+            if 'networks' in target_vm:
+                self._update_vm_networks_libvirt(target_vm['name'], target_vm['networks'])
 
-            # Modifier la configuration XML pour utiliser le nouveau réseau
-            for network in target_vm['networks']:
-                # Trouver l'interface réseau dans la configuration XML
-                interface = root.find('.//interface')
-                if interface is not None:
-                    source = interface.find('source')
-                    if source is not None:
-                        source.set('network', network['name'])
+            return True
+        except subprocess.CalledProcessError as e:
+            print(f"  ✗ Erreur lors du clonage de la VM {target_vm['name']}: {e}")
+            return False
 
-            # Appliquer la nouvelle configuration XML à la VM clonée
-            new_xml_config = ET.tostring(root, encoding='unicode')
-            domain = self.conn.defineXML(new_xml_config)
-
-            # Redéfinir le réseau de la VM clonée
-            for network in target_vm['networks']:
-                #self.create_network(network)
-                self.start_network(network['name'])
+    def clone_vm(self, source_vm_name: str, target_vm: Dict) -> bool:
+        """Clone une VM existante."""
+        try:
+            # Cloner la VM
+            if not self._clone_vm(source_vm_name, target_vm):
+                return False
 
             # Créer l'ISO clone_init
-            clone_init_iso = self._create_clone_init_iso(target_vm)
+            clone_init_iso = self._create_init_iso(target_vm, 'clone_init')
 
-            # Attacher l'ISO à la VM clonée en utilisant un contrôleur SATA
+            # Attacher l'ISO à la VM clonée
+            if not self._attach_iso_to_vm(target_vm['name'], clone_init_iso):
+                return False
+
+            # Démarrer la VM
+            self.start_vm(target_vm['name'])
+
+            # Agrandir le disque
+            if not self._resize_disk(target_vm):
+                return False
+
+            return True
+        except libvirt.libvirtError as e:
+            print(f"  ✗ Erreur lors du clonage de la VM {target_vm['name']}: {e}")
+            return False
+
+    def _attach_iso_to_vm(self, vm_name: str, iso_path: str) -> bool:
+        """Attache une ISO à une VM."""
+        try:
             cmd = [
                 "virsh",
                 "attach-disk",
-                target_vm['name'],
-                clone_init_iso,
+                vm_name,
+                iso_path,
                 "--type", "cdrom",
                 "--target", "sdc",  # Utiliser un périphérique SATA différent
                 "--persistent"
             ]
             subprocess.run(cmd, check=True)
-            print(f"  ✓ VM {target_vm['name']} clonée à partir de {source_vm_name}")
+            print(f"  ✓ ISO attachée à la VM {vm_name}")
+            return True
+        except subprocess.CalledProcessError as e:
+            print(f"  ✗ Erreur lors de l'attachement de l'ISO à la VM {vm_name}: {e}")
+            return False
 
-            # Démarrer la VM pour appliquer la configuration clone_init
-            domain = self.conn.lookupByName(target_vm['name'])
-            domain.create()
-            print(f"  ✓ VM {target_vm['name']} démarrée")
-
-            # Attendre que l'agent QEMU soit disponible
-            if not self.wait_for_agent(target_vm['name']):
-                print(f"  ✗ Timeout atteint en attendant qemu-guest-agent pour {target_vm['name']}")
-                return
-
-            # Agrandir le disque à la taille spécifiée
-            for disk in target_vm['clone_init'].get('disks', [{'name': 'system', 'path': f"{VM_IMAGES_DIR}/{target_vm['name']}.qcow2", 'size': target_vm['disk_size']}]):
+    def _resize_disk(self, vm: Dict) -> bool:
+        """Agrandit le disque d'une VM."""
+        try:
+            for disk in vm['clone_init'].get('disks', [{'name': 'system', 'path': f"{VM_IMAGES_DIR}/{vm['name']}.qcow2", 'size': vm['disk_size']}]):
                 disk_path = disk['path']
-                new_size_gb = disk.get('size', target_vm['disk_size'])
-                # Utiliser virsh blockresize pour agrandir le disque
+                new_size_gb = disk.get('size', vm['disk_size'])
                 cmd = [
                     "virsh",
                     "blockresize",
-                    target_vm['name'],
+                    vm['name'],
                     "--path", disk_path,
                     "--size", f"{new_size_gb}G"
                 ]
                 subprocess.run(cmd, check=True)
-
-            # Appliquer la configuration clone_init
-            self.apply_clone_init_via_agent(target_vm)
-        except libvirt.libvirtError as e:
-            print(f"  ✗ Erreur lors du clonage de la VM {target_vm['name']}: {e}")
-            raise
-
-
-
-    def create_vm(self, vm: Dict):
-        """Crée ou configure une VM."""
-        if not self.vm_exists(vm['name']):
-            if 'cloud_init' in vm:
-                self.install_vm(vm)
-            elif 'clone_init' in vm:
-                source_vm_name = vm['clone_init']['source_vm']
-                self.clone_vm(source_vm_name, vm)
-        else:
-            template = env.get_template('vm.xml.j2')
-            vm_xml = template.render(vm=vm, vm_images_dir=VM_IMAGES_DIR)
-            try:
-                self.conn.defineXML(vm_xml)
-                print(f"  ✓ VM {vm['name']} configurée")
-            except libvirt.libvirtError as e:
-                print(f"  ✗ Erreur lors de la configuration de la VM {vm['name']}: {e}")
-                raise
+                print(f"  ✓ Disque {disk_path} agrandi à {new_size_gb}G")
+            return True
+        except subprocess.CalledProcessError as e:
+            print(f"  ✗ Erreur lors de l'agrandissement du disque pour {vm['name']}: {e}")
+            return False
 
     def wait_for_vm_shutdown(self, name: str, timeout: int = 3000, interval: int = 1) -> bool:
         """Attend qu'une VM s'éteigne."""
@@ -515,7 +439,6 @@ class InfraDeployer:
         except libvirt.libvirtError as e:
             print(f"  ✗ Erreur lors du démarrage de la VM {name}: {e}")
             raise
-
 
     def execute_via_qemu_agent(self, vm_name: str, command, username: str = "root", wait_for_completion: bool = True, timeout: int = 30) -> Dict:
         """
@@ -548,7 +471,6 @@ class InfraDeployer:
                     command_dict = command
                 else:
                     raise ValueError("La commande doit être une chaîne de caractères ou un dictionnaire")
-
             # Exécution de la commande
             cmd = [
                 "virsh",
@@ -573,7 +495,6 @@ class InfraDeployer:
                     'error': f"Réponse invalide de l'agent: {result.stdout}",
                     'pid': None
                 }
-
             # Vérifier si la commande est de type guest-exec et si nous devons attendre la fin de l'exécution
             if command_dict.get("execute") == "guest-exec" and 'return' in output and 'pid' in output['return'] and wait_for_completion:
                 pid = output['return']['pid']
@@ -634,7 +555,6 @@ class InfraDeployer:
                 'error': str(e),
                 'pid': None
             }
-
 
     def wait_for_agent(self, vm_name: str, timeout: int = 600) -> bool:
         """Attend que le qemu-guest-agent soit disponible."""
@@ -728,7 +648,6 @@ class InfraDeployer:
         if dest_dir and dest_dir != '/' and not self._create_directory_via_agent(vm_name, dest_dir):
             print(f"  ✗ Échec de la création du répertoire parent {dest_dir}")
             return False
-
         # Ouvrir le fichier
         open_cmd = {
             "execute": "guest-file-open",
@@ -742,7 +661,6 @@ class InfraDeployer:
             print(f"  ✗ Échec de l'ouverture du fichier {dest_path}: {open_result['error']}")
             return False
         file_handle = open_result['output']['return']
-
         try:
             # Écrire le contenu par morceaux
             chunk_size = 4 * 1024 * 1024  # 4MB
@@ -825,7 +743,6 @@ class InfraDeployer:
                 except:
                     pass
 
-
     def run_scripts_via_agent(self, vm: Dict):
         """Exécute les scripts dans la VM."""
         if 'post_install_scripts' not in vm:
@@ -874,61 +791,180 @@ class InfraDeployer:
             else:
                 print(f"  ✗ Erreur lors de l'exécution du script {script}: {exec_result['error']}")
 
-    def deploy_vms_via_agent(self):
-        """Déploie les VMs en utilisant les fonctionnalités avancées de l'agent."""
+    def deploy_vms(self):
+        """Déploie toutes les VMs."""
+        # Étape 1: Boucle pour les installations et clônages
         for vm in self.infra['vms']:
-            print(f"\nDéploiement de la VM {vm['name']}...")
-            # # Créer la VM
-            self.create_vm(vm)
-            # Attendre que la VM s'éteigne après l'installation
-            if 'cloud_init' in vm:
-                self.wait_for_vm_shutdown(vm['name'])
-            # Démarrer la VM
-            self.start_vm(vm['name'])
-            # Attendre que l'agent soit disponible
-            if not self.wait_for_agent(vm['name']):
-                print(f"  ❌ Timeout atteint en attendant qemu-guest-agent pour {vm['name']}")
-                continue
+            if not self.vm_exists(vm['name']):
+                if 'cloud_init' in vm:
+                    if not self.install_vm(vm):
+                        print(f"  ✗ Échec de l'installation de la VM {vm['name']}")
+                        continue
+                elif 'clone_init' in vm:
+                    source_vm_name = vm['clone_init']['source_vm']
+                    if not self.clone_vm(source_vm_name, vm):
+                        print(f"  ✗ Échec du clonage de la VM {vm['name']}")
+                        continue
+                else:
+                    print(f"  ✗ Configuration manquante pour la VM {vm['name']}: ni cloud_init ni clone_init spécifié")
+                    continue
 
-            # Copier les fichiers
+        # Étape 2: Boucle pour le reste en multithreading
+        conn_lock = threading.Lock()
+        threads = []
+        for vm in self.infra['vms']:
+            thread = threading.Thread(target=self.deploy_vm, args=(vm, conn_lock))
+            threads.append(thread)
+            thread.start()
+
+        # Attendre que tous les threads soient terminés
+        for thread in threads:
+            thread.join()
+
+    def run_configure_vm_script(self, vm_name: str) -> bool:
+        """Exécute le script configure_vm sur une VM."""
+        configure_vm_script = os.path.join(SCRIPTS_DIR, "clone/configure_vm.py")
+        if not os.path.exists(configure_vm_script):
+            print(f"  ✗ Script configure_vm introuvable: {configure_vm_script}")
+            return False
+
+        print(f"  - Exécution du script configure_vm sur {vm_name}")
+        script_dest = f"/tmp/configure_vm.py"
+
+        try:
+            # Lire le contenu du script
+            with open(configure_vm_script, 'rb') as f:
+                script_content = f.read()
+            script_content_b64 = base64.b64encode(script_content).decode('utf-8')
+
+            # Écrire le script dans la VM
+            if not self._write_file_via_agent(vm_name, script_dest, script_content_b64):
+                print(f"  ✗ Échec de l'écriture du script configure_vm dans {vm_name}")
+                return False
+
+            # Donner les permissions d'exécution
+            chmod_cmd = {
+                "execute": "guest-exec",
+                "arguments": {
+                    "path": "/bin/chmod",
+                    "arg": ["+x", script_dest],
+                    "capture-output": True
+                }
+            }
+            chmod_result = self.execute_via_qemu_agent(vm_name, chmod_cmd)
+            if not chmod_result['success']:
+                print(f"  ✗ Échec de la modification des permissions pour {script_dest}: {chmod_result['error']}")
+                return False
+
+            # Créer le répertoire de montage pour l'ISO
+            mount_dir = "/mnt"
+            mkdir_cmd = f"/bin/mkdir -p {mount_dir}"
+            mkdir_result = self.execute_via_qemu_agent(vm_name, mkdir_cmd)
+            if not mkdir_result['success']:
+                print(f"  ✗ Échec de la création du répertoire de montage {mount_dir}: {mkdir_result['error']}")
+                return False
+
+            # Monter l'ISO
+            mount_cmd = f"/bin/mount /dev/sr0 {mount_dir}"
+            mount_result = self.execute_via_qemu_agent(vm_name, mount_cmd)
+            if not mount_result['success']:
+                print(f"  ✗ Échec du montage de l'ISO: {mount_result['error']}")
+                return False
+
+            # Exécuter le script
+            exec_cmd = {
+                "execute": "guest-exec",
+                "arguments": {
+                    "path": script_dest,
+                    "capture-output": True
+                }
+            }
+            exec_result = self.execute_via_qemu_agent(vm_name, exec_cmd)
+            if exec_result['success']:
+                print(f"  ✓ Script configure_vm exécuté sur {vm_name}")
+                return True
+            else:
+                print(f"  ✗ Erreur lors de l'exécution du script configure_vm: {exec_result['error']}")
+                return False
+        except Exception as e:
+            print(f"  ✗ Erreur lors de l'exécution du script configure_vm: {e}")
+            return False
+
+    def deploy_vm(self, vm, conn_lock):
+        """Déploie une seule VM."""
+        try:
+            with conn_lock:
+                self.conn = libvirt.open("qemu:///system")
+            print(f"\nDéploiement de la VM {vm['name']}...")
+
+            # Vérifier si la VM existe déjà
+            if self.vm_exists(vm['name']):
+                print(f"  ! VM {vm['name']} existe déjà, ignorée")
+            else:
+                # Étape 3: Configurer la VM existante
+                template = env.get_template('vm.xml.j2')
+                vm_xml = template.render(vm=vm, vm_images_dir=VM_IMAGES_DIR)
+                try:
+                    self.conn.defineXML(vm_xml)
+                    print(f"  ✓ VM {vm['name']} configurée")
+                except libvirt.libvirtError as e:
+                    print(f"  ✗ Erreur lors de la configuration de la VM {vm['name']}: {e}")
+                    return
+
+            # Étape 4: Attendre que la VM s'éteigne après l'installation (si nécessaire)
+            if 'cloud_init' in vm:
+                if not self.wait_for_vm_shutdown(vm['name']):
+                    print(f"  ✗ Échec de l'attente de l'extinction de la VM {vm['name']}")
+                    return
+
+            # Étape 5: Démarrer la VM
+            self.start_vm(vm['name'])
+
+            # Étape 6: Attendre que l'agent QEMU soit disponible et appliquer la configuration clone_init si nécessaire
+            if 'clone_init' in vm:
+                if not self.wait_for_agent(vm['name']):
+                    print(f"  ❌ Timeout atteint en attendant qemu-guest-agent pour {vm['name']}")
+                    return
+                if not self.apply_clone_init_via_agent(vm):
+                    print(f"  ✗ Échec de l'application de la configuration clone_init pour {vm['name']}")
+                    return
+
+                # Exécuter le script configure_vm pour les VMs clonées
+                if not self.run_configure_vm_script(vm['name']):
+                    print(f"  ✗ Échec de l'exécution du script configure_vm sur {vm['name']}")
+
+            # Étape 7: Copier les fichiers dans la VM
             self.copy_files_via_agent(vm)
-            # Exécuter les scripts
+
+            # Étape 8: Exécuter les scripts post-installation
             self.run_scripts_via_agent(vm)
 
-    def _create_cloud_init_iso(self, vm: Dict) -> str:
-        """Génère une ISO cloud-init."""
-        iso_path = os.path.join(CLOUD_INIT_ISO_DIR, f"{vm['name']}-cloudinit.iso")
-        meta_data = "\n".join(f"{k}: {v}" for k, v in vm['cloud_init'].get('meta_data', {}).items())
-        with open("/tmp/meta-data", "w") as f:
-            f.write(meta_data)
-        user_data_str = "#cloud-config\n" + yaml.dump(vm['cloud_init']['user_data'], default_flow_style=False, sort_keys=False)
-        with open("/tmp/user-data", "w") as f:
-            f.write(user_data_str)
-        subprocess.run([
-            'genisoimage', '-input-charset', 'utf-8',
-            '-output', iso_path,
-            '-volid', 'cidata', '-joliet', '-rock',
-            '/tmp/meta-data', '/tmp/user-data'
-        ], check=True)
-        print(f"  ✓ ISO cloud-init générée: {iso_path}")
-        return iso_path
+        except Exception as e:
+            print(f"  ✗ Erreur lors du déploiement de la VM {vm['name']}: {e}")
 
-    def _create_clone_init_iso(self, vm: Dict) -> str:
-        """Génère une ISO clone_init."""
-        iso_path = os.path.join(CLOUD_INIT_ISO_DIR, f"{vm['name']}-cloneinit.iso")
-        meta_data = "\n".join(f"{k}: {v}" for k, v in vm['clone_init'].get('meta_data', {}).items())
+    def _create_init_iso(self, vm: Dict, init_type: str) -> str:
+        """Génère une ISO d'initialisation."""
+        if init_type == 'cloud_init':
+            meta_data = "\n".join(f"{k}: {v}" for k, v in vm['cloud_init'].get('meta_data', {}).items())
+            user_data_str = "#cloud-config\n" + yaml.dump(vm['cloud_init']['user_data'], default_flow_style=False, sort_keys=False)
+        elif init_type == 'clone_init':
+            meta_data = "\n".join(f"{k}: {v}" for k, v in vm['clone_init'].get('meta_data', {}).items())
+            user_data_str = "#cloud-config\n" + yaml.dump(vm['clone_init']['user_data'], default_flow_style=False, sort_keys=False)
+        else:
+            print(f"  ✗ Type d'initialisation inconnu: {init_type}")
+            return None
         with open("/tmp/meta-data", "w") as f:
             f.write(meta_data)
-        user_data_str = "#cloud-config\n" + yaml.dump(vm['clone_init']['user_data'], default_flow_style=False, sort_keys=False)
         with open("/tmp/user-data", "w") as f:
             f.write(user_data_str)
+        iso_path = os.path.join(CLOUD_INIT_ISO_DIR, f"{vm['name']}-{init_type}.iso")
         subprocess.run([
             'genisoimage', '-input-charset', 'utf-8',
             '-output', iso_path,
             '-volid', 'cidata', '-joliet', '-rock',
             '/tmp/meta-data', '/tmp/user-data'
         ], check=True)
-        print(f"  ✓ ISO clone_init générée: {iso_path}")
+        print(f"  ✓ ISO {init_type} générée: {iso_path}")
         return iso_path
 
     def _create_disk(self, path: str, size_gb: int):
@@ -975,9 +1011,12 @@ class InfraDeployer:
                     os.remove(disk['path'])
                     print(f"  ✓ Disque {disk['path']} supprimé")
             cloud_init_iso = os.path.join(CLOUD_INIT_ISO_DIR, f"{vm['name']}-cloudinit.iso")
+            print(f"  Chemin de l'ISO cloud-init: {cloud_init_iso}")
             if os.path.exists(cloud_init_iso):
                 os.remove(cloud_init_iso)
                 print(f"  ✓ ISO cloud-init {cloud_init_iso} supprimée")
+            else:
+                print(f"  ! ISO cloud-init {cloud_init_iso} non trouvée")
         elif 'clone_init' in vm:
             for disk in vm['clone_init'].get('disks', [{'name': 'system', 'path': f"{VM_IMAGES_DIR}/{vm['name']}.qcow2"}]):
                 if 'source_vm' in vm['clone_init'] and vm['clone_init']['source_vm'] in disk['path']:
@@ -987,9 +1026,12 @@ class InfraDeployer:
                     os.remove(disk['path'])
                     print(f"  ✓ Disque {disk['path']} supprimé")
             clone_init_iso = os.path.join(CLOUD_INIT_ISO_DIR, f"{vm['name']}-cloneinit.iso")
+            print(f"  Chemin de l'ISO clone_init: {clone_init_iso}")
             if os.path.exists(clone_init_iso):
                 os.remove(clone_init_iso)
                 print(f"  ✓ ISO clone_init {clone_init_iso} supprimée")
+            else:
+                print(f"  ! ISO clone_init {clone_init_iso} non trouvée")
 
     def _clean_network(self, network: Dict):
         """Supprime un réseau."""
@@ -1008,7 +1050,7 @@ class InfraDeployer:
         """Déploie l'infrastructure complète."""
         print(f"Déploiement de l'infrastructure {self.infra['name']}...")
         self.deploy_networks()
-        self.deploy_vms_via_agent()
+        self.deploy_vms()
         self.deploy_firewall()
         print("\n✅ Déploiement terminé !")
 

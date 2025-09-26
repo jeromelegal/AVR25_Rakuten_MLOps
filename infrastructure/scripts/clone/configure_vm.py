@@ -122,6 +122,23 @@ class VMConfigurator:
             self.log("ERROR", f"Erreur configuration utilisateur: {e}")
             return False
 
+    def configure_sudo(self, config):
+        """Configure les permissions sudo pour l'utilisateur"""
+        identity = config.get('autoinstall', {}).get('identity', {})
+        username = identity.get('username', 'ubuntu')  # Default to 'ubuntu' if not specified
+        sudoers_line = f"{username} ALL=(ALL) NOPASSWD:ALL"
+        sudoers_file = f"/etc/sudoers.d/{username}"
+        try:
+            # Écrire la configuration sudoers dans un fichier dans /etc/sudoers.d/
+            with open(sudoers_file, "w") as f:
+                f.write(sudoers_line + "\n")
+            # Définir les permissions appropriées
+            self.run_command(f"chmod 440 {sudoers_file}", check=True)
+            return True
+        except Exception as e:
+            self.log("ERROR", f"Erreur configuration sudo: {e}")
+            return False
+
     def install_packages(self, config):
         """Installe les paquets spécifiés"""
         packages = config.get('autoinstall', {}).get('packages', [])
@@ -217,6 +234,7 @@ class VMConfigurator:
         self.configure_hostname(config)
         self.configure_network(config)
         self.configure_user(config)
+        self.configure_sudo(config)  # Ajout de la configuration sudo
         self.install_packages(config)
         self.resize_partition(config)
         self.resize_logical_volume(config)

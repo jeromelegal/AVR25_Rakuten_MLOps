@@ -1,144 +1,283 @@
-version: "1.0"
-name: "infra-webapp"
-description: "Infrastructure pour une application web avec base de données"
-networks:
-  - name: "ori-k8s"
-    description: "Réseau pour le cluster Kubernetes"
-    type: "nat"
-    subnet: "192.168.100.1/24"
-    dhcp:
-      start: "192.168.100.2"
-      end: "192.168.100.200"
-    dns:
-      enabled: true
-      domain: "k8s.local"
-      servers: ["8.8.8.8", "8.8.4.4"]
+---
+- name: Wait for dpkg lock to be released
+  shell: while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do sleep 1; done
+  become: yes
+  changed_when: false
 
-vms:
-  - name: kubernetes-origin
-    cpu: 4
-    ram: 12288
-    disk_size: 20
-    networks:
-      - name: "ori-k8s"
-        ip: "192.168.100.10"  # Adresse IP statique
-    cloud_init:
-      iso: ubuntu-24.04.3-live-server-amd64.iso
-      meta_data:
-        instance-id: kubernetes-origin
-        local-hostname: kubernetes-origin
-      user_data:
-        #cloud-config
-        autoinstall:
-          version: 1
-          identity:
-            hostname: kubernetes-origin
-            username: ubuntu
-            password: "$6$azI.phbtXYmpiU7T$pNQ7Ogdk9KWYnhPw4G/7p/VnxQ.vMmI/Xs56wWvhDmoEe7VRMRoSRhiA6cONZOU./N9WxdQmxuefaJDG4qxwU."
-          ssh:
-            install-server: true
-            authorized-keys:
-              - "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQC9x/mtoDy50VqHXcDKVQPVNacZAhMtkECMO1qVInBMm+7WfXbguBRKAAvLEHMCuEjUolTlcU7gwOFCtgurgzuVFBHc03PGYQQpy2AsxxQfT52VxZWTgQRqKPT+sqdqniNDTKZMFynQ3F5xvCIfwST4C8nunnMVmb68NnT4hIlw2ZGO0GCE07cXxlYuLbigxtrpR4W/+BvAbESy6lGbEW4Ytjii6vP/UhUFQkdrW+btT8wAiyvl1pBfxsSsjrZDRk3BKM3KPH5eELbAkJynObri8svMB44YbXK3XKgDDq+0YHczdHHTT9X6UaUIALKKEXdDpHjEFrULfz8RobkyJ32+owe2mUCt86xmQMRLUpP5rdA7v7E3JVBlfWQwQzKZ8HgN1BqCFpMF8k44nWitdJQePnbV8PO658eyOlVPRQaNeJS8NhiI4U5ayuZhsvDzVgnhwhxOU29uHud73T60aDFgJWhJd6Id/l+PFhAt2UF+6QvIjC8lftNxo21jkVmn8NV6CuIkeHtacrKf0ynXIY9gVMzKrH1T3JGutKa+gA3us/FKgdn+7pDB8PUSPg59PCF/I5pgg11Z9ZhAPAVlA7Y6gO5UTl/dbgrzJaL9Xo3sIDXnTz+sZcHvPiu1sWcGaGrmrhmLkx7E6E/bg9cLDolxhghhuAxqECk4GeEIHC7y/w== philipperisser@msn.com"
-          storage:
-            layout:
-              name: lvm
-              sizing-policy: all
-          network:
-            version: 2
-            ethernets:
-              enp1s0:
-                dhcp4: false
-                addresses: [192.168.100.10/24]
-                gateway4: 192.168.100.1
-                nameservers:
-                  addresses: [8.8.8.8, 8.8.4.4]
-          packages:
-            - nginx
-            - fcgiwrap
-            - qemu-guest-agent
-            - yq 
-            - cloud-guest-utils
-            - docker.io
-          late-commands:
-            - |
-              cat << 'EOF' > /target/etc/systemd/system/start-ssh.service
-              [Unit]
-              Description=Start SSH Service
-              After=network.target
+- name: Install dependencies
+  apt:
+    name: "{{ item }}"
+    state: present
+    update_cache: yes
+  loop:
+    - apt-transport-https
+    - ca-certificates
+    - curl
+    - gnupg-agent
+    - software-properties-common
 
-              [Service]
-              Type=simple
-              ExecStart=/bin/bash /usr/local/bin/start-ssh.sh
-              User=root
-              Restart=always
+- name: Create /etc/apt/keyrings directory
+  file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: '0755'
 
-              [Install]
-              WantedBy=multi-user.target
-              EOF
-            - |
-              cat << 'EOF' > /target/usr/local/bin/start-ssh.sh
-              #!/bin/bash
-              # Boucle infinie pour vérifier et redémarrer le service SSH si nécessaire
-              while true; do
-                if [ "$(systemctl is-active ssh)" != "active" ]; then
-                  systemctl start ssh
-                fi
-                if [ "$(systemctl is-enabled ssh)" != "enabled" ]; then
-                  systemctl enable ssh
-                fi
-                sleep 10
-              done
-              EOF
-            - chmod +x /target/usr/local/bin/start-ssh.sh
-            - chroot /target systemctl enable start-ssh.service
-            - |
-              cat << 'EOF' > /target/etc/systemd/system/start-qemu-guest-agent.service
-              [Unit]
-              Description=Start QEMU Guest Agent Service
-              After=network.target
+- name: Add Docker's official GPG key
+  get_url:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    dest: /etc/apt/keyrings/docker.asc
+    mode: '0644'
 
-              [Service]
-              Type=simple
-              ExecStart=/bin/bash /usr/local/bin/start-qemu-guest-agent.sh
-              User=root
-              Restart=always
+- name: Determine Ubuntu codename
+  shell: . /etc/os-release && echo "$UBUNTU_CODENAME"
+  register: ubuntu_codename
+  changed_when: false
 
-              [Install]
-              WantedBy=multi-user.target
-              EOF
-            - |
-              cat << 'EOF' > /target/usr/local/bin/start-qemu-guest-agent.sh
-              #!/bin/bash
-              # Boucle infinie pour vérifier et redémarrer le service qemu-guest-agent si nécessaire
-              while true; do
-                if [ "$(systemctl is-active qemu-guest-agent)" != "active" ]; then
-                  systemctl start qemu-guest-agent
-                fi
-                if [ "$(systemctl is-enabled qemu-guest-agent)" != "enabled" ]; then
-                  systemctl enable qemu-guest-agent
-                fi
-                sleep 10
-              done
-              EOF
-            - chmod +x /target/usr/local/bin/start-qemu-guest-agent.sh
-            - chroot /target systemctl enable start-qemu-guest-agent.service
-            - |
-              # Définir un mot de passe pour l'utilisateur root
-              echo 'root:monmotdepasse' | chroot /target chpasswd
-            - |
-              # Créer un fichier de configuration pour le service
-              cat << 'EOF' > /target/etc/root_service.conf
-              # Fichier de configuration pour le service root
-              password="monmotdepasse"
-              EOF
-            - chmod 600 /target/etc/root_service.conf
-            - chown root:root /target/etc/root_service.conf
-      disks:
-        - name: system
-          path: "/var/lib/libvirt/images/kubernetes-origin.qcow2"
-          size: 30
-    copy_files:
-      - source: nginx/
-        destination: /opt/
-    post_install_scripts:
-      - nginx/install.sh
+- name: Determine architecture
+  command: dpkg --print-architecture
+  register: system_arch
+  changed_when: false
+
+- name: Add Docker repository
+  copy:
+    dest: /etc/apt/sources.list.d/docker.list
+    content: "deb [arch={{ system_arch.stdout }} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu {{ ubuntu_codename.stdout }} stable"
+  become: yes
+
+- name: Update apt package index
+  apt:
+    update_cache: yes
+
+- name: Install Docker packages
+  apt:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - docker-ce
+    - docker-ce-cli
+    - containerd.io
+    - docker-buildx-plugin
+    - docker-compose-plugin
+
+- name: Configure Docker daemon options
+  copy:
+    dest: /etc/docker/daemon.json
+    content: |
+      {
+        "exec-opts": ["native.cgroupdriver=systemd"],
+        "log-driver": "json-file",
+        "log-opts": {
+          "max-size": "100m"
+        },
+        "storage-driver": "overlay2"
+      }
+  become: yes
+
+- name: Create Docker systemd directory
+  file:
+    path: /etc/systemd/system/docker.service.d
+    state: directory
+    mode: '0755'
+
+- name: Configure Docker systemd service
+  copy:
+    dest: /etc/systemd/system/docker.service.d/override.conf
+    content: |
+      [Service]
+      ExecStart=
+      ExecStart=/usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock
+  become: yes
+
+- name: Reload systemd daemon
+  systemd:
+    daemon_reload: yes
+  become: yes
+
+- name: Ensure Docker is running and enabled
+  systemd:
+    name: docker
+    state: restarted
+    enabled: yes
+  become: yes
+  ignore_errors: yes
+
+- name: Wait for Docker to be ready
+  shell: |
+    while ! docker info > /dev/null 2>&1; do
+      sleep 1
+    done
+  become: yes
+  changed_when: false
+
+- name: Disable swap
+  command: swapoff -a
+  become: yes
+
+- name: Remove swap entry from /etc/fstab
+  replace:
+    path: /etc/fstab
+    regexp: '^([^#].*?\sswap\s.*)$'
+    replace: '# \1'
+  become: yes
+
+- name: Add temporary host entry for master
+  lineinfile:
+    dest: /etc/hosts
+    line: "{{ hostvars['master1']['ansible_default_ipv4']['address'] }} master"
+    state: present
+  become: yes
+
+- name: Create /etc/apt/keyrings directory if it does not exist
+  file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: '0755'
+
+- name: Remove temporary key file if it exists
+  file:
+    path: /tmp/kubernetes-release.key
+    state: absent
+
+- name: Download the public signing key
+  get_url:
+    url: https://pkgs.k8s.io/core:/stable:/v1.33/deb/Release.key
+    dest: /tmp/kubernetes-release.key
+    mode: '0644'
+  register: download_result
+  until: download_result is succeeded
+  retries: 3
+  delay: 2
+
+- name: Verify the key file exists
+  stat:
+    path: /tmp/kubernetes-release.key
+  register: key_file_stat
+
+- name: Debug key file stat
+  debug:
+    var: key_file_stat
+
+- name: Dearmor the key
+  command: gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg /tmp/kubernetes-release.key
+  become: yes
+  when: key_file_stat.stat.exists
+
+- name: Remove the temporary key file
+  file:
+    path: /tmp/kubernetes-release.key
+    state: absent
+
+- name: Add the appropriate Kubernetes apt repository
+  copy:
+    dest: /etc/apt/sources.list.d/kubernetes.list
+    content: 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.33/deb/ /'
+  become: yes
+
+- name: Update the apt package index
+  apt:
+    update_cache: yes
+  become: yes
+
+- name: Install kubelet, kubeadm and kubectl
+  apt:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - kubelet
+    - kubeadm
+    - kubectl
+  become: yes
+
+- name: Pin the version of kubelet, kubeadm and kubectl
+  command: apt-mark hold kubelet kubeadm kubectl
+  become: yes
+
+- name: Enable the kubelet service
+  systemd:
+    name: kubelet
+    enabled: yes
+    state: started
+  become: yes
+
+- name: Configure containerd for Kubernetes
+  copy:
+    dest: /etc/containerd/config.toml
+    content: |
+      version = 2
+      [plugins."io.containerd.runtime.v1.linux"]
+        [plugins."io.containerd.runtime.v1.linux.runtimes]
+          [plugins."io.containerd.runtime.v1.linux.runtimes.runc]
+            [plugins."io.containerd.runtime.v1.linux.runtimes.runc.options]
+              SystemdCgroup = true
+  become: yes
+
+- name: Restart containerd
+  systemd:
+    name: containerd
+    state: restarted
+  become: yes
+
+- name: Initialize Kubernetes cluster on first master
+  command: kubeadm init --control-plane-endpoint "master:6443" --upload-certs --ignore-preflight-errors=all
+  when: inventory_hostname == 'master1'
+  register: init_output
+
+- name: Set up kubectl for root user
+  command: mkdir -p /root/.kube && cp -i /etc/kubernetes/admin.conf /root/.kube/config
+  when: inventory_hostname == 'master1'
+
+- name: Get join command for other masters
+  command: kubeadm token create --print-join-command
+  when: inventory_hostname == 'master1'
+  register: join_command_master
+
+- name: Get join command for workers
+  command: kubeadm token create --print-join-command
+  when: inventory_hostname == 'master1'
+  register: join_command_worker
+
+- name: Join other masters to the cluster
+  command: "{{ join_command_master.stdout }} --control-plane --certificate-key {{ join_command_master.stdout_lines[0].split('--certificate-key ')[1] }}"
+  when: inventory_hostname != 'master1' and kubernetes_role == 'master'
+
+- name: Join workers to the cluster
+  command: "{{ join_command_worker.stdout }}"
+  when: kubernetes_role == 'worker'
+
+- name: Install CNI plugin (Calico)
+  command: kubectl apply -f https://docs.projectcalico.org/manifests/calico.yaml
+  when: inventory_hostname == 'master1'
+  become: yes
+
+- name: Install CSI plugin (if needed)
+  command: kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/csi-driver-nfs/v4.6.0/deploy/install-driver.sh | bash
+  when: inventory_hostname == 'master1'
+  become: yes
+
+- name: Create Kubernetes service for load balancing
+  command: |
+    kubectl apply -f - <<EOF
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: kubernetes-loadbalancer
+      namespace: default
+    spec:
+      type: LoadBalancer
+      ports:
+      - port: 6443
+        targetPort: 6443
+        protocol: TCP
+      selector:
+        component: kube-apiserver
+    EOF
+  when: inventory_hostname == 'master1'
+  become: yes
+
+- name: Remove temporary host entry for master
+  lineinfile:
+    dest: /etc/hosts
+    line: "{{ hostvars['master1']['ansible_default_ipv4']['address'] }} master"
+    state: absent
+  become: yes
+  when: inventory_hostname == 'master1'
