@@ -105,3 +105,6 @@ test_result/
 *test_result.xml
 *test_coverage.xml
 TODO.md
+
+infrastructure/projet/frontend/hyperviseur/node_modules/*
+infrastructure/isos/*.iso
