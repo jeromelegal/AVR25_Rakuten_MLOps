@@ -23,18 +23,6 @@ logger = logging.getLogger("gateway")
 def create_app(settings: Settings):
     app = FastAPI()
 
-    @app.exception_handler(HTTPError)
-    async def handle_requests_http_error(request, exc: HTTPError):
-        resp = exc.response
-        status_code = resp.status_code if resp is not None else status.HTTP_502_BAD_GATEWAY
-        try:
-            payload = resp.json()
-            detail = payload.get("detail", payload)
-        except Exception:
-            detail = resp.text or str(exc)
-        return JSONResponse(status_code=status_code, content={"detail": detail})
-
-
     # Stocker les paramètres dans l'état de l'application pour un accès facile
     app.state.settings = settings
 

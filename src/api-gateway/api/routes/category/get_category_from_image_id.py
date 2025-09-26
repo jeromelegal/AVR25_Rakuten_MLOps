@@ -1,11 +1,10 @@
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Request, Header, status
 from pydantic import BaseModel
-from typing import List, Dict
+from typing import Dict
 from config.settings import Settings
 from api.auth.clients.manager import ClientManager, create_client_manager
 from api.auth.token.manager import TokenManager, create_token_manager
-from requests import HTTPError, Timeout, ConnectionError as RequestsConnectionError
 
 logger = logging.getLogger("gateway")
 
@@ -66,29 +65,31 @@ async def get_categories_from_image_id(
 ):
     logger.debug("Getting categories from image_id...")
     
-    postgresql_token = user_data.get('tokens', {}).get('postgresql') 
+    try: 
+        postgresql_token = user_data.get('tokens', {}).get('postgresql') 
     
-    if not postgresql_token:
+    except:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, 
                             detail="Missing PostgreSQL token")
     
     postgresql_client = client_manager.get_client("postgresql")
 
     ### Retrieves image_ad relation ###
-    image_ad = read_psql_relation(table="images_ads", relation_filter=image_id, 
-                    client=postgresql_client, token=postgresql_token)
-    ad_id = image_ad["ad_id"]
+    try:
+        image_ad = read_psql_relation(table="images_ads", relation_filter=image_id, 
+                        client=postgresql_client, token=postgresql_token)
+        ad_id = image_ad["ad_id"]
     
-    if not ad_id:
+    except:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, 
                             detail="Missing image or image_ad relation.")
         
     ### Retrieves ad_cat relation ###
-    ad_cat = read_psql_relation(table="ads_cats", relation_filter=ad_id, 
-                    client=postgresql_client, token=postgresql_token)
-    cat_id = ad_cat[0]["cat_id"]
-    
-    if not cat_id:
+    try:
+        ad_cat = read_psql_relation(table="ads_cats", relation_filter=ad_id, 
+                        client=postgresql_client, token=postgresql_token)
+        cat_id = ad_cat[0]["cat_id"]
+    except:
         raise HTTPException(status_code=status.HTTP_204_NO_CONTENT, 
                             detail="No categoy associated.")
 
