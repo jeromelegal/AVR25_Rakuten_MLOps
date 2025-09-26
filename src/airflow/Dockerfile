@@ -31,8 +31,12 @@ ENV AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=${AIRFLOW__CORE__DAGS_ARE_PAUSED_
 ENV AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK=${AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK:-"true"}
 ENV AIRFLOW__CORE__FERNET_KEY=${AIRFLOW__CORE__FERNET_KEY:-"vYgDn-AesJP0QqFphmuOyuX4Qmw0CYeyWjULGiROzmE="}
 ENV AIRFLOW__CORE__HOSTNAME_CALLABLE="airflow.utils.net.get_host_ip_address"
-ENV AIRFLOW__LOGGING__REMOTE_LOGGING="False"
-ENV AIRFLOW__LOGGING__LOG_SERVER_HOST="0.0.0.0"
+ENV AIRFLOW__LOGGING__REMOTE_LOGGING="true"
+ENV AIRFLOW__LOGGING__LOG_SERVER_HOST=${AIRFLOW__LOGGING__LOG_SERVER_HOST:-"minio:9000"}
+ENV AIRFLOW__LOGGING__REMOTE_BASE_LOG_FOLDER="s3://airflow-logs"
+ENV AIRFLOW__LOGGING__DELETE_LOCAL_LOGS="false"
+ENV AIRFLOW__LOGGING__REMOTE_LOG_CONN_ID="minio_s3_conn"
+
 
 ENV POSTGRESQL_SERVICE_NAME=${POSTGRESQL_SERVICE_NAME:-"postgresql"}
 ENV POSTGRESQL_SERVICE_PORT=${POSTGRESQL_SERVICE_PORT:-"5432"}
@@ -52,8 +56,8 @@ ENV MINIO_AIRFLOW_CERT_PATH=${MINIO_AIRFLOW_CERT_PATH:-"/etc/ssl/airflow/minio_a
 ENV MINIO_AIRFLOW_CA_PATH=${MINIO_AIRFLOW_CA_PATH:-"/etc/ssl/airflow/minio_airflow_ca.crt"}
 ENV MINIO_SERVICE_NAME=${MINIO_SERVICE_NAME:-"minio"}
 ENV MINIO_SERVICE_PORT=${MINIO_SERVICE_PORT:-"9010"}
+ENV MINIO_DEFAULT_AIRFLOW_ARTIFACT_BUCKET=${MINIO_DEFAULT_AIRFLOW_ARTIFACT_BUCKET:-"airflow"}
 ENV MINIO_AIRFLOW_USER=${MINIO_AIRFLOW_USER:-"minio-user"}
-ENV MINIO_DEFAULT_AIRFLOW_ARTIFACT_BUCKET=${MINIO_DEFAULT_AIRFLOW_ARTIFACT_BUCKET:-"models"}
 ENV MINIO_AIRFLOW_PASSWORD=${MINIO_AIRFLOW_PASSWORD:-"minio-password"}
 
 ENV AUTHORIZATION=${AUTHORIZATION:-"enabled"}
@@ -96,7 +100,7 @@ COPY requirements.txt requirements.txt
 
 # Installer les dépendances en contournant la restriction
 USER airflow
-RUN pip install --break-system-packages --force-reinstall -r requirements.txt
+RUN pip install --no-cache-dir "apache-airflow==${AIRFLOW_VERSION}" -r requirements.txt
 
 USER root
 # Mettre à jour la liste des paquets et installer wget, gpg et lsb-release
@@ -112,13 +116,13 @@ RUN apt-get update && apt-get install -y vault
 RUN setcap -r /usr/bin/vault
 RUN vault --version
 # Defining Minio related env. variables and certificates here to not mess with pip certificates
-# ENV AIRFLOW_S3_ENDPOINT_URL=https://${MINIO_SERVICE_NAME}:${MINIO_SERVICE_PORT}
-# ENV AWS_ACCESS_KEY_ID=${MINIO_AIRFLOW_USER}
-# ENV AWS_SECRET_ACCESS_KEY=${MINIO_AIRFLOW_PASSWORD}
-# ENV AWS_CA_BUNDLE=${MINIO_AIRFLOW_CA_PATH}
+ENV AIRFLOW_S3_ENDPOINT_URL=https://${MINIO_SERVICE_NAME}:${MINIO_SERVICE_PORT}
+ENV AWS_ACCESS_KEY_ID=${MINIO_AIRFLOW_USER}
+ENV AWS_SECRET_ACCESS_KEY=${MINIO_AIRFLOW_PASSWORD}
+ENV AWS_CA_BUNDLE=${MINIO_AIRFLOW_CA_PATH}
 # ENV REQUESTS_CA_BUNDLE=${AIRFLOW_PEM_PATH}
 # Copie des DAGs et scripts
-COPY dags/ /opt/airflow/dags
+COPY --chown=airflow:root dags/ /opt/airflow/dags
 # Script d'entrée pour obtenir les certificats depuis Vault et démarrer Uvicorn
 COPY vault/vault.sh /usr/local/bin/vault.sh
 COPY custom-entrypoint.sh /usr/local/bin/custom-entrypoint.sh
