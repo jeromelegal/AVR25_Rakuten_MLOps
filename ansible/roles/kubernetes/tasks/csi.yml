@@ -1,0 +1,5 @@
+---
+- name: Install CSI plugin (NFS)
+  command: kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/csi-driver-nfs/v4.6.0/deploy/install-driver.sh | bash
+  when: inventory_hostname == 'master1'
+  become: yes

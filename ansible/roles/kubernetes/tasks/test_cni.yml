@@ -1,0 +1,41 @@
+---
+- name: Check Cilium pods status
+  command: kubectl -n kube-system get pods -l k8s-app=cilium
+  register: cilium_pods
+  when: inventory_hostname == 'master1'
+  become: yes
+  tags: test_cni
+
+- name: Display Cilium pods status
+  debug:
+    var: cilium_pods.stdout_lines
+  when: inventory_hostname == 'master1'
+  tags: test_cni
+
+- name: Check Cilium status
+  command: kubectl -n kube-system exec cilium-{{ item }} -- cilium status
+  register: cilium_status
+  loop: "{{ cilium_pods.stdout_lines | map(attribute='split') | map('first') | list }}"
+  when: inventory_hostname == 'master1' and cilium_pods.stdout_lines | length > 0
+  become: yes
+  tags: test_cni
+
+- name: Display Cilium status
+  debug:
+    var: cilium_status.results | map(attribute='stdout_lines') | list
+  when: inventory_hostname == 'master1'
+  tags: test_cni
+
+- name: Run Cilium connectivity test
+  command: kubectl -n kube-system exec cilium-{{ item }} -- cilium connectivity test
+  register: cilium_connectivity_test
+  loop: "{{ cilium_pods.stdout_lines | map(attribute='split') | map('first') | list }}"
+  when: inventory_hostname == 'master1' and cilium_pods.stdout_lines | length > 0
+  become: yes
+  tags: test_cni
+
+- name: Display Cilium connectivity test results
+  debug:
+    var: cilium_connectivity_test.results | map(attribute='stdout_lines') | list
+  when: inventory_hostname == 'master1'
+  tags: test_cni

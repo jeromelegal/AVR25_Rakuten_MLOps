@@ -1,0 +1,9 @@
+---
+- name: Create default namespaces
+  command: kubectl create namespace {{ item }}
+  loop:
+    - development
+    - production
+    - testing
+  when: inventory_hostname == 'master1'
+  become: yes
