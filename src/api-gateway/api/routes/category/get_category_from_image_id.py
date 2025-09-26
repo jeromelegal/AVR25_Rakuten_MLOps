@@ -5,6 +5,7 @@ from typing import List, Dict
 from config.settings import Settings
 from api.auth.clients.manager import ClientManager, create_client_manager
 from api.auth.token.manager import TokenManager, create_token_manager
+from requests import HTTPError, Timeout, ConnectionError as RequestsConnectionError
 
 logger = logging.getLogger("gateway")
 
@@ -35,45 +36,27 @@ def get_user_data_from_token(
     return token_manager.get_user_data_from_token(authorization)
 
 def read_psql_entity_by_id(table: str, entity_id: int, client, token) -> dict:
-    try:
-        logger.debug(f"Read '{table}' id={entity_id}")
-        
-        response = client.read_entity(
-            token=token, 
-            table=table, 
-            entity_id=entity_id
-            )
-        data = response
-        if not data:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, 
-                                detail=f"{table} id={entity_id} not found")
-        return data
     
-    except Exception as e:
-        logger.error(f"Error read '{table}' id={entity_id}: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
-                            detail=f"Error read '{table}': {e}")
+    logger.debug(f"Read '{table}' id={entity_id}")
+    
+    data = client.read_entity(
+        token=token, 
+        table=table, 
+        entity_id=entity_id
+        )
+    if not data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, 
+                            detail=f"{table} id={entity_id} not found")
+    return data
     
 def read_psql_relation(table: str, relation_filter: int, client, token) -> dict:
-    try:
-        logger.debug(f"Read relation '{table}' with {relation_filter}")
-        
-        response = client.read_relation(
-            token=token, 
-            table=table, 
-            relation_id=relation_filter
-            )
-        data = response
-        if not data:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, 
-                                detail=f"{table} not found for {relation_filter}")
-        return data
-    
-    except Exception as e:
-        logger.error(f"Error read relation '{table}': {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
-                            detail=f"Error read relation '{table}': {e}")
 
+    logger.debug(f"Read relation '{table}' with {relation_filter}")
+    data = client.read_relation(token=token, table=table, relation_id=relation_filter)
+    if not data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail=f"{table} not found for {relation_filter}")
+    return data
 
 @router.get("/get_categories_from_image_id/{image_id}", response_model=CategoryOut)
 async def get_categories_from_image_id(
@@ -112,9 +95,4 @@ async def get_categories_from_image_id(
     ### Retrieves categories ###
     cat_row = read_psql_entity_by_id(table="category", entity_id=cat_id, 
                                 client=postgresql_client, token=postgresql_token)
-    if cat_row:
-        return cat_row
-    else:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
-                        detail="Error in reading category table.")
-        
+    return cat_row

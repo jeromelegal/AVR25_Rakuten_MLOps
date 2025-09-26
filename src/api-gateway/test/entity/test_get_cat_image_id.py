@@ -63,7 +63,7 @@ def _create_ad(headers, cat_code, cat_label):
     payload = response.json()
     return payload
 
-def test_get_categories_from_image_id():
+def test_get_categories_from_image_id_all_data():
 
     headers = _signup_and_login()
 
@@ -79,15 +79,21 @@ def test_get_categories_from_image_id():
     assert cat_data["id"] == 24
     assert cat_data["code"] == 2583
     assert cat_data["label"] == "Autour de la piscine"
+
+def test_get_categories_from_image_id_no_image():
+    headers = _signup_and_login()
     
     # No image
     response = client.get(f"{test_settings.PROTECTED_ENDPOINT_URL}/get_categories_from_image_id/3000000", 
                           headers=headers)
-    assert response.status_code == 500, f"Get failed : {response.status_code} {response.text}"
+    assert response.status_code == 404, f"Get failed : {response.status_code} {response.text}"
 
+def test_get_categories_from_image_id_no_category():
     # No category associated
+    headers = _signup_and_login()
     no_cat_ad_data = _create_ad(headers, None, None)
     image_id = no_cat_ad_data["image"]["id"]
     response = client.get(f"{test_settings.PROTECTED_ENDPOINT_URL}/get_categories_from_image_id/{image_id}", 
                           headers=headers)
+    assert response.status_code == 204, f"Get failed : {response.status_code} {response.text}"
     assert response.status_code == 500, f"Get failed : {response.status_code} {response.text}"

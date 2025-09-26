@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, status
 from fastapi.middleware.cors import CORSMiddleware
 from api.middlewares.auth import create_auth_middleware
 from api.middlewares.logging import LoggingMiddleware
@@ -13,6 +13,8 @@ from api.routes.category.get import router as categories_router
 from api.routes.category.get_category_from_image_id import router as cat_image_id_router
 from config.settings import Settings
 import logging
+from fastapi.responses import JSONResponse
+from requests import HTTPError
 
 # Configurer le logging
 logging.basicConfig(level=logging.WARNING)
@@ -20,6 +22,18 @@ logger = logging.getLogger("gateway")
 
 def create_app(settings: Settings):
     app = FastAPI()
+
+    @app.exception_handler(HTTPError)
+    async def handle_requests_http_error(request, exc: HTTPError):
+        resp = exc.response
+        status_code = resp.status_code if resp is not None else status.HTTP_502_BAD_GATEWAY
+        try:
+            payload = resp.json()
+            detail = payload.get("detail", payload)
+        except Exception:
+            detail = resp.text or str(exc)
+        return JSONResponse(status_code=status_code, content={"detail": detail})
+
 
     # Stocker les paramètres dans l'état de l'application pour un accès facile
     app.state.settings = settings
