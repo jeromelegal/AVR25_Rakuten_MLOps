@@ -3,25 +3,35 @@
   include_tasks: install.yml
   tags: install
 
+- name: Include Label Nodes tasks
+  include_tasks: label_nodes.yml
+  when: label_nodes | default(false)
+  tags: label_nodes
+
+- name: Include Namespaces tasks
+  include_tasks: namespaces.yml
+  when: create_namespaces | default(false)
+  tags: namespaces 
+
 - name: Include CNI tasks
   include_tasks: cni.yml
   when: install_cni | default(false)
   tags: cni
+
+- name: Include Test CNI tasks
+  include_tasks: test_cni.yml
+  when: test_cni | default(false)
+  tags: test_cni
 
 - name: Include CSI tasks
   include_tasks: csi.yml
   when: install_csi | default(false)
   tags: csi
 
-- name: Include Dashboard tasks
-  include_tasks: dashboard.yml
-  when: install_dashboard | default(false)
-  tags: dashboard
-
-- name: Include Namespaces tasks
-  include_tasks: namespaces.yml
-  when: create_namespaces | default(false)
-  tags: namespaces
+- name: Include Test CNI tasks
+  include_tasks: test_csi.yml
+  when: test_csi | default(false)
+  tags: test_csi
 
 - name: Include MetalLB tasks
   include_tasks: metallb.yml
@@ -33,7 +43,9 @@
   when: test_metallb | default(false)
   tags: test_metallb
 
-- name: Include Test CNI tasks
-  include_tasks: test_cni.yml
-  when: test_cni | default(false)
-  tags: test_cni
+- name: Include Dashboard tasks
+  include_tasks: dashboard.yml
+  when: install_dashboard | default(false)
+  tags: dashboard
+
+

@@ -1,0 +1,21 @@
+---
+- name: Label master nodes
+  command: kubectl label nodes {{ item }} node-role.kubernetes.io/master=true
+  loop: "{{ groups['masters'] | default([]) }}"
+  when: inventory_hostname == 'master1'
+  become: yes
+  tags: label_nodes
+
+- name: Label worker nodes
+  command: kubectl label nodes {{ item }} node-role.kubernetes.io/worker=true
+  loop: "{{ groups['workers'] | default([]) }}"
+  when: inventory_hostname == 'master1'
+  become: yes
+  tags: label_nodes
+
+- name: Label data nodes
+  command: kubectl label nodes {{ item }} node-role.kubernetes.io/data=true
+  loop: "{{ groups['datas'] | default([]) }}"
+  when: inventory_hostname == 'master1'
+  become: yes
+  tags: label_nodes
