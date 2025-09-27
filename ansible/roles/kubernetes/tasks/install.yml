@@ -1,173 +1,60 @@
 ---
-- name: Wait for dpkg lock to be released
-  shell: while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do sleep 1; done
+- name: Ensure conflicting containerd package is removed
+  apt:
+    name: containerd
+    state: absent
   become: yes
-  changed_when: false
   tags: install
-- name: Install dependencies
+
+- name: Ensure Docker is installed
+  apt:
+    name: docker.io
+    state: present
+    update_cache: yes
+  tags: install
+
+- name: Ensure Docker service is running and enabled
+  systemd:
+    name: docker
+    state: started
+    enabled: yes
+  become: yes
+  tags: install
+
+- name: Ensure dependencies for Kubernetes repository are installed
   apt:
     name: "{{ item }}"
     state: present
-    update_cache: yes
   loop:
     - apt-transport-https
     - ca-certificates
     - curl
-    - gnupg-agent
-    - software-properties-common
+    - gnupg
   tags: install
-- name: Create /etc/apt/keyrings directory
-  file:
-    path: /etc/apt/keyrings
-    state: directory
-    mode: '0755'
-  tags: install
-- name: Add Docker's official GPG key
-  get_url:
-    url: https://download.docker.com/linux/ubuntu/gpg
-    dest: /etc/apt/keyrings/docker.asc
-    mode: '0644'
-  tags: install
-- name: Determine Ubuntu codename
-  shell: . /etc/os-release && echo "$UBUNTU_CODENAME"
-  register: ubuntu_codename
-  changed_when: false
-  tags: install
-- name: Determine architecture
-  command: dpkg --print-architecture
-  register: system_arch
-  changed_when: false
-  tags: install
-- name: Add Docker repository
-  copy:
-    dest: /etc/apt/sources.list.d/docker.list
-    content: "deb [arch={{ system_arch.stdout }} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu {{ ubuntu_codename.stdout }} stable"
-  become: yes
-  tags: install
-- name: Update apt package index
-  apt:
-    update_cache: yes
-  tags: install
-- name: Install Docker packages
-  apt:
-    name: "{{ item }}"
-    state: present
-  loop:
-    - docker-ce
-    - docker-ce-cli
-    - containerd.io
-    - docker-buildx-plugin
-    - docker-compose-plugin
-  tags: install
-- name: Configure Docker daemon options
-  copy:
-    dest: /etc/docker/daemon.json
-    content: |
-      {
-        "exec-opts": ["native.cgroupdriver=systemd"],
-        "log-driver": "json-file",
-        "log-opts": {
-          "max-size": "100m"
-        },
-        "storage-driver": "overlay2"
-      }
-  become: yes
-  tags: install
-- name: Create Docker systemd directory
-  file:
-    path: /etc/systemd/system/docker.service.d
-    state: directory
-    mode: '0755'
-  tags: install
-- name: Configure Docker systemd service
-  copy:
-    dest: /etc/systemd/system/docker.service.d/override.conf
-    content: |
-      [Service]
-      ExecStart=
-      ExecStart=/usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock
-  become: yes
-  tags: install
-- name: Reload systemd daemon
-  systemd:
-    daemon_reload: yes
-  become: yes
-  tags: install
-- name: Ensure Docker is running and enabled
-  systemd:
-    name: docker
-    state: restarted
-    enabled: yes
-  become: yes
-  ignore_errors: yes
-  tags: install
-- name: Wait for Docker to be ready
-  shell: |
-    while ! docker info > /dev/null 2>&1; do
-      sleep 1
-    done
-  become: yes
-  changed_when: false
-  tags: install
-- name: Disable swap
-  command: swapoff -a
-  become: yes
-  tags: install
-- name: Remove swap entry from /etc/fstab
-  replace:
-    path: /etc/fstab
-    regexp: '^([^#].*?\sswap\s.*)$'
-    replace: '# \1'
-  become: yes
-  tags: install
-- name: Add temporary host entry for master
-  lineinfile:
-    dest: /etc/hosts
-    line: "{{ hostvars['master1']['ansible_default_ipv4']['address'] }} master"
+
+- name: Ensure Kubernetes apt repository key is present
+  apt_key:
+    url: https://pkgs.k8s.io/core:/stable:/v1.34/deb/Release.key
+    keyring: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
     state: present
   become: yes
   tags: install
-- name: Create /etc/apt/keyrings directory if it does not exist
-  file:
-    path: /etc/apt/keyrings
-    state: directory
-    mode: '0755'
-  tags: install
-- name: Remove temporary key file if it exists
-  file:
-    path: /tmp/kubernetes-release.key
-    state: absent
-  tags: install
-- name: Download and process the public signing key for the Kubernetes package repositories
-  block:
-    - name: Download the public signing key
-      get_url:
-        url: https://pkgs.k8s.io/core:/stable:/v1.33/deb/Release.key
-        dest: /tmp/kubernetes-release.key
-        mode: '0644'
-      tags: install
-    - name: Dearmor the key
-      command: gpg --dearmor --yes -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg /tmp/kubernetes-release.key
-      become: yes
-      tags: install
-    - name: Remove the temporary key file
-      file:
-        path: /tmp/kubernetes-release.key
-        state: absent
-      tags: install
-  tags: install
-- name: Add the appropriate Kubernetes apt repository
-  copy:
-    dest: /etc/apt/sources.list.d/kubernetes.list
-    content: 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.33/deb/ /'
+
+- name: Ensure Kubernetes apt repository is configured
+  apt_repository:
+    repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.34/deb/ /"
+    state: present
+    filename: kubernetes
   become: yes
   tags: install
-- name: Update the apt package index
+
+- name: Ensure apt package index is updated
   apt:
     update_cache: yes
   become: yes
   tags: install
-- name: Install kubelet, kubeadm and kubectl
+
+- name: Ensure Kubernetes components are installed
   apt:
     name: "{{ item }}"
     state: present
@@ -175,51 +62,50 @@
     - kubelet
     - kubeadm
     - kubectl
-  become: yes
   tags: install
-- name: Pin the version of kubelet, kubeadm and kubectl
-  command: apt-mark hold kubelet kubeadm kubectl
-  become: yes
-  tags: install
-- name: Enable the kubelet service
-  systemd:
-    name: kubelet
-    enabled: yes
-    state: started
-  become: yes
-  tags: install
-- name: Create containerd config directory
-  file:
-    path: /etc/containerd
-    state: directory
-    mode: '0755'
-  become: yes
-  tags: install
-- name: Configure containerd for Kubernetes
-  copy:
-    dest: /etc/containerd/config.toml
-    content: |
-      version = 2
-      [plugins."io.containerd.runtime.v1.linux"]
-        [plugins."io.containerd.runtime.v1.linux".runtimes]
-          [plugins."io.containerd.runtime.v1.linux".runtimes.runc]
-            [plugins."io.containerd.runtime.v1.linux".runtimes.runc.options]
-              SystemdCgroup = true
-  become: yes
-  tags: install
-- name: Restart containerd
-  systemd:
-    name: containerd
-    state: restarted
-  become: yes
+
+- name: Check if swap is enabled
+  command: swapon --show
+  register: swap_status
+  changed_when: false
   ignore_errors: yes
   tags: install
+
+- name: Disable swap if enabled
+  command: swapoff -a
+  become: yes
+  when: swap_status.rc == 0
+  tags: install
+
+- name: Remove swap entry from /etc/fstab
+  replace:
+    path: /etc/fstab
+    regexp: '^([^#].*?\sswap\s.*)$'
+    replace: '# \1'
+  become: yes
+  when: swap_status.rc == 0
+  tags: install
+
+- name: Add kubernetes-master entry to /etc/hosts
+  lineinfile:
+    dest: /etc/hosts
+    line: "{{ hostvars['master1']['ansible_default_ipv4']['address'] }} kubernetes-master"
+    state: present
+  become: yes
+  tags: install
+
+- name: Pull Kubernetes images
+  command: kubeadm config images pull
+  become: yes
+  tags: install
+
 - name: Initialize Kubernetes cluster on first master
-  command: kubeadm init --control-plane-endpoint "master:6443" --upload-certs --ignore-preflight-errors=all
+  command: kubeadm init --ignore-preflight-errors=all --control-plane-endpoint "kubernetes-master:6443" --upload-certs
   when: inventory_hostname == 'master1'
   register: init_output
   tags: install
-- name: Create .kube directory
+
+- name: Ensure .kube directory exists
   file:
     path: /root/.kube
     state: directory
@@ -227,7 +113,8 @@
   when: inventory_hostname == 'master1'
   become: yes
   tags: install
-- name: Copy admin.conf to .kube/config
+
+- name: Ensure kubeconfig is configured
   copy:
     src: /etc/kubernetes/admin.conf
     dest: /root/.kube/config
@@ -237,46 +124,4 @@
     mode: '0644'
   when: inventory_hostname == 'master1'
   become: yes
-  tags: install
-- name: Get join command for other masters
-  command: kubeadm token create --print-join-command
-  when: inventory_hostname == 'master1'
-  register: join_command_master
-  tags: install
-- name: Save join command for other masters to a file
-  copy:
-    content: "{{ join_command_master.stdout }}"
-    dest: /tmp/join_command_master.sh
-    mode: '0755'
-  when: inventory_hostname == 'master1'
-  become: yes
-  tags: install
-- name: Get join command for workers
-  command: kubeadm token create --print-join-command
-  when: inventory_hostname == 'master1'
-  register: join_command_worker
-  tags: install
-- name: Save join command for workers to a file
-  copy:
-    content: "{{ join_command_worker.stdout }}"
-    dest: /tmp/join_command_worker.sh
-    mode: '0755'
-  when: inventory_hostname == 'master1'
-  become: yes
-  tags: install
-- name: Fetch join command for other masters from master1
-  fetch:
-    src: /tmp/join_command_master.sh
-    dest: /tmp/join_command_master.sh
-    flat: yes
-  when: inventory_hostname != 'master1' and kubernetes_role == 'master'
-  delegate_to: master1
-  tags: install
-- name: Fetch join command for workers from master1
-  fetch:
-    src: /tmp/join_command_worker.sh
-    dest: /tmp/join_command_worker.sh
-    flat: yes
-  when: kubernetes_role == 'worker'
-  delegate_to: master1
   tags: install

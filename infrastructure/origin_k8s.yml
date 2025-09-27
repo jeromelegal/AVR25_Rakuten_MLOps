@@ -45,7 +45,7 @@ vms:
             disks:
               - name: system
                 path: "/var/lib/libvirt/images/kubernetes-origin.qcow2"
-                size: 30
+                size: 20
                 partition: "/dev/vda3"
                 resize: true
                 mount_point: "/"

@@ -589,7 +589,8 @@ class InfraDeployer:
             if 'clone_init' in target_vm:
                 disks = target_vm['clone_init']['user_data']['autoinstall'].get('storage', {}).get('disks', [])
 
-            for disk in disks:
+            #On passe le premier disk car il a été créé lors du clonage
+            for disk in disks[1:]:
                 self._create_disk(disk['path'], disk.get('size', target_vm['disk_size']))
 
             # Créer l'ISO clone_init
@@ -1188,6 +1189,10 @@ class InfraDeployer:
 
             # Étape 6: Attendre que l'agent QEMU soit disponible et appliquer la configuration clone_init si nécessaire
             if 'clone_init' in vm:
+
+
+
+                
                 if not self.wait_for_agent(vm['name']):
                     log_message(f"Timeout atteint en attendant qemu-guest-agent pour {vm['name']}", "ERROR")
                     return
