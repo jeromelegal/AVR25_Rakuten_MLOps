@@ -72,8 +72,6 @@ vms:
             - qemu-guest-agent
             - yq
             - cloud-guest-utils
-            - docker.io
-
           late-commands:
             - |
               cat << 'EOF' > /target/etc/systemd/system/start-ssh.service
