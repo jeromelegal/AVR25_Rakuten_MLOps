@@ -3,7 +3,7 @@ kind: InitConfiguration
 nodeRegistration:
   criSocket: unix:///var/run/containerd/containerd.sock
   imagePullPolicy: IfNotPresent
-  name: "{{ kubeadm_control_plane_endpoint }}"
+  name: "{{ groups['masters'][0]  }}"
   taints: []
 localAPIEndpoint:
   advertiseAddress: {{ kubeadm_advertise_address }}
