@@ -464,14 +464,14 @@ with DAG(
         print("Deleting elements from train and test folders...")
         if os.path.exists("/app/images/train"):
             subprocess.run(
-                "rm -r /app/images/train/*",
+                "rm -r /app/images/train",
                 check=True,
                 shell=True,
                 executable="/bin/bash",
             )
         if os.path.exists("/app/images/test"):
             subprocess.run(
-                "rm -r /app/images/test/*",
+                "rm -r /app/images/test",
                 check=True,
                 shell=True,
                 executable="/bin/bash",
@@ -502,43 +502,3 @@ with DAG(
             ),
         ]
     )
-
-
-# import mlflow
-# import tensorflow as tf
-# from uuid import uuid4
-# import numpy as np
-# from image_processing import _get_image_from_bytes
-
-# MODEL_PATH = "./combined_trained_model_no_output.keras"
-# MODEL_NAME = "image-processing"
-# REGISTERED_MODEL_NAME = "image-processing"
-# IMAGE = "./demo.jpg"
-
-# print("Setting MLFlow URI")
-# mlflow.set_tracking_uri("http://mlflow:5000")
-
-# print("Defining experiment")
-# mlflow.set_experiment("Store image models")
-
-# with mlflow.start_run(run_name=f"run_{uuid4()}") as run:
-#     # set tags
-#     mlflow.set_tag("run_id", run.info.run_id)
-
-#     model = tf.keras.models.load_model(MODEL_PATH)
-
-#     with open(IMAGE, "rb") as f:
-#         img_bytes = f.read()
-#         _, img = _get_image_from_bytes(img_bytes)
-#         print(f"shape: {img.shape}")
-
-#         predictions = model.predict(np.array([img]))[0]
-
-#     mlflow.tensorflow.log_model(
-#         model=model, name=MODEL_NAME, input_example=np.array([img])
-#     )
-
-#     model_uri = f"runs:/{run.info.run_id}/{MODEL_NAME}"
-#     mv = mlflow.register_model(model_uri, REGISTERED_MODEL_NAME)
-#     print(f"Name: {mv.name}")
-#     print(f"Version: {mv.version}")
