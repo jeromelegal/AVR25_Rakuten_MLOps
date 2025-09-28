@@ -27,6 +27,12 @@ class Settings(BaseSettings):
     API_MINIO_API_GATEWAY_KEY_PATH: str = os.getenv("API_MINIO_API_GATEWAY_KEY_PATH", "")
     API_MINIO_API_GATEWAY_CERT_PATH: str = os.getenv("API_MINIO_API_GATEWAY_CERT_PATH", "")
 
+    # Configuration pour le traitement
+    API_PROCESSING_BASE_URL: str = os.getenv("API_PROCESSING_BASE_URL", 'http://localhost:8050')
+    API_PROCESSING_API_GATEWAY_CA_PATH: str = os.getenv("API_PROCESSING_API_GATEWAY_CA_PATH", "")
+    API_PROCESSING_API_GATEWAY_KEY_PATH: str = os.getenv("API_PROCESSING_API_GATEWAY_KEY_PATH", "")
+    API_PROCESSING_API_GATEWAY_CERT_PATH: str = os.getenv("API_PROCESSING_API_GATEWAY_CERT_PATH", "")
+
     # Configuration JWT
     SECRET_KEY: str = os.getenv("API_GATEWAY_SECRET_KEY", "test-secret-key")
     INTERNAL_SECRET_KEY: str = os.getenv("API_GATEWAY_INTERNAL_SECRET_KEY", "test-internal-secret-key")
