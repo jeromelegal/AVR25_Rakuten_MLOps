@@ -233,3 +233,25 @@ EOF
 cat <<EOF > $API_MINIO_API_GATEWAY_CERT_PATH
 $(printf "%s" "$API_MINIO_API_GATEWAY_CERT")
 EOF
+
+# Extraire le certificat et la clé privée pour Processing
+API_PROCESSING_API_GATEWAY_CA=$(vault kv get -field=ca secret/api-processing/api-gateway/certs)
+API_PROCESSING_API_GATEWAY_CERT=$(vault kv get -field=cert secret/api-processing/api-gateway/certs)
+API_PROCESSING_API_GATEWAY_KEY=$(vault kv get -field=key secret/api-processing/api-gateway/certs)
+
+cat <<EOF > $API_PROCESSING_API_GATEWAY_PEM_PATH
+$(printf "%s" "$API_PROCESSING_API_GATEWAY_KEY")
+$(printf "%s" "$API_PROCESSING_API_GATEWAY_CERT")
+EOF
+
+cat <<EOF > $API_PROCESSING_API_GATEWAY_CA_PATH
+$(printf "%s" "$API_PROCESSING_API_GATEWAY_CA")
+EOF
+
+cat <<EOF > $API_PROCESSING_API_GATEWAY_KEY_PATH
+$(printf "%s" "$API_PROCESSING_API_GATEWAY_KEY")
+EOF
+
+cat <<EOF > $API_PROCESSING_API_GATEWAY_CERT_PATH
+$(printf "%s" "$API_PROCESSING_API_GATEWAY_CERT")
+EOF
