@@ -1,5 +1,7 @@
 ---
 # Fichier: roles/kubernetes/tasks/install.yml
+# Description: Ce fichier Ansible installe et configure un cluster Kubernetes avec des nœuds de contrôle, de données et de travailleurs.
+
 # Configuration initiale
 - name: Gather all facts
   setup:
@@ -8,17 +10,22 @@
 # Configuration des hosts pour tous les nœuds
 - name: Configure /etc/hosts with cluster domain
   block:
+    # Crée une sauvegarde du fichier /etc/hosts avant de le modifier
     - name: Create /etc/hosts backup
       copy:
         src: /etc/hosts
         dest: /etc/hosts.bak
         remote_src: yes
+
+    # Ajoute l'endpoint du plan de contrôle à /etc/hosts
     - name: Add control plane endpoint to /etc/hosts
       lineinfile:
         path: /etc/hosts
         line: "{{ kubeadm_advertise_address }} {{ kubeadm_control_plane_endpoint }} {{ kubeadm_control_plane_endpoint }}.{{ dns_domain }}"
         state: present
         create: yes
+
+    # Ajoute tous les maîtres à /etc/hosts
     - name: Add all masters to /etc/hosts
       lineinfile:
         path: /etc/hosts
@@ -26,6 +33,8 @@
         state: present
       when: item in groups['masters'] | default([])
       loop: "{{ groups['masters'] | default([]) }}"
+
+    # Ajoute tous les travailleurs à /etc/hosts
     - name: Add all workers to /etc/hosts
       lineinfile:
         path: /etc/hosts
@@ -38,6 +47,7 @@
 # Configuration réseau
 - name: Configure network for Kubernetes
   block:
+    # Configure les paramètres sysctl pour le forwarding IPv4 et les appels iptables/ip6tables
     - name: Configure sysctl for IPv4 forwarding
       copy:
         dest: /etc/sysctl.d/k8s.conf
@@ -45,11 +55,14 @@
           net.ipv4.ip_forward = 1
           net.bridge.bridge-nf-call-iptables = 1
           net.bridge.bridge-nf-call-ip6tables = 1
+
+    # Applique les paramètres sysctl
     - name: Apply sysctl settings
       command: sysctl --system
   tags: install
 
 # Installation des prérequis système
+# Installe les paquets de base nécessaires pour Kubernetes
 - name: Install base packages
   apt:
     name: "{{ item }}"
@@ -68,24 +81,33 @@
 # Installation et configuration de containerd
 - name: Install containerd
   block:
+    # Ajoute la clé GPG de Docker pour le dépôt
     - name: Add Docker GPG key
       apt_key:
         url: https://download.docker.com/linux/ubuntu/gpg
         state: present
+
+    # Ajoute le dépôt Docker
     - name: Add Docker repository
       apt_repository:
         repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
         state: present
+
+    # Installe containerd.io
     - name: Install containerd.io
       apt:
         name: containerd.io
         state: present
         update_cache: yes
+
+    # Arrête le service containerd s'il est en cours d'exécution
     - name: Stop containerd service
       systemd:
         name: containerd
         state: stopped
       ignore_errors: yes
+
+    # Crée les répertoires de configuration pour containerd
     - name: Create containerd config directories
       file:
         path: "{{ item }}"
@@ -94,34 +116,32 @@
       loop:
         - /etc/containerd
         - /etc/systemd/system/containerd.service.d
+
+    # Génère la configuration par défaut de containerd
     - name: Generate default containerd config
       shell: containerd config default > /etc/containerd/config.toml
       args:
         creates: /etc/containerd/config.toml
 
-
+    # Configure containerd pour Kubernetes
     - name: Configure containerd for Kubernetes
       copy:
         dest: /etc/containerd/config.toml
         content: |
           version = 2
-
           [plugins."io.containerd.runtime.v1.linux"]
             [plugins."io.containerd.runtime.v1.linux".runtimes]
               [plugins."io.containerd.runtime.v1.linux".runtimes.runc]
                 runtime_type = "io.containerd.runc.v2"
-
           [plugins."io.containerd.grpc.v1.cri"]
             disable = false
             sandbox_image = "registry.k8s.io/pause:3.10.1"
-
             [plugins."io.containerd.grpc.v1.cri".containerd]
               [plugins."io.containerd.grpc.v1.cri".containerd.runtimes]
                 [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
                   runtime_type = "io.containerd.runc.v2"
                   [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
                     SystemdCgroup = true
-
             [plugins."io.containerd.grpc.v1.cri".registry]
               [plugins."io.containerd.grpc.v1.cri".registry.mirrors]
                 [plugins."io.containerd.grpc.v1.cri".registry.mirrors."docker.io"]
@@ -129,9 +149,7 @@
                 [plugins."io.containerd.grpc.v1.cri".registry.mirrors."registry.k8s.io"]
                   endpoint = ["https://registry.k8s.io"]
 
-
-
-
+    # Configure le service systemd pour containerd
     - name: Configure containerd systemd service
       copy:
         dest: /etc/systemd/system/containerd.service.d/override.conf
@@ -139,47 +157,60 @@
           [Service]
           ExecStartPre=/sbin/modprobe overlay
           ExecStartPre=/sbin/modprobe br_netfilter
+
+    # Recharge le démon systemd
     - name: Reload systemd daemon
       systemd:
         daemon_reload: yes
+
+    # Démarre et active le service containerd
     - name: Start containerd service
       systemd:
         name: containerd
         state: started
         enabled: yes
+
+    # Vérifie que containerd est en cours d'exécution
     - name: Verify containerd is running
       systemd:
         name: containerd
         state: started
-    - name: Install crictl manually
-      block:
-        - name: Download crictl binary
-          get_url:
-            url: https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.30.0/crictl-v1.30.0-linux-amd64.tar.gz
-            dest: /tmp/crictl.tar.gz
-            mode: '0755'
-        - name: Extract crictl binary
-          unarchive:
-            src: /tmp/crictl.tar.gz
-            dest: /usr/local/bin/
-            remote_src: yes
-        - name: Set crictl permissions
-          file:
-            path: /usr/local/bin/crictl
-            mode: '0755'
-            owner: root
-            group: root
-        - name: Configure crictl
-          copy:
-            dest: /etc/crictl.yaml
-            content: |
-              runtime-endpoint: unix:///var/run/containerd/containerd.sock
-              image-endpoint: unix:///var/run/containerd/containerd.sock
-              timeout: 10
-              debug: false
+
+    # Télécharge le binaire crictl
+    - name: Download crictl binary
+      get_url:
+        url: https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.30.0/crictl-v1.30.0-linux-amd64.tar.gz
+        dest: /tmp/crictl.tar.gz
+        mode: '0755'
+
+    # Extrait le binaire crictl
+    - name: Extract crictl binary
+      unarchive:
+        src: /tmp/crictl.tar.gz
+        dest: /usr/local/bin/
+        remote_src: yes
+
+    # Définit les permissions pour crictl
+    - name: Set crictl permissions
+      file:
+        path: /usr/local/bin/crictl
+        mode: '0755'
+        owner: root
+        group: root
+
+    # Configure crictl
+    - name: Configure crictl
+      copy:
+        dest: /etc/crictl.yaml
+        content: |
+          runtime-endpoint: unix:///var/run/containerd/containerd.sock
+          image-endpoint: unix:///var/run/containerd/containerd.sock
+          timeout: 10
+          debug: false
   tags: install
 
 # Configuration du dépôt Kubernetes (1.34)
+# Ajoute la clé GPG de Kubernetes
 - name: Add Kubernetes GPG key
   apt_key:
     url: https://pkgs.k8s.io/core:/stable:/v1.34/deb/Release.key
@@ -187,6 +218,7 @@
     state: present
   tags: install
 
+# Ajoute le dépôt Kubernetes
 - name: Add Kubernetes repository
   apt_repository:
     repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.34/deb/ /"
@@ -195,6 +227,7 @@
   tags: install
 
 # Installation des composants Kubernetes (1.34)
+# Installe les composants Kubernetes (kubelet, kubeadm, kubectl)
 - name: Install Kubernetes components
   apt:
     name: "{{ item }}"
@@ -206,12 +239,14 @@
     - kubectl=1.34.0-1.1
   tags: install
 
+# Crée le répertoire de configuration pour kubelet
 - name: Create kubelet config directory
   file:
     path: /var/lib/kubelet
     state: directory
     mode: '0755'
 
+# Configure kubelet pour utiliser systemd comme gestionnaire de cgroups et containerd comme runtime de conteneurs
 - name: Configure kubelet
   copy:
     dest: /var/lib/kubelet/config.yaml
@@ -225,6 +260,7 @@
 # Configuration du système pour Kubernetes
 - name: Configure kernel modules
   block:
+    # Charge les modules noyau nécessaires pour Kubernetes
     - name: Load kernel modules
       modprobe:
         name: "{{ item }}"
@@ -237,6 +273,8 @@
         - ip_vs_wrr
         - ip_vs_sh
         - nf_conntrack
+
+    # Rend les modules noyau persistants
     - name: Persist kernel modules
       copy:
         dest: /etc/modules-load.d/k8s.conf
@@ -250,6 +288,7 @@
           nf_conntrack
   tags: install
 
+# Vérifie l'état de la swap
 - name: Disable swap
   block:
     - name: Check swap status
@@ -257,9 +296,13 @@
       register: swap_status
       changed_when: false
       ignore_errors: yes
+
+    # Désactive la swap si elle est active
     - name: Disable active swap
       command: swapoff -a
       when: swap_status.rc == 0
+
+    # Supprime la swap du fichier fstab
     - name: Remove swap from fstab
       replace:
         path: /etc/fstab
@@ -271,11 +314,14 @@
 # Configuration spécifique pour kubelet
 - name: Configure kubelet for containerd
   block:
+    # Crée le répertoire de configuration pour kubelet
     - name: Create kubelet config directory
       file:
         path: /etc/default
         state: directory
         mode: '0755'
+
+    # Configure les arguments supplémentaires pour kubelet
     - name: Configure kubelet extra args
       copy:
         dest: /etc/default/kubelet
@@ -283,6 +329,7 @@
           KUBELET_EXTRA_ARGS="--cgroup-driver=systemd --container-runtime-endpoint=unix:///var/run/containerd/containerd.sock"
   tags: install
 
+# Redémarre et active kubelet
 - name: Restart kubelet
   systemd:
     name: kubelet
@@ -294,6 +341,7 @@
 # Initialisation du cluster
 - name: Initialize Kubernetes cluster
   block:
+    # Crée le répertoire de configuration pour kubeadm sur le premier maître
     - name: Create kubeadm config directory
       file:
         path: /etc/kubernetes
@@ -301,6 +349,7 @@
         mode: '0755'
       when: inventory_hostname == groups['masters'][0]
 
+    # Génère la configuration pour kubeadm sur le premier maître
     - name: Generate kubeadm config
       template:
         src: templates/kubeadm-config.yaml.j2
@@ -310,10 +359,20 @@
         mode: '0644'
       when: inventory_hostname == groups['masters'][0]
 
+    # Télécharge les images Kubernetes sur le premier maître
     - name: Pull Kubernetes images
       command: kubeadm config images pull --config /etc/kubernetes/kubeadm-config.yaml
       when: inventory_hostname == groups['masters'][0]
 
+    # Réinitialise kubeadm
+    - name: Reset kubeadm 
+      command: kubeadm reset -f
+      register: reset_cp
+      failed_when: false
+      changed_when: "'[reset]' in reset_cp.stdout or reset_cp.stderr"
+      
+
+    # Démarre et active kubelet sur le premier maître
     - name: Start kubelet on master1
       systemd:
         name: kubelet
@@ -321,11 +380,13 @@
         enabled: yes
       when: inventory_hostname == groups['masters'][0]
 
+    # Initialise le cluster sur le premier maître
     - name: Initialize cluster
       command: kubeadm init --config /etc/kubernetes/kubeadm-config.yaml --upload-certs
       register: kubeadm_init
       when: inventory_hostname == groups['masters'][0]
 
+    # Crée le répertoire .kube pour le premier maître
     - name: Create .kube directory
       file:
         path: /root/.kube
@@ -333,6 +394,7 @@
         mode: '0755'
       when: inventory_hostname == groups['masters'][0]
 
+    # Copie la configuration admin pour kubectl sur le premier maître
     - name: Copy admin config
       copy:
         src: /etc/kubernetes/admin.conf
@@ -343,16 +405,45 @@
         mode: '0644'
       when: inventory_hostname == groups['masters'][0]
 
-    - name: Generate join command
-      command: kubeadm token create --print-join-command
-      register: join_command
+    # Génère la clé de certificat
+    - name: Get certificate key
+      command: kubeadm certs certificate-key
+      register: cert_key
       when: inventory_hostname == groups['masters'][0]
 
-    - name: Set join command fact
+    # Définit le fait pour la clé de certificat
+    - name: Set certificate key fact
       set_fact:
-        kube_join_command: "{{ join_command.stdout }}"
+        kube_cert_key: "{{ cert_key.stdout }}"
       when: inventory_hostname == groups['masters'][0]
 
+    # Génère la commande de jointure pour les nœuds de contrôle
+    - name: Generate join command for control plane nodes
+      command: kubeadm token create --print-join-command --certificate-key {{ kube_cert_key }}
+      register: control_plane_join_command
+      when: inventory_hostname == groups['masters'][0]
+
+    # Génère la commande de jointure pour les nœuds de travailleurs
+    - name: Generate join command for worker nodes
+      command: kubeadm token create --print-join-command
+      register: worker_join_command
+      when: inventory_hostname == groups['masters'][0]
+
+    # Génère la commande de jointure pour les nœuds de données
+    - name: Generate join command for data nodes
+      command: kubeadm token create --print-join-command
+      register: data_join_command
+      when: inventory_hostname == groups['masters'][0]
+
+    # Définit les faits pour les commandes de jointure
+    - name: Set join command facts
+      set_fact:
+        kube_control_plane_join_command: "{{ control_plane_join_command.stdout }}"
+        kube_worker_join_command: "{{ worker_join_command.stdout }}"
+        kube_data_join_command: "{{ data_join_command.stdout }}"
+      when: inventory_hostname == groups['masters'][0]
+
+    # Réinitialise kubeadm sur les maîtres supplémentaires si nécessaire
     - name: Reset kubeadm on additional masters if previously attempted
       command: kubeadm reset -f
       register: reset_cp
@@ -360,12 +451,14 @@
       changed_when: "'[reset]' in reset_cp.stdout or reset_cp.stderr"
       when: inventory_hostname in groups['masters'][1:]
 
+    # Nettoie le répertoire PKI sur les maîtres supplémentaires
     - name: Ensure PKI dir is clean on additional masters
       file:
         path: /etc/kubernetes/pki
         state: absent
-      when: inventory_hostname in groups['masters'][1:]            
+      when: inventory_hostname in groups['masters'][1:]
 
+    # Recrée le répertoire PKI sur les maîtres supplémentaires
     - name: Recreate PKI dir
       file:
         path: /etc/kubernetes/pki
@@ -373,67 +466,67 @@
         mode: '0755'
       when: inventory_hostname in groups['masters'][1:]
 
-
-    - name: Get certificate key
-      command: kubeadm certs certificate-key
-      register: cert_key
-      when: inventory_hostname == groups['masters'][0]
-
-    - name: Set certificate key fact
-      set_fact:
-        kube_cert_key: "{{ cert_key.stdout }}"
-      when: inventory_hostname == groups['masters'][0]
-
+    # Télécharge les certificats du plan de contrôle avec la clé générée
     - name: Upload control-plane certs with the generated key
       command: kubeadm init phase upload-certs --upload-certs --certificate-key {{ kube_cert_key }}
       when: inventory_hostname == groups['masters'][0]
-
-    - name: (Optionnel) Regenerate join command with certificate key embedded
-      command: kubeadm token create --print-join-command --certificate-key {{ kube_cert_key }}
-      register: join_command
-      when: inventory_hostname == groups['masters'][0]
-
-    - name: Update join command fact
-      set_fact:
-        kube_join_command: "{{ join_command.stdout }}"
-      when: inventory_hostname == groups['masters'][0]
-
   tags: install
-
-
-
-
 
 # Jointure des nœuds
-- name: Join worker nodes to cluster
-  command: "{{ hostvars[groups['masters'][0]]['kube_join_command'] }}"
-  register: join_result
-  when:
-    - inventory_hostname in groups['workers']
-    - hostvars[groups['masters'][0]]['kube_join_command'] is defined
-  tags: install
-
-- name: Join data nodes to cluster
-  command: "{{ hostvars[groups['masters'][0]]['kube_join_command'] }}"
-  register: join_result
-  when:
-    - inventory_hostname in groups['datas']
-    - hostvars[groups['masters'][0]]['kube_join_command'] is defined
-  tags: install
-
-
-- name: Reset kubeadm on additional masters if previously attempted
-  command: kubeadm reset -f
-  register: reset_cp
-  failed_when: false
-  changed_when: "'[reset]' in reset_cp.stdout or reset_cp.stderr"
-  when: inventory_hostname in groups['masters'][1:]
-
+# Joint les nœuds de contrôle supplémentaires au cluster
 - name: Join additional master nodes
-  command: "{{ hostvars[groups['masters'][0]]['kube_join_command'] }} --control-plane --certificate-key {{ hostvars[groups['masters'][0]]['kube_cert_key'] }}"
+  command: "{{ hostvars[groups['masters'][0]]['kube_control_plane_join_command'] }}"
   register: join_result
   when:
     - inventory_hostname in groups['masters'][1:]
-    - hostvars[groups['masters'][0]]['kube_join_command'] is defined
-    - hostvars[groups['masters'][0]]['kube_cert_key'] is defined
+    - hostvars[groups['masters'][0]]['kube_control_plane_join_command'] is defined
+  tags: install
+
+# Configure .kube pour l'utilisateur 1000:1000 sur les masters
+- name: Configure .kube for user 1000:1000 on masters
+  block:
+    - name: Create .kube directory for user 1000
+      file:
+        path: "/home/{{ ansible_user }}/.kube"
+        state: directory
+        mode: '0755'
+        owner: 1000
+        group: 1000
+      when: inventory_hostname in groups['masters']
+
+    - name: Copy admin.conf to user 1000's .kube directory
+      copy:
+        src: /etc/kubernetes/admin.conf
+        dest: "/home/{{ ansible_user }}/.kube/config"
+        remote_src: yes
+        owner: 1000
+        group: 1000
+        mode: '0644'
+      when: inventory_hostname in groups['masters']
+
+    - name: Set correct ownership for .kube/config
+      file:
+        path: "/home/{{ ansible_user }}/.kube/config"
+        owner: 1000
+        group: 1000
+        mode: '0644'
+      when: inventory_hostname in groups['masters']
+  tags: install
+
+# Joint les nœuds de travailleurs au cluster
+- name: Join worker nodes to cluster
+  command: "{{ hostvars[groups['masters'][0]]['kube_worker_join_command'] }}"
+  register: join_result
+  when:
+    - inventory_hostname in groups['workers']
+    - hostvars[groups['masters'][0]]['kube_worker_join_command'] is defined
+  tags: install
+
+# Joint les nœuds de données au cluster
+- name: Join data nodes to cluster
+  command: "{{ hostvars[groups['masters'][0]]['kube_data_join_command'] }}"
+  register: join_result
+  when:
+    - inventory_hostname in groups['datas']
+    - hostvars[groups['masters'][0]]['kube_data_join_command'] is defined
   tags: install
