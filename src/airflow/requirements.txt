@@ -8,3 +8,5 @@
 # apache-airflow-providers-celery
 numpy
 Pillow
+apache-airflow[virtualenv]
+apache-airflow[cloudpickle]
