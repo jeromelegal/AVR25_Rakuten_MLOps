@@ -1,0 +1,14 @@
+[Unit]
+Description=NGINX FCGI Wrap Service
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/nginx-fcgiwrap.sh
+Restart=on-failure
+User=root
+Group=root
+EnvironmentFile=-/etc/default/nginx-fcgiwrap
+
+[Install]
+WantedBy=multi-user.target

@@ -1,7 +1,7 @@
 import logging
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Header, UploadFile
 from pydantic import BaseModel
-from typing import Optional, Dict, cast
+from typing import Optional, Dict, cast, Tuple
 from config.settings import Settings
 from api.auth.clients.manager import ClientManager, create_client_manager
 from api.auth.token.manager import TokenManager, create_token_manager
@@ -70,32 +70,41 @@ def insert_psql_table(data, table, client, token, relation=False):
         )
     
 def insert_entities(ad_data, cat_data, image_data, 
-                    postgresql_client, postgresql_token):
+                    postgresql_client, postgresql_token
+                    ) -> Tuple[int, Optional[int], Optional[int]]:
+    cat_id: Optional[int] = None
+    image_id: Optional[int] = None
+    
     # Insert in 'ads' on PostgreSQL
     ad_response = insert_psql_table(ad_data, "ad", 
                                     postgresql_client, postgresql_token)
     ad_id = ad_response["id"]
     # Get 'category' ID on PostgreSQL
-    cat_response = get_id_category(int(cat_data["code"]), "by-code", 
-                                     postgresql_client, postgresql_token)
-    cat_id = cat_response["id"]
+    if cat_data["code"]:
+        cat_response = get_id_category(int(cat_data["code"]), "by-code", 
+                                        postgresql_client, postgresql_token)
+        cat_id = cat_response["id"]
     # Insert in 'image' on PostgreSQL
-    image_response = insert_psql_table(image_data, "image", 
-                                       postgresql_client, postgresql_token)
-    image_id = image_response["id"]
+    if image_data["image_name"]:
+        image_response = insert_psql_table(image_data, "image", 
+                                        postgresql_client, postgresql_token)
+        image_id = image_response["id"]
     return ad_id, cat_id, image_id 
 
 def insert_relations(ad_cat, user_ad, ad_image, postgresql_client, 
                      postgresql_token):
     # Insert 'ad_cats' relation in PostgreSQL
-    insert_psql_table(ad_cat, "ads_cats", postgresql_client, 
-                      postgresql_token, relation=True)
+    if ad_cat["ad_id"] and ad_cat["cat_id"]:
+        insert_psql_table(ad_cat, "ads_cats", postgresql_client, 
+                        postgresql_token, relation=True)
     # Insert 'user_ads' relation in PostgreSQL
-    insert_psql_table(user_ad, "users_ads", postgresql_client, 
-                      postgresql_token, relation=True)
+    if user_ad["user_id"] and user_ad["ad_id"]:
+        insert_psql_table(user_ad, "users_ads", postgresql_client, 
+                        postgresql_token, relation=True)
     # Insert 'ad_image' relation in PostgreSQL
-    insert_psql_table(ad_image, "ads_images", postgresql_client, 
-                      postgresql_token, relation=True)
+    if ad_image["ad_id"] and ad_image["image_id"]:
+        insert_psql_table(ad_image, "ads_images", postgresql_client, 
+                        postgresql_token, relation=True)
 
 def insert_image_minio(payload, files, minio_client):
     try:

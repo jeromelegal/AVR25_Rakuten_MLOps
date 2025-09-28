@@ -100,4 +100,20 @@ set_dynamic_env_variables() {
     export AIRFLOW__API_AUTH__JWT_SECRET='ykJsrdqOKXTe14WM+zDScA=='    
     export AIRFLOW__API__SECRET_KEY='ykJsrdqOKXTe14WM+zDScA=='
 
+    # API Gateway
+    export API_GATEWAY_AIRFLOW_KEY_PATH="/etc/ssl/${SERVICE_NAME}/api-gateway_${SERVICE_NAME}.key"
+    export API_GATEWAY_AIRFLOW_CERT_PATH="/etc/ssl/${SERVICE_NAME}/api-gateway_${SERVICE_NAME}.crt"
+    export API_GATEWAY_AIRFLOW_CA_PATH="/etc/ssl/${SERVICE_NAME}/api-gateway_${SERVICE_NAME}_ca.crt"
+    export API_GATEWAY_AIRFLOW_PEM_PATH="/etc/ssl/${SERVICE_NAME}/api-gateway_${SERVICE_NAME}.pem"
+    
+    # Configure logs
+    export AIRFLOW__LOGGING__LOG_SERVER_HOST="${MINIO_SERVICE_NAME}:${MINIO_SERVICE_PORT}"
+    export AIRFLOW_CONN_MINIO_S3_CONN="{ \
+        \"conn_type\": \"aws\",
+        \"login\": \"${MINIO_AIRFLOW_USER}\", \
+        \"password\": \"${MINIO_AIRFLOW_PASSWORD}\", \
+        \"extra\": { \
+          \"endpoint_url\": \"https://${AIRFLOW__LOGGING__LOG_SERVER_HOST}\" \
+        } \
+      }"
 }

@@ -1,0 +1,19 @@
+#cloud-config
+autoinstall:
+  version: 1
+  identity:
+    hostname: {{ vm.cloud_init.hostname }}
+    username: {{ vm.cloud_init.user }}
+    password: "{{ vm.cloud_init.password_hash }}"
+  ssh:
+    install-server: true
+    allow-pw: true
+    {% if vm.cloud_init.ssh_keys is defined %}
+    authorized-keys: {{ vm.cloud_init.ssh_keys | tojson }}
+    {% endif %}
+  storage:
+    layout:
+      name: {{ vm.cloud_init.storage.layout }}
+  packages: {{ vm.cloud_init.packages | tojson }}
+  user-data:
+    disable_root: false
