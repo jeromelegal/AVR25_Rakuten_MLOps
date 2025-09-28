@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, status
 from fastapi.middleware.cors import CORSMiddleware
 from api.middlewares.auth import create_auth_middleware
 from api.middlewares.logging import LoggingMiddleware
@@ -10,8 +10,11 @@ from api.routes.ad.delete import router as ad_delete_router
 from api.routes.ad.read import router as read_router
 from api.routes.ad.update import router as update_router
 from api.routes.category.get import router as categories_router
+from api.routes.category.get_category_from_image_id import router as cat_image_id_router
 from config.settings import Settings
 import logging
+from fastapi.responses import JSONResponse
+from requests import HTTPError
 
 # Configurer le logging
 logging.basicConfig(level=logging.WARNING)
@@ -46,6 +49,7 @@ def create_app(settings: Settings):
     app.include_router(read_router, prefix=settings.PROTECTED_ENDPOINT_URL, tags=["ad_read"])
     app.include_router(update_router, prefix=settings.PROTECTED_ENDPOINT_URL, tags=["ad_update"])
     app.include_router(categories_router, prefix=settings.PROTECTED_ENDPOINT_URL, tags=["categories"])
+    app.include_router(cat_image_id_router, prefix=settings.PROTECTED_ENDPOINT_URL, tags=["cat_image_id"])
 
     # Route racine
     @app.get("/")
