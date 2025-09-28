@@ -1,21 +1,46 @@
 ---
-- name: Label master nodes
-  command: kubectl label nodes {{ item }} node-role.kubernetes.io/master=true
-  loop: "{{ groups['masters'] | default([]) }}"
-  when: inventory_hostname == 'master1'
+# Récupère la liste des nœuds du cluster
+- name: Get list of nodes in the cluster
+  command: kubectl get nodes -o jsonpath='{.items[*].metadata.name}'
+  register: k8s_nodes
+  delegate_to: "{{ groups['masters'][0] }}"
+  run_once: true
   become: yes
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  changed_when: false
+  tags: label_nodes
+
+# Applique les labels aux nœuds (uniquement s'ils existent dans le cluster)
+- name: Label master nodes
+  command: kubectl label node {{ item }} node-role.kubernetes.io/master=true --overwrite
+  loop: "{{ groups['masters'] | default([]) }}"
+  delegate_to: "{{ groups['masters'][0] }}"
+  run_once: true
+  become: yes
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  when: item in k8s_nodes.stdout.split()
   tags: label_nodes
 
 - name: Label worker nodes
-  command: kubectl label nodes {{ item }} node-role.kubernetes.io/worker=true
+  command: kubectl label node {{ item }} node-role.kubernetes.io/worker=true --overwrite
   loop: "{{ groups['workers'] | default([]) }}"
-  when: inventory_hostname == 'master1'
+  delegate_to: "{{ groups['masters'][0] }}"
+  run_once: true
   become: yes
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  when: item in k8s_nodes.stdout.split()
   tags: label_nodes
 
 - name: Label data nodes
-  command: kubectl label nodes {{ item }} node-role.kubernetes.io/data=true
+  command: kubectl label node {{ item }} node-role.kubernetes.io/data=true --overwrite
   loop: "{{ groups['datas'] | default([]) }}"
-  when: inventory_hostname == 'master1'
+  delegate_to: "{{ groups['masters'][0] }}"
+  run_once: true
   become: yes
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  when: item in k8s_nodes.stdout.split()
   tags: label_nodes
