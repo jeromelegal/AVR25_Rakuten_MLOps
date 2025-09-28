@@ -1,4 +1,5 @@
 import json
+import os
 from typing import Dict
 import boto3
 from botocore.exceptions import ClientError
@@ -89,3 +90,27 @@ class S3Client:
         self._s3.put_object(
             Bucket=bucket, Key=key, Body=json_data, ContentType="application/json"
         )
+
+    def download_bucket(self, bucket, local_dir):
+        paginator = self._s3.get_paginator("list_objects_v2")
+        for page in paginator.paginate(Bucket=bucket):
+            if "Contents" not in page:
+                continue
+
+            for obj in page["Contents"]:
+                key = obj["Key"]
+
+                # Skip "folders" (S3 keys ending with '/')
+                if key.endswith("/"):
+                    continue
+
+                # Build local path
+                local_path = os.path.join(local_dir, key)
+                local_folder = os.path.dirname(local_path)
+
+                # Create local directories if they don’t exist
+                os.makedirs(local_folder, exist_ok=True)
+
+                # Download file
+                self._s3.download_file(bucket, key, local_path)
+                print(f"Downloaded: s3://{bucket}/{key} -> {local_path}")
