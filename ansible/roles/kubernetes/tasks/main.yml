@@ -9,12 +9,14 @@
 
 - name: Include Namespaces tasks
   include_tasks: namespaces.yml
-  when: create_namespaces | default(false)
   tags: namespaces 
+
+- name: Include Helm install task
+  include_tasks: helm.yml
+  tags: helm
 
 - name: Include CNI tasks
   include_tasks: cni.yml
-  when: install_cni | default(false)
   tags: cni
 
 - name: Include MetalLB tasks

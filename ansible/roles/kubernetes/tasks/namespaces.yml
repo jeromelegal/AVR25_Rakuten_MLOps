@@ -1,9 +1,26 @@
----
 - name: Create default namespaces
-  command: kubectl create namespace {{ item }}
-  loop:
-    - development
-    - production
-    - testing
-  when: inventory_hostname == 'master1'
+  block:
+    - name: Delete existing namespaces (if they exist)
+      command: kubectl delete namespace {{ item }} --grace-period=0 --force
+      loop:
+        - development
+        - production
+        - testing
+      ignore_errors: yes
+      register: delete_result
+      changed_when: "'deleted' in delete_result.stdout"
+
+    - name: Create namespaces
+      command: kubectl create namespace {{ item }}
+      loop:
+        - development
+        - production
+        - testing
+      when: delete_result is changed or (delete_result is skipped or delete_result is failed)
+  when: inventory_hostname == groups['masters'][0]
+  delegate_to: "{{ groups['masters'][0] }}"
+  run_once: true
   become: yes
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  tags: namespaces
