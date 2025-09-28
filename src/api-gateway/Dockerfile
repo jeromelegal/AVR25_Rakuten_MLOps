@@ -65,6 +65,14 @@ ENV API_MINIO_API_GATEWAY_CA_PATH=${API_MINIO_API_GATEWAY_CA_PATH:-"/etc/ssl/api
 ENV API_MINIO_API_GATEWAY_KEY_PATH=${API_MINIO_API_GATEWAY_KEY_PATH:-"/etc/ssl/api-gateway/api-minio_api-gateway.key"}
 ENV API_MINIO_API_GATEWAY_CERT_PATH=${API_MINIO_API_GATEWAY_CERT_PATH:-"/etc/ssl/api-gateway/api-minio_api-gateway.crt"}
 
+ENV API_PROCESSING_SERVICE_NAME=${API_PROCESSING_SERVICE_NAME:-"api-processing"}
+ENV API_PROCESSING_SERVICE_PORT=${API_PROCESSING_SERVICE_PORT:-"8050"}
+ENV API_PROCESSING_BASE_URL=${API_PROCESSING_BASE_URL:-"https://$API_PROCESSING_SERVICE_NAME:$API_PROCESSING_SERVICE_PORT"}
+ENV API_PROCESSING_API_GATEWAY_PEM_PATH=${API_PROCESSING_API_GATEWAY_PEM_PATH:-"/etc/ssl/api-gateway/api-processing_api-gateway.pem"}
+ENV API_PROCESSING_API_GATEWAY_CA_PATH=${API_PROCESSING_API_GATEWAY_CA_PATH:-"/etc/ssl/api-gateway/api-processing_api-gateway.ca"}
+ENV API_PROCESSING_API_GATEWAY_KEY_PATH=${API_PROCESSING_API_GATEWAY_KEY_PATH:-"/etc/ssl/api-gateway/api-processing_api-gateway.key"}
+ENV API_PROCESSING_API_GATEWAY_CERT_PATH=${API_PROCESSING_API_GATEWAY_CERT_PATH:-"/etc/ssl/api-gateway/api-processing_api-gateway.crt"}
+
 # Ajouter l'utilisateur et le groupe api-gateway
 RUN groupadd --gid 999 --system api-gateway && \
     useradd --uid 999 --system --gid api-gateway --home-dir /home/api-gateway api-gateway && \
