@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from pydantic import BaseModel, Field
 from config.db import get_db_client
 from typing import List, Optional, Dict
@@ -7,6 +7,7 @@ from api.auth import get_current_user
 from datetime import datetime, timezone
 from bson import ObjectId
 from config.settings import Settings
+from pymongo.errors import OperationFailure
 
 router = APIRouter()
 
@@ -37,6 +38,12 @@ class AdResponse(BaseModel):
     images: Optional[List[Images]] = None
     created_at: datetime
 
+class SearchOut(BaseModel):
+    items: List[AdResponse]
+    count: int
+    skip: int
+    limit: int    
+
 def get_settings(request: Request) -> Settings:
     return request.app.state.settings
 
@@ -54,6 +61,49 @@ async def create_ad(request: Request, ad:Ad, current_user: Dict = Depends(get_cu
         response = await db.ads.insert_one(ad_dict)
         ad_dict["id"] = str(response.inserted_id)
         return AdResponse(**ad_dict)
+
+@router.get("/api/internal/mongodb/entity/ad/search", response_model=SearchOut)
+async def search_ads(request: Request,
+    q: str | None = Query(None),
+    category: str | None = Query(None),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(10, ge=1, le=50),
+    current_user: dict = Depends(get_current_user),
+):
+    settings: Settings = request.app.state.settings
+    async with get_db_client(settings) as db:
+        base = {}
+        if category:
+            base["category"] = category
+
+        def _coerce(d):
+            d["id"] = str(d["_id"])
+            return AdResponse(**d)
+
+        # Cas 1: q présent -> $text
+        if q:
+            try:
+                cur = (db.ads.find(base | {"$text": {"$search": q}})
+                     .sort([("score", {"$meta": "textScore"}), ("created_at", -1)])
+                     .skip(skip).limit(limit))
+                docs = await cur.to_list(length=limit)
+                return SearchOut(items=[_coerce(d) for d in docs], count=len(docs), skip=skip, limit=limit)
+            except OperationFailure as e:
+                # filet de sécurité (env de test sans index)
+                from re import escape
+                safe = escape(q)
+                fallback = base | {"$or": [
+                    {"designation": {"$regex": safe, "$options": "i"}},
+                    {"description": {"$regex": safe, "$options": "i"}}
+                ]}
+                cur = (db.ads.find(fallback).sort("created_at", -1).skip(skip).limit(limit))
+                docs = await cur.to_list(length=limit)
+                return SearchOut(items=[_coerce(d) for d in docs], count=len(docs), skip=skip, limit=limit)
+
+        # Cas 2: pas de q -> listing indexé par date
+        cur = (db.ads.find(base).sort("created_at", -1).skip(skip).limit(limit))
+        docs = await cur.to_list(length=limit)
+        return SearchOut(items=[_coerce(d) for d in docs], count=len(docs), skip=skip, limit=limit)
 
 @router.get("/api/internal/mongodb/entity/ad/{id}", response_model=AdResponse)
 async def get_ad(request: Request, id: str, current_user: Dict = Depends(get_current_user)):
@@ -87,3 +137,4 @@ async def delete_ad(request: Request, id: str, current_user: Dict = Depends(get_
         if result.deleted_count == 1:
             return {"message": "Ad deleted successfully"}
         raise HTTPException(status_code=404, detail="Ad not found")
+    

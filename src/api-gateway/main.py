@@ -9,7 +9,11 @@ from api.routes.ad.create import router as create_router
 from api.routes.ad.delete import router as ad_delete_router
 from api.routes.ad.read import router as read_router
 from api.routes.ad.update import router as update_router
+from api.routes.ad.search_mongodb import router as search_router
 from api.routes.category.get import router as categories_router
+from api.routes.image.get import router as get_image_router
+from api.routes.image.save import router as save_image_router
+from api.routes.replicate.ads_to_mongo import router as replicate_router
 from config.settings import Settings
 import logging
 
@@ -46,6 +50,10 @@ def create_app(settings: Settings):
     app.include_router(read_router, prefix=settings.PROTECTED_ENDPOINT_URL, tags=["ad_read"])
     app.include_router(update_router, prefix=settings.PROTECTED_ENDPOINT_URL, tags=["ad_update"])
     app.include_router(categories_router, prefix=settings.PROTECTED_ENDPOINT_URL, tags=["categories"])
+    app.include_router(get_image_router, prefix=settings.PROTECTED_ENDPOINT_URL, tags=["get_image"])
+    app.include_router(save_image_router, prefix=settings.PROTECTED_ENDPOINT_URL, tags=["save_image"])
+    app.include_router(search_router, prefix=settings.PROTECTED_ENDPOINT_URL, tags=["search"])
+    app.include_router(replicate_router, prefix=settings.PROTECTED_ENDPOINT_URL, tags=["replicate"])
 
     # Route racine
     @app.get("/")

@@ -94,6 +94,17 @@ async def test_create_category():
     update_data = update_response.json()
     assert update_data["code"] == 800
     assert update_data["label"] == "Instruments"
+    
+    # Test get id by code
+    code = update_data["code"]
+    response = client.get(
+        f"/api/internal/postgresql/entity/category/by-code/{code}",
+        headers=headers
+    )
+    print_response_details(response)
+    assert update_response.status_code == 200
+    data = response.json()
+    assert data["id"] == category_id
 
     # Test delete category
     delete_response = client.delete(

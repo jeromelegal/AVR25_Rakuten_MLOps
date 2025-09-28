@@ -6,7 +6,7 @@ from config.db import get_db_client
 from bson import ObjectId
 from api.auth import create_internal_api_access_token
 from test.config.test_settings import test_settings
-from datetime import datetime, UTC
+from datetime import datetime, UTC, timedelta
 
 def print_response_details(response):
     """Helper function to print response details if status is not 200."""
@@ -174,3 +174,105 @@ async def test_ad_flow():
     async with get_db_client(test_settings) as db:
         deleted_user_in_db = await db.users.find_one({"_id": ObjectId(user_id)})
         assert deleted_user_in_db is None, "User was not deleted from the database"
+        
+def _make_client_and_headers():
+    app = create_app(test_settings)
+    client = TestClient(app)
+
+    internal = create_internal_api_access_token(data={"scope": "internal"}, settings=test_settings)
+    headers_internal = {
+        "Referer": test_settings.API_GATEWAY_HOST + test_settings.PROTECTED_ENDPOINT_URL,
+        "X-API-Key": internal,
+    }
+
+    # create user + login
+    r = client.post(
+        "/api/internal/mongodb/entity/user",
+        json={"username": "ad_search_user", "email": "ad_search_user@example.com", "password": "searchpwd"},
+        headers=headers_internal,
+    )
+    assert r.status_code == 200, r.text
+    user_id = r.json()["user_id"]
+
+    r = client.post("/token", data={"username": "ad_search_user", "password": "searchpwd"})
+    assert r.status_code == 200, r.text
+    token = r.json()["access_token"]
+
+    internal = create_internal_api_access_token(data={"scope": "internal"}, settings=test_settings)
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Referer": test_settings.API_GATEWAY_HOST + test_settings.PROTECTED_ENDPOINT_URL,
+        "X-API-Key": internal,
+    }
+    return client, headers, user_id
+
+
+@pytest.mark.asyncio
+async def test_ad_search():
+    client, headers, user_id = _make_client_and_headers()
+
+    # Clean collection - ONLY FOR FIRST TEST
+    async with get_db_client(test_settings) as db:
+        await db.ads.delete_many({})
+
+    t0 = datetime.now(UTC)
+    ads = [
+        {
+            "ad_id": 9001,
+            "user": {"id": 1, "username": "u"},
+            "designation": "Vinyle 1",
+            "description": "musique",
+            "category": "musique",
+            "images": [],
+            "created_at": (t0 - timedelta(minutes=2)).isoformat(),
+        },
+        {
+            "ad_id": 9002,
+            "user": {"id": 1, "username": "u"},
+            "designation": "Lecteur CD",
+            "description": "electronique",
+            "category": "electronique",
+            "images": [],
+            "created_at": (t0 - timedelta(minutes=1)).isoformat(),
+        },
+        {
+            "ad_id": 9003,
+            "user": {"id": 1, "username": "u"},
+            "designation": "Vinyle 2",
+            "description": "musique",
+            "category": "musique",
+            "images": [],
+            "created_at": t0.isoformat(),
+        },
+    ]
+    created_ids = []
+    for payload in ads:
+        r = client.post("/api/internal/mongodb/entity/ad", json=payload, headers=headers)
+        assert r.status_code == 200, r.text
+        created_ids.append(r.json()["id"])
+
+    # 1) /search sans q
+    r = client.get("/api/internal/mongodb/entity/ad/search", headers=headers)
+    assert r.status_code == 200, r.text
+    items = r.json()["items"]
+    ids = [it["ad_id"] for it in items[:3]]
+    assert ids == [9003, 9002, 9001]
+
+    # 2) filtre category
+    r = client.get("/api/internal/mongodb/entity/ad/search", params={"category": "electronique"}, headers=headers)
+    assert r.status_code == 200, r.text
+    items = r.json()["items"]
+    assert all(it["category"] == "electronique" for it in items)
+    assert any(it["ad_id"] == 9002 for it in items)
+
+    # 3) pagination
+    r = client.get("/api/internal/mongodb/entity/ad/search", params={"skip": 1, "limit": 1}, headers=headers)
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert data["skip"] == 1 and data["limit"] == 1
+    assert len(data["items"]) == 1
+
+    # Cleanup
+    for _id in created_ids:
+        client.delete(f"/api/internal/mongodb/entity/ad/{_id}", headers=headers)
+    client.delete(f"/api/internal/mongodb/entity/user/{user_id}", headers=headers)

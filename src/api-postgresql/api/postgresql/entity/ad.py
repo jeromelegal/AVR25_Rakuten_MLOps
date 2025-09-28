@@ -107,7 +107,7 @@ async def delete_ad(ad_id: int, current_user: Dict = Depends(get_current_user), 
             return {"message": "Ad deleted successfully"}
         raise HTTPException(status_code=404, detail="Ad not found")
     
-@router.get("/api/internal/postgresql/entity/{table}/ids", response_model=List)
+@router.get("/api/internal/postgresql/entity/{table}/ids", response_model=List[int])
 async def list_ids(table: str,current_user: Dict = Depends(get_current_user), request: Request = None):
     settings: Settings = request.app.state.settings
     
@@ -117,12 +117,9 @@ async def list_ids(table: str,current_user: Dict = Depends(get_current_user), re
 
     async with get_db_client(settings) as conn:
         result = await conn.fetch(
-            "SELECT id FROM $1 ORDER BY id", table
-        )
+            f"SELECT id FROM {table} ORDER BY id")
         
         ids = [r["id"] for r in result]
         if ids:
-            return List[ids]
+            return ids
         raise HTTPException(status_code=404, detail=f"Can't get ids in table {table}.")
-
-

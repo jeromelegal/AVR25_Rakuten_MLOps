@@ -142,13 +142,12 @@ async def delete_ad(
 
     # Delete ad and category
     cat_id = cat_relation[0]["cat_id"]
-    cat_deleted = delete_entity(postgresql_client, postgresql_token, "category", cat_id)
+    # cat_deleted = delete_entity(postgresql_client, postgresql_token, "category", cat_id)
     ad_deleted = delete_entity(postgresql_client, postgresql_token, "ad", ad_id)
 
     return DeleteAdResponse(
         ad_id=ad_id,
         deleted_relations=rel_flags,
         deleted_images=deleted_images,
-        cat_deleted=bool(cat_deleted),
         ad_deleted=bool(ad_deleted),
     )

@@ -126,7 +126,7 @@ async def read_ad(
     user_ad = read_psql_relation("ads_users", ad_id, postgresql_client, postgresql_token)
     ad_image = read_psql_relation("ads_images", ad_id, postgresql_client, postgresql_token)
     cat_id = ad_cat[0]["cat_id"]
-    user_id = user_ad[0]["user_id"]
+    user_id = user_ad.get("user_id")
     image_id = ad_image[0]["image_id"] 
 
     ### Retrieves data ###

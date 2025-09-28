@@ -86,7 +86,14 @@ db.ads.createIndex(
   }
 );
 // Create filters index
+// Index for text search
+db.ads.createIndex(
+  { designation: "text", description: "text" },
+  { default_language: "french", weights: { designation: 8, description: 5 }, name: "ads_search" }
+);
+// Index for unicity on ad_id
 db.ads.createIndex({ ad_id: 1 }, { unique: true, name: "ad_id_unique" });
+// Index for category listing sorted by date
 db.ads.createIndex({ category: 1, created_at: -1 }, { name: "cat_created" });
-db.ads.createIndex({ "user.username": 1 }, { name: "username" });
+// Index global sorting by date
 db.ads.createIndex({ created_at: -1 }, { name: "created_desc" });

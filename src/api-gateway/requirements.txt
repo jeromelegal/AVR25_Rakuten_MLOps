@@ -9,3 +9,7 @@ cryptography
 pydantic-settings
 pytest
 httpx
+pandas
+google-auth
+google-auth-oauthlib
+google-api-python-client

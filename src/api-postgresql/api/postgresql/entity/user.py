@@ -45,9 +45,9 @@ async def create_user(request: Request, user: User):
 @router.get("/api/internal/postgresql/entity/user/{user_id}", response_model=UserResponse)
 async def get_user(user_id: int, current_user: dict = Depends(get_current_user), request: Request = None):
     settings: Settings = request.app.state.settings
-    if current_user["id"] != user_id and "superadmin" not in current_user.get("roles", []):
-        raise HTTPException(status_code=403, detail="Not enough permissions")
-
+    # TODO : manage role
+    # if current_user["id"] != user_id and "superadmin" not in current_user.get("roles", []):
+    #     raise HTTPException(status_code=403, detail="Not enough permissions")
     async with get_db_client(settings) as conn:
         user = await conn.fetchrow(
             "SELECT id as user_id, username, email, created_at, created_by FROM users WHERE id = $1",
