@@ -130,3 +130,25 @@ $(printf "%s" "$API_IMAGE_PROCESSING_API_PROCESSING_CA")
 EOF
 
 
+
+# Vérifier si le certificat et la clé Vault existent déjà
+if vault kv get -field=cert secret/api-processing/api-gateway/certs > /dev/null 2>&1 && vault kv get -field=key secret/api-processing/api-gateway/certs > /dev/null 2>&1; then
+  echo "Le certificat mTLS api-processing pour le service api-gateway existe déjà"
+else
+  # Générer le certificat et la clé
+  echo "Générer le certificat et la clé"
+  vault write -format=json pki_api-processing/issue/api-processing common_name="api-processing"   ttl="72h" > api-processing_api-gateway_cert.json
+
+  # Extraire le certificat et la clé privée
+  API_PROCESSING_API_GATEWAY_CA=$(jq -r '.data.ca_chain[0]' api-processing_api-gateway_cert.json)
+  API_PROCESSING_API_GATEWAY_CERT=$(jq -r '.data.certificate' api-processing_api-gateway_cert.json)
+  API_PROCESSING_API_GATEWAY_KEY=$(jq -r '.data.private_key' api-processing_api-gateway_cert.json)
+
+
+  # Enregistrer le certificat et la clé privée dans Vault
+  vault kv put secret/api-processing/api-gateway/certs cert="$API_PROCESSING_API_GATEWAY_CERT" key="$API_PROCESSING_API_GATEWAY_KEY" ca="$API_PROCESSING_API_GATEWAY_CA"
+
+  # Nettoyage des fichiers temporaires
+  rm -f api-processing_api-gateway_cert.json
+fi
+
