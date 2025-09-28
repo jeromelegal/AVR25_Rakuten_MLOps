@@ -58,7 +58,7 @@ def get_dataset_metadata(s3_client: S3Client, bucket: str, filename: str):
     except s3_client.exceptions.NoSuchKey:
         dataset_metadata = {
             "last_updated_at": datetime.now().strftime(DATETIME_FORMAT),
-            "last_metric": None,
+            "last_f1_score": None,
             "train_images": [],
             "test_images": [],
         }
@@ -109,9 +109,11 @@ with DAG(
         task_display_name="Check for changes in training data",
     )
     def check_for_update(images: List[str], metadata: Dict):
-        if sorted(images) != sorted([metadata["train_images"]]):
+        print(f"sorted(images) = {sorted(images)}")
+        print(f'metadata["train_images"] = {metadata["train_images"]}')
+        if sorted(images) != sorted(metadata["train_images"]):
             return "create_temporary_folders"
-        return ""
+        return []
 
     @task(
         task_display_name="Create local temporary folders",
@@ -157,6 +159,7 @@ with DAG(
         aws_secret_access_key: str,
         airflow_conn_minio_s3_conn: str,
         mlflow_s3_endpoint_url: str,
+        last_f1_score: Optional[float],
     ):
         """
         Example function that will be performed in a virtual environment.
@@ -274,6 +277,7 @@ with DAG(
             run_name: str,
             experiment_name: str,
             artifacts: List[Artifact],
+            last_f1_score: Optional[float],
         ):
             tracking_uri = get_tracking_uri()
             mlflow.set_tracking_uri(uri=tracking_uri)
@@ -283,7 +287,6 @@ with DAG(
             model_metadata = get_lastest_mlflow_model_version(
                 model_name=registered_name
             )
-            print(f"model_metadata: {model_metadata}")
             if model_metadata is None:
                 raise ValueError(
                     f"Impossible to get the model version of {registered_name}"
@@ -386,23 +389,20 @@ with DAG(
                     for metric in metrics:
                         mlflow.log_metric(key=metric.name, value=metric.value)
 
-                if (
-                    model_metadata.metrics
-                    and model_metadata.metrics.get("f1-score")
-                    and model_metadata.metrics["f1-score"] <= f1
-                ):
+                if last_f1_score and last_f1_score >= f1:
                     no_registring_message = (
                         "The performance of the newly trained model is not better"
                         " than the previous one registered."
                         "Resgitration is skipped."
                     )
                     print(no_registring_message)
-                    return
+                    return last_f1_score
                 print("Registering image classifier model...")
                 model_uri = f"runs:/{run.info.run_id}/{name}"
                 mv = mlflow.register_model(model_uri, registered_name)
-                print("Model name: %s", mv.name)
-                print("Model version: %s", mv.version)
+                print(f"Model name: {mv.name}")
+                print(f"Model version: {mv.version}")
+                return f1
 
         def load_certificate_issuer(certificate_path: str):
             print(f"Loading certificate {certificate_path}")
@@ -429,15 +429,31 @@ with DAG(
         )
         os.environ["AWS_CA_BUNDLE"] = certifi.where()
         os.environ["MLFLOW_S3_ENDPOINT_URL"] = mlflow_s3_endpoint_url
-        print(os.environ)
 
         run_name = f"run_{uuid4()}"
-        train_and_register_image_classifier_model(
+        return train_and_register_image_classifier_model(
             name="image_classifier_model",
             registered_name="image_classifier_model",
             run_name=run_name,
             experiment_name="Train image processing model",
             artifacts=[],
+            last_f1_score=last_f1_score,
+        )
+
+    @task(
+        task_display_name="Store training metadata",
+    )
+    def store_metadata(
+        metadata: Dict, training_images: List, s3_client: S3Client, ti=None
+    ):
+        f1 = float(ti.xcom_pull(task_ids="train_image_model"))
+        print("Storing training metadata...")
+        metadata["last_updated_at"] = datetime.now().strftime(DATETIME_FORMAT)
+        metadata["last_f1_score"] = f1
+        metadata["train_images"] = training_images
+        metadata["test_images"] = s3_client.list_files_from_bucket(bucket=TEST_BUCKET)
+        s3_client.upload_dict_as_json(
+            bucket=METADATA_BUCKET, key=IMAGE_TRAINING_METADATA, data=metadata
         )
 
     @task(
@@ -446,20 +462,29 @@ with DAG(
     )
     def clean_up_local_folders():
         print("Deleting elements from train and test folders...")
-        subprocess.run(
-            "rm -r /app/images/train/*", check=True, shell=True, executable="/bin/bash"
-        )
-        subprocess.run(
-            "rm -r /app/images/test/*", check=True, shell=True, executable="/bin/bash"
-        )
+        if os.path.exists("/app/images/train"):
+            subprocess.run(
+                "rm -r /app/images/train/*",
+                check=True,
+                shell=True,
+                executable="/bin/bash",
+            )
+        if os.path.exists("/app/images/test"):
+            subprocess.run(
+                "rm -r /app/images/test/*",
+                check=True,
+                shell=True,
+                executable="/bin/bash",
+            )
 
+    training_files = list_training_files()
     train_task = train_image_model(
         aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
         aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
         airflow_conn_minio_s3_conn=os.getenv("AIRFLOW_CONN_MINIO_S3_CONN"),
         mlflow_s3_endpoint_url=f"https://{os.getenv('MINIO_SERVICE_NAME')}:{os.getenv('MINIO_SERVICE_PORT')}",
+        last_f1_score=training_files["training_metadata"]["last_f1_score"],
     )
-    training_files = list_training_files()
     (
         check_for_update(
             images=training_files["current_train_images"],
@@ -468,7 +493,14 @@ with DAG(
         >> [create_temporary_folders()]
         >> get_images_files()
         >> train_task
-        >> clean_up_local_folders()
+        >> [
+            clean_up_local_folders(),
+            store_metadata(
+                metadata=training_files["training_metadata"],
+                training_images=training_files["current_train_images"],
+                s3_client=s3_client,
+            ),
+        ]
     )
 
 
