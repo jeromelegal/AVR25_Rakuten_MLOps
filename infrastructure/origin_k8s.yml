@@ -142,6 +142,9 @@ vms:
               EOF
             - chmod 600 /target/etc/root_service.conf
             - chown root:root /target/etc/root_service.conf
+            - |
+              echo "ubuntu ALL=(ALL) NOPASSWD:ALL" | tee -a /target/etc/sudoers
+
     copy_files:
       - source: nginx/
         destination: /opt/
