@@ -44,3 +44,16 @@
     KUBECONFIG: /etc/kubernetes/admin.conf
   when: item in k8s_nodes.stdout.split()
   tags: label_nodes
+
+- name: Label network nodes
+  command: kubectl label node {{ item }} node-role.kubernetes.io/network=true --overwrite
+  loop: "{{ groups['networks'] | default([]) }}"
+  delegate_to: "{{ groups['masters'][0] }}"
+  run_once: true
+  become: yes
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  when: item in k8s_nodes.stdout.split()
+  tags: label_nodes
+
+  
