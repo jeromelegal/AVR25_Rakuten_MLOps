@@ -1,30 +1,376 @@
 ---
-- name: Add OpenEBS Helm repository
-  command: helm repo add openebs https://openebs.github.io/charts
-  when: inventory_hostname == 'master1'
-  become: yes
-  tags: csi
+# Tâche Ansible pour configurer Mayastor (OpenEBS) sur des nœuds de données
+- name: Mayastor NVMe-only — déploiement complet
+  vars:
+    # Namespace du chart OpenEBS (Mayastor inclus)
+    mayastor_namespace: openebs
+    # Groupe d'inventaire qui contient tes nœuds "data"
+    data_node_group: datas
+    # Disque NVMe par défaut (RECOMMANDE: /dev/disk/by-id/… via host_vars/<node>.yml)
+    mayastor_disk_device_default: "/dev/nvme0n2"
+    # Réserver (taint) les nœuds data pour les workloads qui le tolèrent
+    taint_data_nodes: true
+    # Définir la StorageClass par défaut ?
+    set_default_sc: true
+    default_sc_name: mayastor-3
 
-- name: Update Helm repositories
-  command: helm repo update
-  when: inventory_hostname == 'master1'
-  become: yes
-  tags: csi
+  block:
+    ###########################################################################
+    # 0) PRÉREQUIS NVMe/TCP SUR LES NŒUDS QUI MONTERONT LES VOLUMES (ici: data)
+    ###########################################################################
+    - name: Check kernel >= 5.13 (requis NVMe/TCP)
+      shell: |
+        cur=$(uname -r | cut -d- -f1)
+        printf "5.13\n%s\n" "$cur" | sort -C -V
+      register: kernelchk
+      failed_when: kernelchk.rc != 0
+      changed_when: false
+      when: inventory_hostname in groups[data_node_group]
+      tags: [mayastor, storage, nvme, csi]
 
-- name: Install Mayastor using Helm
-  command: helm install mayastor openebs/mayastor --namespace mayastor --create-namespace --version 2.6.0
-  when: inventory_hostname == 'master1'
-  become: yes
-  tags: csi
+    - name: Install nvme-cli (utile mais optionnel)
+      package:
+        name: nvme-cli
+        state: present
+      when: inventory_hostname in groups[data_node_group]
+      tags: [mayastor, storage, nvme, csi]
 
-- name: Install Mayastor Control Plane
-  command: kubectl apply -f https://raw.githubusercontent.com/openebs/mayastor/master/deploy/mayastor-control-plane.yaml
-  when: inventory_hostname == 'master1'
-  become: yes
-  tags: csi
+    - name: Load nvme_tcp module now
+      modprobe:
+        name: nvme_tcp
+        state: present
+      when: inventory_hostname in groups[data_node_group]
+      tags: [mayastor, storage, nvme, csi]
 
-- name: Install Mayastor Data Plane
-  command: kubectl apply -f https://raw.githubusercontent.com/openebs/mayastor/master/deploy/mayastor-data-plane.yaml
-  when: inventory_hostname == 'master1'
+    - name: Persist nvme_tcp at boot
+      copy:
+        dest: /etc/modules-load.d/nvme_tcp.conf
+        content: "nvme_tcp\n"
+        mode: "0644"
+      when: inventory_hostname in groups[data_node_group]
+      tags: [mayastor, storage, nvme, csi]
+
+    ###########################################################################
+    # 1) PRÉPA DES NŒUDS DATA (HugePages, labels/taints, wipe disque)
+    ###########################################################################
+    #TODO: Verifier la valeur réelle des pages
+    - name: Ensure HugePages
+      sysctl:
+        name: vm.nr_hugepages
+        value: "2048"
+        sysctl_set: true
+        reload: true
+      when: inventory_hostname in groups[data_node_group]
+      tags: [mayastor, storage, nvme, csi]
+
+    - name: Label node for Mayastor
+      command: kubectl label node {{ inventory_hostname }} openebs.io/engine=mayastor --overwrite
+      environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
+      register: label_ms
+      changed_when: "'labeled' in label_ms.stdout or 'configured' in label_ms.stdout or 'labeled' in label_ms.stderr or 'configured' in label_ms.stderr"
+      when: inventory_hostname in groups[data_node_group]
+      delegate_to: "{{ groups['masters'][0] }}"
+      tags: [mayastor, storage, nvme, csi]
+
+    - name: Label node for CSI topology (restrict csi-node/agent-ha-node to data nodes)
+      command: kubectl label node {{ inventory_hostname }} openebs.io/csi-node=mayastor --overwrite
+      environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
+      register: label_csi
+      changed_when: "'labeled' in label_csi.stdout or 'configured' in label_csi.stdout or 'labeled' in label_csi.stderr or 'configured' in label_csi.stderr"
+      when: inventory_hostname in groups[data_node_group]
+      delegate_to: "{{ groups['masters'][0] }}"
+      tags: [mayastor, storage, nvme, csi]
+
+
+    - name: Label node for "storage" visibility (matches taint key)
+      command: kubectl label node {{ inventory_hostname }} openebs.io/storage=mayastor --overwrite
+      environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
+      register: label_storage
+      changed_when: >
+        'labeled' in (label_storage.stdout | default('')) or
+        'configured' in (label_storage.stdout | default('')) or
+        'labeled' in (label_storage.stderr | default('')) or
+        'configured' in (label_storage.stderr | default(''))
+      when: inventory_hostname in groups[data_node_group]
+      delegate_to: "{{ groups['masters'][0] }}"
+      tags: [mayastor, storage, nvme, csi]
+
+
+    - name: (Optionnel recommandé) Taint DATA nodes (réserver ces nœuds)
+      command: kubectl taint nodes {{ inventory_hostname }} openebs.io/storage=mayastor:NoSchedule --overwrite
+      environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
+      register: taint_out
+      changed_when: "'tainted' in (taint_out.stdout + taint_out.stderr) or 'already has' in (taint_out.stdout + taint_out.stderr)"
+      when:
+        - taint_data_nodes
+        - inventory_hostname in groups[data_node_group]
+      delegate_to: "{{ groups['masters'][0] }}"
+      tags: [mayastor, storage, nvme, csi]
+
+    # >>> GARDE-FOU AVANT LE WIPE <<<
+    - name: "Guard - ensure device looks like a block path"
+      vars:
+        dev: "{{ hostvars[inventory_hostname].mayastor_disk_device | default(mayastor_disk_device_default) }}"
+      assert:
+        that:
+          - dev is match('^/dev/.+')
+        fail_msg: "mayastor_disk_device doit être un chemin /dev/... (idéalement /dev/disk/by-id/...)."
+      when: inventory_hostname in groups[data_node_group]
+      tags: [mayastor, storage, nvme, csi]
+
+    - name: (DANGEREUX) Wipe du disque NVMe dédié (efface TOUT)
+      vars:
+        dev: "{{ hostvars[inventory_hostname].mayastor_disk_device | default(mayastor_disk_device_default) }}"
+      ansible.builtin.shell: |
+        set -euo pipefail
+        wipefs -a "{{ dev }}"
+        sgdisk --zap-all "{{ dev }}" || true
+        udevadm settle || true
+      args:
+        executable: /bin/bash
+      when: inventory_hostname in groups[data_node_group]
+      tags: [mayastor, storage, nvme, csi]
+
+    ###########################################################################
+    # 2) INSTALL OPENEBS (MAYASTOR UNIQUEMENT) + topo CSI / tolerations
+    ###########################################################################
+    - name: Add OpenEBS helm repo
+      command: helm repo add openebs https://openebs.github.io/openebs
+      register: helm_repo_add
+      changed_when: "'has been added' in helm_repo_add.stdout or 'already exists' in helm_repo_add.stderr"
+      environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
+      when: inventory_hostname == groups['masters'][0]
+      delegate_to: "{{ groups['masters'][0] }}"
+      run_once: true
+      tags: [mayastor, storage, nvme, csi]
+
+    - name: Helm repo update
+      command: helm repo update
+      changed_when: false
+      environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
+      when: inventory_hostname == groups['masters'][0]
+      delegate_to: "{{ groups['masters'][0] }}"
+      run_once: true
+      tags: [mayastor, storage, nvme, csi]
+
+    - name: Create namespace {{ mayastor_namespace }}
+      command: kubectl create namespace {{ mayastor_namespace }}
+      register: ns_out
+      failed_when: ns_out.rc not in [0,1]
+      changed_when: "'created' in ns_out.stdout"
+      environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
+      when: inventory_hostname == groups['masters'][0]
+      delegate_to: "{{ groups['masters'][0] }}"
+      run_once: true
+      tags: [mayastor, storage, nvme, csi]
+
+    - name: Render OpenEBS/Mayastor values (tolerations + CSI topology)
+      copy:
+        dest: /tmp/openebs-mayastor-values.yml
+        content: |
+          mayastor:
+            tolerations:
+              - key: "openebs.io/storage"
+                operator: "Equal"
+                value: "mayastor"
+                effect: "NoSchedule"
+            csi:
+              node:
+                topology:
+                  nodeSelector: true
+                  segments:
+                    openebs.io/csi-node: mayastor
+      when: inventory_hostname == groups['masters'][0]
+      delegate_to: "{{ groups['masters'][0] }}"
+      run_once: true
+      tags: [mayastor, storage, nvme, csi]
+
+    - name: Install/upgrade OpenEBS with Mayastor only (NVMe) + values
+      command: >
+        helm upgrade --install openebs openebs/openebs
+        -n {{ mayastor_namespace }} --create-namespace
+        --set engines.local.lvm.enabled=false
+        --set engines.local.zfs.enabled=false
+        --set engines.replicated.mayastor.enabled=true
+        -f /tmp/openebs-mayastor-values.yml
+      register: helm_install
+      changed_when: "'deployed' in helm_install.stdout
+                    or 'installed' in helm_install.stdout
+                    or 'upgraded' in helm_install.stdout"
+      environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
+      when: inventory_hostname == groups['masters'][0]
+      delegate_to: "{{ groups['masters'][0] }}"
+      run_once: true
+      tags: [mayastor, storage, nvme, csi]
+
+    - name: Wait for DiskPool CRD to be established
+      shell: kubectl get crd diskpools.openebs.io
+      register: crd
+      retries: 30
+      delay: 5
+      until: crd.rc == 0
+      changed_when: false
+      environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
+      when: inventory_hostname == groups['masters'][0]
+      delegate_to: "{{ groups['masters'][0] }}"
+      run_once: true
+      tags: [mayastor, storage, nvme, csi]
+
+    ###########################################################################
+    # 3) DISKPOOLS (UN PAR NŒUD DATA) — v1beta3
+    ###########################################################################
+    - name: Create DiskPool for each DATA node
+      vars:
+        target_dev: "{{ hostvars[item].mayastor_disk_device | default(mayastor_disk_device_default) }}"
+        pool_yaml: |
+          apiVersion: openebs.io/v1beta3
+          kind: DiskPool
+          metadata:
+            name: pool-{{ item }}
+            namespace: {{ mayastor_namespace }}
+          spec:
+            node: {{ item }}
+            disks:
+              - {{ target_dev }}
+      shell: |
+        cat <<'YAML' | kubectl apply -f -
+        {{ pool_yaml }}
+        YAML
+      loop: "{{ groups[data_node_group] | default([]) }}"
+      environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
+      when:
+        - inventory_hostname == groups['masters'][0]
+        - groups[data_node_group] is defined
+        - groups[data_node_group] | length > 0
+      delegate_to: "{{ groups['masters'][0] }}"
+      run_once: true
+      tags: [mayastor, storage, nvme, csi]
+
+    ###########################################################################
+    # 4) STORAGECLASSES (NVMe/TCP, RWO)
+    ###########################################################################
+    - name: Create SC mayastor-1 and mayastor-3
+      shell: |
+        cat <<'YAML' >/tmp/sc-mayastor-1.yml
+        apiVersion: storage.k8s.io/v1
+        kind: StorageClass
+        metadata: { name: mayastor-1 }
+        provisioner: io.openebs.csi-mayastor
+        allowVolumeExpansion: true
+        volumeBindingMode: WaitForFirstConsumer
+        parameters:
+          protocol: nvmf
+          repl: "1"
+        ---
+        apiVersion: storage.k8s.io/v1
+        kind: StorageClass
+        metadata: { name: mayastor-3 }
+        provisioner: io.openebs.csi-mayastor
+        allowVolumeExpansion: true
+        volumeBindingMode: WaitForFirstConsumer
+        parameters:
+          protocol: nvmf
+          repl: "3"
+          thin: "true"
+          ioTimeout: "30"
+        YAML
+        kubectl apply -f /tmp/sc-mayastor-1.yml
+      register: sc_apply
+      changed_when: "'created' in sc_apply.stdout or 'configured' in sc_apply.stdout"
+      environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
+      when: inventory_hostname == groups['masters'][0]
+      delegate_to: "{{ groups['masters'][0] }}"
+      run_once: true
+      tags: [mayastor, storage, nvme, csi]
+
+    - name: Optionally set default StorageClass
+      when:
+        - set_default_sc
+        - inventory_hostname == groups['masters'][0]
+      block:
+        - name: Remove default annotation from other SCs
+          shell: |
+            set -e
+            for sc in $(kubectl get sc -o jsonpath='{.items[*].metadata.name}'); do
+              if [ "$sc" != "{{ default_sc_name }}" ]; then
+                kubectl annotate sc "$sc" storageclass.kubernetes.io/is-default-class- || true
+              fi
+            done
+          environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
+          delegate_to: "{{ groups['masters'][0] }}"
+          run_once: true
+          tags: [mayastor, storage, nvme, csi]
+
+        # (ajouter avant l'annotation) : vérifier si la SC est déjà par défaut
+        - name: Check if {{ default_sc_name }} is already default
+          command: kubectl get sc {{ default_sc_name }} -o jsonpath='{.metadata.annotations.storageclass\.kubernetes\.io/is-default-class}'
+          register: sc_default
+          changed_when: false
+          failed_when: false
+          environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
+          when: inventory_hostname == groups['masters'][0]
+          delegate_to: "{{ groups['masters'][0] }}"
+          run_once: true
+          tags: [mayastor, storage, nvme, csi]
+
+        # annoter seulement si ce n'est pas déjà "true"
+        - name: Annotate {{ default_sc_name }} as default
+          command: kubectl annotate sc {{ default_sc_name }} storageclass.kubernetes.io/is-default-class="true" --overwrite
+          register: annotate_out
+          changed_when: >
+            'annotated' in (annotate_out.stdout | default('')) or
+            'annotated' in (annotate_out.stderr | default(''))
+          when:
+            - inventory_hostname == groups['masters'][0]
+            - sc_default.stdout | default('') != 'true'
+          environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
+          delegate_to: "{{ groups['masters'][0] }}"
+          run_once: true
+          tags: [mayastor, storage, nvme, csi]
+
+
+    ###########################################################################
+    # 5) MANIFEST DE TEST (PVC + BUSYBOX)
+    ###########################################################################
+    - name: Create test PVC and busybox pod
+      shell: |
+        cat <<'YAML' >/tmp/test-mayastor.yml
+        apiVersion: v1
+        kind: PersistentVolumeClaim
+        metadata:
+          name: test-pvc
+        spec:
+          accessModes: [ "ReadWriteOnce" ]
+          storageClassName: mayastor-3
+          resources:
+            requests:
+              storage: 5Gi
+        ---
+        apiVersion: v1
+        kind: Pod
+        metadata:
+          name: test-busybox
+        spec:
+          containers:
+          - name: busybox
+            image: busybox
+            command: ['sh', '-c', 'echo "Hello, Mayastor!" > /mnt/test.txt && sleep 3600']
+            volumeMounts:
+            - name: test-volume
+              mountPath: /mnt
+          volumes:
+          - name: test-volume
+            persistentVolumeClaim:
+              claimName: test-pvc
+        YAML
+        kubectl apply -f /tmp/test-mayastor.yml
+      register: test_apply
+      changed_when: "'created' in test_apply.stdout or 'configured' in test_apply.stdout"
+      environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
+      when: inventory_hostname == groups['masters'][0]
+      delegate_to: "{{ groups['masters'][0] }}"
+      run_once: true
+      tags: [mayastor, storage, nvme, csi, test]
+
   become: yes
-  tags: csi
+  tags: [mayastor, storage, nvme, csi]
