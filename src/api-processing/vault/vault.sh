@@ -61,6 +61,11 @@ cp api-processing_ca.crt /usr/local/share/ca-certificates/
 cp api-text-processing_ca.crt /usr/local/share/ca-certificates/
 cp api-image-processing_ca.crt /usr/local/share/ca-certificates/
 
+cat minio_ca.crt >> $(python3 -c "import certifi; print(certifi.where())")
+cat api-image-processing_ca.crt >> $(python3 -c "import certifi; print(certifi.where())")
+cat api-text-processing_ca >> $(python3 -c "import certifi; print(certifi.where())")
+cat api-processing_ca.crt >> $(python3 -c "import certifi; print(certifi.where())")
+
 update-ca-certificates
 
 export VAULT_SKIP_VERIFY="0"

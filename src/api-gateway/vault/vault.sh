@@ -26,6 +26,7 @@ vault kv get -field=certificate secret/api-mongodb/ca > api-mongodb_ca.crt
 vault kv get -field=certificate secret/api-gateway/ca > api-gateway_ca.crt
 vault kv get -field=certificate secret/api-postgresql/ca > api-postgresql_ca.crt
 vault kv get -field=certificate secret/mlflow/ca > mlflow_ca.crt
+vault kv get -field=certificate secret/api-processing/ca > api-processing_ca.crt
 
 mkdir -p $(dirname $API_GATEWAY_PEM_PATH)
 mkdir -p $(dirname $API_GATEWAY_CA_PATH)
@@ -41,6 +42,13 @@ cp api-mongodb_ca.crt /usr/local/share/ca-certificates/
 cp api-gateway_ca.crt /usr/local/share/ca-certificates/
 cp api-postgresql_ca.crt /usr/local/share/ca-certificates/
 cp mlflow_ca.crt /usr/local/share/ca-certificates/
+cp api-processing_ca.crt /usr/local/share/ca-certificates/
+
+cat api-mongodb_ca.crt >> $(python3 -c "import certifi; print(certifi.where())")
+cat api-gateway_ca.crt >> $(python3 -c "import certifi; print(certifi.where())")
+cat api-postgresql_ca.crt >> $(python3 -c "import certifi; print(certifi.where())")
+cat mlflow_ca.crt >> $(python3 -c "import certifi; print(certifi.where())")
+cat api-processing_ca.crt >> $(python3 -c "import certifi; print(certifi.where())")
 
 update-ca-certificates
 

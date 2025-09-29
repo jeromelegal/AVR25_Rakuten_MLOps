@@ -43,6 +43,7 @@ vault kv get -field=certificate secret/consul/ca > consul_ca.crt
 vault kv get -field=certificate secret/api-text-processing/ca > api-text-processing_ca.crt
 vault kv get -field=certificate secret/mlflow/ca > mlflow_ca.crt
 vault kv get -field=certificate secret/minio/ca > minio_ca.crt
+vault kv get -field=certificate secret/api-processing/ca > api-processing_ca.crt
 # vault kv get -field=certificate secret/api-gateway/ca > api-gateway_ca.crt
 
 mkdir -p $(dirname $API_TEXT_PROCESSING_PEM_PATH)
@@ -59,10 +60,12 @@ cp api-text-processing_ca.crt /usr/local/share/ca-certificates/
 # cp api-gateway_ca.crt /usr/local/share/ca-certificates/
 cp mlflow_ca.crt /usr/local/share/ca-certificates/
 cp minio_ca.crt /usr/local/share/ca-certificates/
+cp api-processing_ca.crt /usr/local/share/ca-certificates/
 
 cat mlflow_ca.crt >> $(python3 -c "import certifi; print(certifi.where())")
 cat api-text-processing_ca.crt >> $(python3 -c "import certifi; print(certifi.where())")
 cat minio_ca.crt >> $(python3 -c "import certifi; print(certifi.where())")
+cat api-processing_ca.crt >> $(python3 -c "import certifi; print(certifi.where())")
 
 update-ca-certificates
 
