@@ -21,7 +21,6 @@
 
 - name: Include MetalLB tasks
   include_tasks: metallb.yml
-  when: install_metallb | default(false)
   tags: metallb
 
 - name: Include Dashboard tasks

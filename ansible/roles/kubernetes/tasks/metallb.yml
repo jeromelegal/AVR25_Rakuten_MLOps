@@ -1,26 +1,65 @@
 ---
+# Déploiement MetalLB avec solution pour les webhooks
+- name: Ensure masters group exists and is not empty
+  assert:
+    that:
+      - "'masters' in groups"
+      - "groups['masters'] | length > 0"
+    fail_msg: "Le groupe [masters] doit exister et contenir au moins un hôte"
+  run_once: true
+  delegate_to: "{{ groups['masters'][0] }}"
+  tags: metallb
+
 - name: Add MetalLB Helm repository
   command: helm repo add metallb https://metallb.github.io/metallb
-  when: inventory_hostname == 'master1'
+  args:
+    creates: /root/.cache/helm/repository/metallb-index.yaml
+  run_once: true
+  delegate_to: "{{ groups['masters'][0] }}"
   become: yes
+  tags: metallb
+
+- name: Add Prometheus CRDs
+  command: kubectl apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/example/prometheus-operator-crd/monitoring.coreos.com_servicemonitors.yaml
+  run_once: true
+  delegate_to: "{{ groups['masters'][0] }}"
+  become: yes
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
   tags: metallb
 
 - name: Update Helm repositories
   command: helm repo update
-  when: inventory_hostname == 'master1'
+  run_once: true
+  delegate_to: "{{ groups['masters'][0] }}"
   become: yes
   tags: metallb
 
-- name: Install MetalLB using Helm
-  command: helm install metallb metallb/metallb --namespace metallb-system --create-namespace --version 0.13.10
-  when: inventory_hostname == 'master1'
+- name: Install/Upgrade MetalLB with webhooks disabled
+  command: >-
+    helm upgrade --install metallb metallb/metallb
+    --namespace metallb-system
+    --create-namespace
+    --version {{ metallb_chart_version | default('0.13.12') }}
+    --set-string speaker.nodeSelector."node-role\.kubernetes\.io/network"="true"
+    --set-string controller.nodeSelector."node-role\.kubernetes\.io/network"="true"
+    --set prometheus.enabled=true
+    --set prometheus.serviceMonitor.enabled=true
+    --set prometheus.serviceAccount=default
+    --set prometheus.namespace=monitoring
+    --set webhook.enabled=false
+  run_once: true
+  delegate_to: "{{ groups['masters'][0] }}"
   become: yes
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
   tags: metallb
 
-- name: Create MetalLB configuration file
-  copy:
-    dest: /tmp/metallb-config.yaml
-    content: |
+# Configuration MetalLB simplifiée
+- name: Apply MetalLB configuration
+  command: kubectl apply -f -
+  args:
+    stdin: |
       apiVersion: metallb.io/v1beta1
       kind: IPAddressPool
       metadata:
@@ -28,7 +67,7 @@
         namespace: metallb-system
       spec:
         addresses:
-        - 192.168.200.100-192.168.200.200
+        - {{ metallb_ip_range | default('192.168.200.100-192.168.200.200') }}
       ---
       apiVersion: metallb.io/v1beta1
       kind: L2Advertisement
@@ -38,33 +77,72 @@
       spec:
         ipAddressPools:
         - master-pool
-  when: inventory_hostname == 'master1'
+  run_once: true
+  delegate_to: "{{ groups['masters'][0] }}"
   become: yes
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
   tags: metallb
 
-- name: Apply MetalLB configuration
-  command: kubectl apply -f /tmp/metallb-config.yaml
-  when: inventory_hostname == 'master1'
+# Service & Endpoints pour API masters
+- name: Apply kubeapi-lb Service + Endpoints
+  command: kubectl apply -f -
+  args:
+    stdin: |
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: kubeapi-lb
+        namespace: default
+        annotations:
+          metallb.universe.tf/loadBalancerIPs: "{{ metallb_master_ip | default('192.168.200.101') }}"
+      spec:
+        type: LoadBalancer
+        ports:
+        - port: 6443
+          targetPort: 6443
+          protocol: TCP
+          name: https
+        externalTrafficPolicy: Local
+      ---
+      apiVersion: v1
+      kind: Endpoints
+      metadata:
+        name: kubeapi-lb
+        namespace: default
+      subsets:
+      {% for master in groups['masters'] %}
+      - addresses:
+        - ip: "{{ hostvars[master].ansible_host | default(hostvars[master].ansible_default_ipv4.address) }}"
+        ports:
+        - port: 6443
+          protocol: TCP
+      {% endfor %}
+  run_once: true
+  delegate_to: "{{ groups['masters'][0] }}"
   become: yes
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
   tags: metallb
 
-- name: Create LoadBalancer service for Kubernetes masters
-  command: kubectl apply -f - <<EOF
-apiVersion: v1
-kind: Service
-metadata:
-  name: kubernetes-master
-  namespace: default
-spec:
-  type: LoadBalancer
-  ports:
-  - port: 6443
-    targetPort: 6443
-    protocol: TCP
-    name: https
-  selector:
-    component: kube-apiserver
-EOF
-  when: inventory_hostname == 'master1'
+# Vérifications
+- name: Wait for kubeapi-lb Service IP assignment
+  command: kubectl get svc kubeapi-lb -n default -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+  register: kubeapi_lb_ip
+  until: kubeapi_lb_ip.stdout != ""
+  retries: 10
+  delay: 10
+  run_once: true
+  delegate_to: "{{ groups['masters'][0] }}"
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  tags: metallb
+
+- name: Verify MetalLB installation
+  command: kubectl -n metallb-system get all
+  run_once: true
+  delegate_to: "{{ groups['masters'][0] }}"
   become: yes
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
   tags: metallb
