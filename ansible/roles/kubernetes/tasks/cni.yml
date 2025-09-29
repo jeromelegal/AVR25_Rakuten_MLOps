@@ -1,203 +1,272 @@
 ---
-# Installer Cilium avec nodeSelectors (operator + Hubble sur nœuds "network")
+# Tâche Ansible — Cilium en 3 phases : réseau d’abord, puis KPR, puis Hubble
+- name: Cilium — réseau d’abord, puis KPR, puis Hubble
+  vars:
+    kube_system_ns: "kube-system"
+    cilium_version: "1.18.2"
 
+    # (Optionnel) fichier values ; mettre use_values_file: true si vous en avez un
+    cilium_values_file: "/etc/cilium/values-selectors.yaml"
+    use_values_file: false  # passez à true si vous gérez un values.yaml
 
+    # Phase 2 : activer kube-proxy replacement et supprimer kube-proxy
+    enable_kpr: true
+    remove_kube_proxy: true
 
-- name: Ensure Cilium values dir
-  file:
-    path: /etc/cilium
-    state: directory
-    mode: '0755'
-  run_once: true
-  delegate_to: "{{ groups['masters'][0] }}"
+    # Phase 3 : activer Hubble (relay + UI)
+    enable_hubble: true
+    enable_hubble_ui: true
+
+  block:
+
+    ###########################################################################
+    # 0) DÉCOUVERTE & ATTENTE API
+    ###########################################################################
+    - name: Discover API host:port from default/kubernetes Endpoints
+      command: kubectl -n default get endpoints kubernetes -o jsonpath='{.subsets[0].addresses[0].ip}:{.subsets[0].ports[0].port}'
+      register: api_hostport
+      changed_when: false
+      failed_when: api_hostport.rc != 0 or api_hostport.stdout == ""
+      run_once: true
+      delegate_to: "{{ groups['masters'][0] }}"
+      become: yes
+      environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
+      tags: [cilium]
+
+    - name: Set facts for Cilium k8sServiceHost/Port
+      set_fact:
+        cilium_api_host: "{{ api_hostport.stdout.split(':')[0] }}"
+        cilium_api_port: "{{ api_hostport.stdout.split(':')[1] | default('6443') }}"
+      run_once: true
+      delegate_to: "{{ groups['masters'][0] }}"
+      delegate_facts: true
+      tags: [cilium]
+
+    - name: Wait for Kubernetes API to be reachable
+      command: kubectl --request-timeout=5s get --raw='/version'
+      register: api_ping
+      retries: 60
+      delay: 5
+      until: api_ping.rc == 0
+      changed_when: false
+      run_once: true
+      delegate_to: "{{ groups['masters'][0] }}"
+      become: yes
+      environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
+      tags: [cilium]
+
+    ###########################################################################
+    # 0.bis) FLAG HELM --values OPTIONNEL (seulement si le fichier existe)
+    ###########################################################################
+    - name: Probe optional Cilium values file
+      when: (use_values_file | default(false)) | bool
+      ansible.builtin.stat:
+        path: "{{ cilium_values_file }}"
+      register: cilium_values_stat
+      run_once: true
+      delegate_to: "{{ groups['masters'][0] }}"
+      become: yes
+      tags: [cilium]
+
+    - name: Compute Helm --values flag
+      set_fact:
+        cilium_values_flag: >-
+          {{ ('-f ' ~ cilium_values_file)
+             if ((use_values_file | default(false)) | bool) and (cilium_values_stat.stat.exists | default(false))
+             else '' }}
+      run_once: true
+      delegate_to: "{{ groups['masters'][0] }}"
+      delegate_facts: true
+      tags: [cilium]
+
+    ###########################################################################
+    # 1) INSTALL CILIUM (réseau d’abord, kube-proxy encore présent)
+    ###########################################################################
+    - name: Add Cilium Helm repo
+      command: helm repo add cilium https://helm.cilium.io
+      register: helm_repo_add
+      changed_when: >
+        'has been added' in (helm_repo_add.stdout | default('')) or
+        'already exists' in (helm_repo_add.stderr | default(''))
+      run_once: true
+      delegate_to: "{{ groups['masters'][0] }}"
+      become: yes
+      environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
+      tags: [cilium]
+
+    - name: Helm repo update
+      command: helm repo update
+      changed_when: false
+      run_once: true
+      delegate_to: "{{ groups['masters'][0] }}"
+      become: yes
+      environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
+      tags: [cilium]
+
+    - name: Install/Upgrade Cilium (kube-proxy encore présent)
+      command: >-
+        helm upgrade --install cilium cilium/cilium
+        --namespace {{ kube_system_ns }}
+        --version {{ cilium_version }}
+        --wait --atomic --timeout 10m
+        {{ hostvars[groups['masters'][0]].cilium_values_flag | default('') }}
+        --set-string kubeProxyReplacement=false
+        --set ipam.mode=cluster-pool
+        --set ipam.operator.clusterPoolIPv4PodCIDRList=10.244.0.0/16
+        --set ipam.operator.clusterPoolIPv4MaskSize=24
+      register: cilium_install_phase1
+      run_once: true
+      delegate_to: "{{ groups['masters'][0] }}"
+      become: yes
+      environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
+      tags: [cilium]
+
+    - name: Wait for cilium-agent DaemonSet to be Ready (phase 1)
+      command: kubectl -n {{ kube_system_ns }} rollout status ds/cilium --timeout=600s
+      changed_when: false
+      run_once: true
+      delegate_to: "{{ groups['masters'][0] }}"
+      become: yes
+      environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
+      tags: [cilium]
+
+    - name: Wait for cilium-operator Deployment to be Ready (phase 1)
+      command: kubectl -n {{ kube_system_ns }} rollout status deploy/cilium-operator --timeout=600s
+      changed_when: false
+      run_once: true
+      delegate_to: "{{ groups['masters'][0] }}"
+      become: yes
+      environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
+      tags: [cilium]
+
+    ###########################################################################
+    # 2) BASCULE EN KPR (kube-proxy replacement)
+    ###########################################################################
+    - name: Upgrade Cilium with kube-proxy replacement
+      when: enable_kpr | bool
+      command: >-
+        helm upgrade cilium cilium/cilium
+        --namespace {{ kube_system_ns }}
+        --version {{ cilium_version }}
+        --wait --atomic --timeout 10m
+        {{ hostvars[groups['masters'][0]].cilium_values_flag | default('') }}
+        --reuse-values
+        --set-string kubeProxyReplacement=true
+        --set-string k8sServiceHost={{ hostvars[groups['masters'][0]].cilium_api_host }}
+        --set k8sServicePort={{ hostvars[groups['masters'][0]].cilium_api_port }}
+        --set bpf.masquerade=true
+      register: cilium_upgrade_kpr
+      run_once: true
+      delegate_to: "{{ groups['masters'][0] }}"
+      become: yes
+      environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
+      tags: [cilium]
+
+    - name: Wait for cilium-agent DaemonSet to be Ready (KPR)
+      when: enable_kpr | bool
+      command: kubectl -n {{ kube_system_ns }} rollout status ds/cilium --timeout=600s
+      changed_when: false
+      run_once: true
+      delegate_to: "{{ groups['masters'][0] }}"
+      become: yes
+      environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
+      tags: [cilium]
+
+    - name: Wait for cilium-operator Deployment to be Ready (KPR)
+      when: enable_kpr | bool
+      command: kubectl -n {{ kube_system_ns }} rollout status deploy/cilium-operator --timeout=600s
+      changed_when: false
+      run_once: true
+      delegate_to: "{{ groups['masters'][0] }}"
+      become: yes
+      environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
+      tags: [cilium]
+
+    - name: Remove kube-proxy DaemonSet
+      when: enable_kpr | bool and remove_kube_proxy | bool
+      command: kubectl -n kube-system delete ds kube-proxy --ignore-not-found=true
+      run_once: true
+      delegate_to: "{{ groups['masters'][0] }}"
+      become: yes
+      environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
+      tags: [cilium]
+
+    - name: Remove kube-proxy ConfigMap (avoid re-install by kubeadm upgrade)
+      when: enable_kpr | bool and remove_kube_proxy | bool
+      command: kubectl -n kube-system delete cm kube-proxy --ignore-not-found=true
+      run_once: true
+      delegate_to: "{{ groups['masters'][0] }}"
+      become: yes
+      environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
+      tags: [cilium]
+
+    # (Optionnel) nettoyage iptables sur tous les nœuds après suppression de kube-proxy
+    - name: Flush KUBE* iptables chains on all nodes (post kube-proxy removal)
+      when: enable_kpr | bool and remove_kube_proxy | bool
+      ansible.builtin.shell: |
+        set -euo pipefail
+        iptables-save | grep -v KUBE | iptables-restore
+      args:
+        executable: /bin/bash
+      become: yes
+      tags: [cilium]
+
+    ###########################################################################
+    # 3) HUBBLE (après réseau stable)
+    ###########################################################################
+    - name: Enable Hubble Relay (reuse values)
+      when: enable_hubble | bool
+      command: >-
+        helm upgrade cilium cilium/cilium
+        --namespace {{ kube_system_ns }}
+        --version {{ cilium_version }}
+        --wait --timeout 10m
+        {{ hostvars[groups['masters'][0]].cilium_values_flag | default('') }}
+        --reuse-values
+        --set hubble.relay.enabled=true
+      register: hubble_relay_enable
+      run_once: true
+      delegate_to: "{{ groups['masters'][0] }}"
+      become: yes
+      environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
+      tags: [cilium, hubble]
+
+    - name: Optionally enable Hubble UI
+      when: enable_hubble | bool and enable_hubble_ui | bool
+      command: >-
+        helm upgrade cilium cilium/cilium
+        --namespace {{ kube_system_ns }}
+        --version {{ cilium_version }}
+        --wait --timeout 10m
+        {{ hostvars[groups['masters'][0]].cilium_values_flag | default('') }}
+        --reuse-values
+        --set hubble.ui.enabled=true
+      register: hubble_ui_enable
+      run_once: true
+      delegate_to: "{{ groups['masters'][0] }}"
+      become: yes
+      environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
+      tags: [cilium, hubble]
+
+    - name: Wait for hubble-relay to be Ready
+      when: enable_hubble | bool
+      command: kubectl -n {{ kube_system_ns }} rollout status deploy/hubble-relay --timeout=600s
+      changed_when: false
+      run_once: true
+      delegate_to: "{{ groups['masters'][0] }}"
+      become: yes
+      environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
+      tags: [cilium, hubble]
+
+    - name: Wait for hubble-ui to be Ready (if enabled)
+      when: enable_hubble | bool and enable_hubble_ui | bool
+      command: kubectl -n {{ kube_system_ns }} rollout status deploy/hubble-ui --timeout=600s
+      changed_when: false
+      run_once: true
+      delegate_to: "{{ groups['masters'][0] }}"
+      become: yes
+      environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
+      tags: [cilium, hubble]
+
+  tags: [cilium]
   become: yes
-  tags: cni
-
-# values.yaml pour router les composants sur les nœuds "network"
-- name: Write cilium values file for nodeSelectors
-  copy:
-    dest: /etc/cilium/values-selectors.yaml
-    owner: root
-    group: root
-    mode: '0644'
-    content: |
-      operator:
-        nodeSelector:
-          node-role.kubernetes.io/network: "true"
-      hubble:
-        enabled: true
-        relay:
-          enabled: true
-          nodeSelector:
-            node-role.kubernetes.io/network: "true"
-        ui:
-          enabled: true
-          nodeSelector:
-            node-role.kubernetes.io/network: "true"
-      # Si vos nœuds "network" sont taintés (ex: dedicated=network:NoSchedule), décommentez :
-      # operator:
-      #   tolerations:
-      #     - key: dedicated
-      #       operator: Equal
-      #       value: network
-      #       effect: NoSchedule
-      # hubble:
-      #   relay:
-      #     tolerations:
-      #       - key: dedicated
-      #         operator: Equal
-      #         value: network
-      #         effect: NoSchedule
-      #   ui:
-      #     tolerations:
-      #       - key: dedicated
-      #         operator: Equal
-      #         value: network
-      #         effect: NoSchedule
-  run_once: true
-  delegate_to: "{{ groups['masters'][0] }}"
-  become: yes
-  tags: cni
-
-- name: Add Cilium Helm repository
-  command: helm repo add cilium https://helm.cilium.io/
-  args:
-    creates: /root/.cache/helm/repository/cilium-index.yaml
-  environment:
-    HELM_CONFIG_HOME: /root/.config/helm
-    HELM_CACHE_HOME: /root/.cache/helm
-  run_once: true
-  delegate_to: "{{ groups['masters'][0] }}"
-  become: yes
-  tags: cni
-
-- name: Update Helm repositories
-  command: helm repo update
-  environment:
-    HELM_CONFIG_HOME: /root/.config/helm
-    HELM_CACHE_HOME: /root/.cache/helm
-  run_once: true
-  delegate_to: "{{ groups['masters'][0] }}"
-  become: yes
-  tags: cni
-
-# 1) Déploiement en mode "progressive" pour stabiliser le réseau tant que kube-proxy existe
-# - name: Install/Upgrade Cilium (progressive phase)
-#   command: >-
-#     helm upgrade --install cilium cilium/cilium
-#     --namespace kube-system
-#     --version {{ cilium_chart_version | default('1.18.2') }}
-#     --wait --atomic --timeout 10m
-#     -f /etc/cilium/values-selectors.yaml
-#     --set-string kubeProxyReplacement=progressive
-#     --set-string k8sServiceHost={{ kubeadm_control_plane_endpoint }}
-#     --set k8sServicePort={{ kubeadm_api_port | default(6443) }}
-#     --set ipam.mode=cluster-pool
-#     --set ipam.operator.clusterPoolIPv4PodCIDRList="{{ kubernetes_pod_subnet | default('10.244.0.0/16') }}"
-#     --set ipam.operator.clusterPoolIPv4MaskSize=24
-#     --set hubble.metrics.enabled="{dns:query;ignoreAAAA,drop,tcp,flow,icmp,http}"
-#     --set prometheus.enabled=true
-#     --set operator.prometheus.enabled=true
-#     --set bpf.masquerade=true
-#   environment:
-#     KUBECONFIG: /etc/kubernetes/admin.conf
-#     HELM_CONFIG_HOME: /root/.config/helm
-#     HELM_CACHE_HOME: /root/.cache/helm
-#   run_once: true
-#   delegate_to: "{{ groups['masters'][0] }}"
-#   become: yes
-#   tags: cni
-- name: Install/Upgrade Cilium (kube-proxy free phase)
-  command: >-
-    helm upgrade --install cilium cilium/cilium
-    --namespace kube-system
-    --version {{ cilium_chart_version | default('1.18.2') }}
-    --wait --atomic --timeout 10m
-    -f /etc/cilium/values-selectors.yaml
-    --set-string kubeProxyReplacement=true
-    --set-string k8sServiceHost={{ kubeadm_control_plane_endpoint }}
-    --set k8sServicePort={{ kubeadm_api_port | default(6443) }}
-    --set ipam.mode=cluster-pool
-    --set ipam.operator.clusterPoolIPv4PodCIDRList={{ kubernetes_pod_subnet | default('10.244.0.0/16') }}
-    --set ipam.operator.clusterPoolIPv4MaskSize=24
-    --set hubble.metrics.enabled="{dns:query;ignoreAAAA,drop,tcp,flow,icmp,http}"
-    --set prometheus.enabled=true
-    --set operator.prometheus.enabled=true
-    --set bpf.masquerade=true
-  environment:
-    KUBECONFIG: /etc/kubernetes/admin.conf
-  run_once: true
-  delegate_to: "{{ groups['masters'][0] }}"
-  become: yes
-  tags: cni
-
-
-
-- name: Wait for cilium DaemonSet rollout
-  command: kubectl -n kube-system rollout status ds/cilium --timeout=5m
-  environment:
-    KUBECONFIG: /etc/kubernetes/admin.conf
-  run_once: true
-  delegate_to: "{{ groups['masters'][0] }}"
-  become: yes
-  tags: cni
-
-- name: Wait for cilium-operator Deployment rollout
-  command: kubectl -n kube-system rollout status deployment/cilium-operator --timeout=5m
-  environment:
-    KUBECONFIG: /etc/kubernetes/admin.conf
-  run_once: true
-  delegate_to: "{{ groups['masters'][0] }}"
-  become: yes
-  tags: cni
-
-# 2) Passer en kube-proxy-free (suppression kube-proxy)
-- name: Remove kube-proxy DaemonSet (if switching to kube-proxy-free)
-  command: kubectl -n kube-system delete ds kube-proxy --ignore-not-found=true
-  environment:
-    KUBECONFIG: /etc/kubernetes/admin.conf
-  when: cilium_kube_proxy_free | default(true)
-  run_once: true
-  delegate_to: "{{ groups['masters'][0] }}"
-  become: yes
-  tags: cni
-
-# 3) Bascule Cilium en kube-proxy-free et conserve toutes les valeurs précédentes (nodeSelectors)
-- name: Upgrade Cilium to kube-proxy-free (reuse previous values)
-  command: >-
-    helm upgrade cilium cilium/cilium
-    --namespace kube-system
-    --version {{ cilium_chart_version | default('1.18.2') }}
-    --wait --atomic --timeout 10m
-    --reuse-values
-    --set-string kubeProxyReplacement=true
-  environment:
-    KUBECONFIG: /etc/kubernetes/admin.conf
-    HELM_CONFIG_HOME: /root/.config/helm
-    HELM_CACHE_HOME: /root/.cache/helm
-  when: cilium_kube_proxy_free | default(true)
-  run_once: true
-  delegate_to: "{{ groups['masters'][0] }}"
-  become: yes
-  tags: cni
-
-# 4) Re-vérifier les rollouts après la bascule
-- name: Wait for cilium DaemonSet rollout (post-switch)
-  command: kubectl -n kube-system rollout status ds/cilium --timeout=5m
-  environment:
-    KUBECONFIG: /etc/kubernetes/admin.conf
-  when: cilium_kube_proxy_free | default(true)
-  run_once: true
-  delegate_to: "{{ groups['masters'][0] }}"
-  become: yes
-  tags: cni
-
-- name: Wait for cilium-operator Deployment rollout (post-switch)
-  command: kubectl -n kube-system rollout status deployment/cilium-operator --timeout=5m
-  environment:
-    KUBECONFIG: /etc/kubernetes/admin.conf
-  when: cilium_kube_proxy_free | default(true)
-  run_once: true
-  delegate_to: "{{ groups['masters'][0] }}"
-  become: yes
-  tags: cni
