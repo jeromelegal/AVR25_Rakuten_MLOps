@@ -95,6 +95,26 @@ async def test_create_ad():
     assert update_data["designation"] == "Vinyl Sleep Token"
     assert update_data["description"] == "Album 'Sundowning'"
 
+    # Test get list ids
+    ad_payload = {
+        "designation": "Vinyl GRIMA",
+        "description": "Album 'The Nightside'"
+        }
+    create_response = client.post(
+        "/api/internal/postgresql/entity/ad",
+        json=ad_payload,
+        headers=headers
+    )
+    table = "ads"
+    response = client.get(
+        f"/api/internal/postgresql/entity/{table}/ids",
+        headers=headers
+    )
+    print_response_details(response)
+    assert response.status_code == 200
+    ad_data = response.json()
+    assert len(ad_data) >= 2
+    
     # Test delete ad
     delete_response = client.delete(
         f"/api/internal/postgresql/entity/ad/{ad_id}",

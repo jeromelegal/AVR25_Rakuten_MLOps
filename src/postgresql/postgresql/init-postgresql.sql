@@ -37,8 +37,8 @@ CREATE TABLE user_roles (
 -- Créer une table ads
 CREATE TABLE ads (
     id SERIAL PRIMARY KEY,
-    designation VARCHAR(300) NOT NULL,
-    description VARCHAR(1000),
+    designation VARCHAR(500) NOT NULL,
+    description VARCHAR(5000),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_by INT NOT NULL
 );

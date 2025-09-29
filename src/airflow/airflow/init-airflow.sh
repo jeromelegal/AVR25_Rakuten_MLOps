@@ -3,7 +3,6 @@
 
 args=$1
 echo "Airflow args: ${args}"
-echo "POSTGRESQL_AIRFLOW_CONN = $POSTGRESQL_AIRFLOW_CONN"
 
 source utils.sh
 set_dynamic_env_variables
@@ -62,24 +61,33 @@ else
     fi
 fi
 
-echo $AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
-shift
 if [[ "$args" == "api-server" ]]; then
+    info_msg "Check if we should create an Airflow user..."
+    res=$(airflow users list | grep "${AIRFLOW_USER}")
+
+    info_msg "Requesting to create user."
+    export _AIRFLOW_WWW_USER_CREATE='true'
+    export _AIRFLOW_WWW_USER_USERNAME=${AIRFLOW_USER}
+    export _AIRFLOW_WWW_USER_PASSWORD=${AIRFLOW_PASSWORD}
+
+    info_msg "Requesting to migrate database."
+    export _AIRFLOW_DB_MIGRATE='true'
+    
     # source init-api-server.sh
-    exec /entrypoint airflow api-server &
+    su airflow -c "exec /entrypoint airflow api-server " &
 elif [[ "$args" == "triggerer" ]]; then
     # source init-triggerer.sh
-    exec /entrypoint airflow triggerer &
+    su airflow -c "exec /entrypoint airflow triggerer" &
 elif [[ "$args" == "dag-processor" ]]; then
     # source init-dag-processor.sh
-    exec /entrypoint airflow dag-processor &
+    su airflow -c "exec /entrypoint airflow dag-processor" &
 elif [[ "$args" == "worker" ]]; then
     echo "DUMB_INIT_SETSID=${DUMB_INIT_SETSID}"
     # source init-worker.sh
-    exec /entrypoint airflow celery worker &
+    su airflow -c "exec /entrypoint airflow celery worker" &
 elif [[ "$args" == "scheduler" ]]; then
     # source init-scheduler.sh
-    exec /entrypoint airflow scheduler &
+    su airflow -c "exec /entrypoint airflow scheduler" &
 else
     error_exit "Commande $args non gérée"
     exit 1

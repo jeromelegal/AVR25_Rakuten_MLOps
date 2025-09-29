@@ -26,6 +26,15 @@ until [ $HTTP_CODE -eq 200 ]; do
     sleep 1
 done
 
+# Appeler le script MLFlow pour récupérer les certificats et la clé privée
+HTTP_CODE=$(curl -k -o /dev/null -s -w "%{http_code}\n" https://$MLFLOW_SERVICE_NAME/health)
+# Vous pouvez ajouter une logique conditionnelle ici
+until [ $HTTP_CODE -eq 200 ]; do
+    HTTP_CODE=$(curl -k -o /dev/null -s -w "%{http_code}\n" https://$MLFLOW_SERVICE_NAME/health)
+    echo "Waiting for MLFlow service to be healthy."
+    sleep 1
+done
+
 if [ ${SERVICE_NAME} != ${AIRFLOW_API_SERVER_SERVICE_NAME} ]; then
   echo "Waiting for Airflow API server"
   # Appeler le script Airflow API-server pour récupérer les certificats et la clé privée
@@ -62,6 +71,9 @@ vault kv get -field=certificate secret/redis/ca > redis_ca.crt
 if [ ${SERVICE_NAME} != ${AIRFLOW_API_SERVER_SERVICE_NAME} ]; then
   vault kv get -field=certificate secret/${AIRFLOW_API_SERVER_SERVICE_NAME}/ca > ${AIRFLOW_API_SERVER_SERVICE_NAME}_ca.crt
 fi
+vault kv get -field=certificate secret/minio/ca > minio_ca.crt
+vault kv get -field=certificate secret/api-gateway/ca > api-gateway_ca.crt
+vault kv get -field=certificate secret/mlflow/ca > mlflow_ca.crt
 
 mkdir -p $(dirname $AIRFLOW_PEM_PATH)  
 mkdir -p $(dirname $AIRFLOW_CA_PATH)
@@ -81,6 +93,9 @@ cp consul_ca.crt /usr/local/share/ca-certificates/
 cp ${VAULT_USERNAME}_ca.crt /usr/local/share/ca-certificates/
 cp postgresql_ca.crt /usr/local/share/ca-certificates/
 cp redis_ca.crt /usr/local/share/ca-certificates/
+cp minio_ca.crt /usr/local/share/ca-certificates/
+cp api-gateway_ca.crt /usr/local/share/ca-certificates/
+cp mlflow_ca.crt /usr/local/share/ca-certificates/
 #cp airflow_fernet_key.txt /usr/local/share/ca-certificates/
 if [ ${SERVICE_NAME} != ${AIRFLOW_API_SERVER_SERVICE_NAME} ]; then
   cp ${AIRFLOW_API_SERVER_SERVICE_NAME}_ca.crt /usr/local/share/ca-certificates/
@@ -89,6 +104,9 @@ fi
 
 cat ${VAULT_USERNAME}_ca.crt >> $(python -c "import certifi; print(certifi.where())")
 cat redis_ca.crt >> $(python -c "import certifi; print(certifi.where())")
+cat minio_ca.crt >> $(python -c "import certifi; print(certifi.where())")
+cat api-gateway_ca.crt >> $(python -c "import certifi; print(certifi.where())")
+cat mlflow_ca.crt >> $(python -c "import certifi; print(certifi.where())")
 
 update-ca-certificates
 
@@ -389,3 +407,55 @@ EOF
 chown airflow:airflow $AIRFLOW_API_SERVER_AIRFLOW_COMPONENT_KEY_PATH
 chmod 600 $AIRFLOW_API_SERVER_AIRFLOW_COMPONENT_KEY_PATH
 fi
+
+# Extraire le certificat et la clé privée de API Gateway
+echo "Getting API Gateway certificates"
+API_GATEWAY_AIRFLOW_CA=$(vault kv get -field=ca secret/api-gateway/$SERVICE_NAME/certs)
+API_GATEWAY_AIRFLOW_CERT=$(vault kv get -field=cert secret/api-gateway/$SERVICE_NAME/certs)
+API_GATEWAY_AIRFLOW_KEY=$(vault kv get -field=key secret/api-gateway/$SERVICE_NAME/certs)
+
+cat <<EOF > $API_GATEWAY_AIRFLOW_PEM_PATH
+$(printf "%s" "$API_GATEWAY_AIRFLOW_KEY")
+$(printf "%s" "$API_GATEWAY_AIRFLOW_CERT")
+EOF
+
+cat <<EOF > $API_GATEWAY_AIRFLOW_CA_PATH
+$(printf "%s" "$API_GATEWAY_AIRFLOW_CA")
+EOF
+
+cat <<EOF > "${API_GATEWAY_AIRFLOW_KEY_PATH}"
+$(printf "%s" "$API_GATEWAY_AIRFLOW_KEY")
+EOF
+
+cat <<EOF > "${API_GATEWAY_AIRFLOW_CERT_PATH}"
+$(printf "%s" "$API_GATEWAY_AIRFLOW_CERT")
+EOF
+
+chown airflow:airflow $API_GATEWAY_AIRFLOW_KEY_PATH
+chmod 600 $API_GATEWAY_AIRFLOW_KEY_PATH
+
+# Extraire le certificat et la clé privée de MLFlow
+echo "Getting MLFlow certificates"
+MLFLOW_AIRFLOW_CA=$(vault kv get -field=ca secret/mlflow/$SERVICE_NAME/certs)
+MLFLOW_AIRFLOW_CERT=$(vault kv get -field=cert secret/mlflow/$SERVICE_NAME/certs)
+MLFLOW_AIRFLOW_KEY=$(vault kv get -field=key secret/mlflow/$SERVICE_NAME/certs)
+
+cat <<EOF > $MLFLOW_AIRFLOW_PEM_PATH
+$(printf "%s" "$MLFLOW_AIRFLOW_KEY")
+$(printf "%s" "$MLFLOW_AIRFLOW_CERT")
+EOF
+
+cat <<EOF > $MLFLOW_AIRFLOW_CA_PATH
+$(printf "%s" "$MLFLOW_AIRFLOW_CA")
+EOF
+
+cat <<EOF > "${MLFLOW_AIRFLOW_KEY_PATH}"
+$(printf "%s" "$MLFLOW_AIRFLOW_KEY")
+EOF
+
+cat <<EOF > "${MLFLOW_AIRFLOW_CERT_PATH}"
+$(printf "%s" "$MLFLOW_AIRFLOW_CERT")
+EOF
+
+chown airflow:airflow $MLFLOW_AIRFLOW_KEY_PATH
+chmod 600 $MLFLOW_AIRFLOW_KEY_PATH

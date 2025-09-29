@@ -170,6 +170,33 @@ else
   rm -f mlflow_api-text-processing_cert.json
 fi
 
+#Liste des services pour lesquels générer les certificats
+services=("airflow-worker" "airflow-scheduler" "airflow-triggerer" "airflow-dag-processor")
+
+# Boucle sur chaque service
+for service_name in "${services[@]}"; do
+  # Vérifier si le certificat et la clé Vault pour Airflow processing existent déjà ou les créer
+  if vault kv get -field=cert secret/mlflow/${service_name}/certs > /dev/null 2>&1 && vault kv get -field=key secret/mlflow/${service_name}/certs > /dev/null 2>&1; then
+    echo "Le certificat mTLS mlflow pour le service ${service_name} existe déjà"
+  else
+    # Générer le certificat et la clé
+    echo "Générer le certificat et la clé"
+    vault write -format=json pki_mlflow/issue/mlflow common_name="mlflow"   ttl="72h" > mlflow_airflow_cert.json
+
+    # Extraire le certificat et la clé privée
+    MLFLOW_AIRFLOW_CA=$(jq -r '.data.ca_chain[0]' mlflow_airflow_cert.json)
+    MLFLOW_AIRFLOW_CERT=$(jq -r '.data.certificate' mlflow_airflow_cert.json)
+    MLFLOW_AIRFLOW_KEY=$(jq -r '.data.private_key' mlflow_airflow_cert.json)
+
+
+    # Enregistrer le certificat et la clé privée dans Vault
+    vault kv put secret/mlflow/${service_name}/certs cert="$MLFLOW_AIRFLOW_CERT" key="$MLFLOW_AIRFLOW_KEY" ca="$MLFLOW_AIRFLOW_CA"
+
+    # Nettoyage des fichiers temporaires
+    rm -f mlflow_airflow_cert.json
+  fi
+done
+
 
 # Vérifier si le certificat et la clé Vault existent déjà pour MLFlow
 if vault kv get -field=cert secret/mlflow/mlflow/certs > /dev/null 2>&1 && vault kv get -field=key secret/mlflow/mlflow/certs > /dev/null 2>&1; then

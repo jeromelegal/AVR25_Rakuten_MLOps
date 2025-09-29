@@ -6,3 +6,7 @@
 # Flask-AppBuilder
 # apache-airflow-providers-amazon
 # apache-airflow-providers-celery
+numpy
+Pillow
+apache-airflow[virtualenv]
+apache-airflow[cloudpickle]

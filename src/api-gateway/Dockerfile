@@ -72,6 +72,7 @@ ENV API_PROCESSING_API_GATEWAY_PEM_PATH=${API_PROCESSING_API_GATEWAY_PEM_PATH:-"
 ENV API_PROCESSING_API_GATEWAY_CA_PATH=${API_PROCESSING_API_GATEWAY_CA_PATH:-"/etc/ssl/api-gateway/api-processing_api-gateway.ca"}
 ENV API_PROCESSING_API_GATEWAY_KEY_PATH=${API_PROCESSING_API_GATEWAY_KEY_PATH:-"/etc/ssl/api-gateway/api-processing_api-gateway.key"}
 ENV API_PROCESSING_API_GATEWAY_CERT_PATH=${API_PROCESSING_API_GATEWAY_CERT_PATH:-"/etc/ssl/api-gateway/api-processing_api-gateway.crt"}
+ENV AIRFLOW_USER=${AIRFLOW_USER:-"airflow-user"}
 
 # Ajouter l'utilisateur et le groupe api-gateway
 RUN groupadd --gid 999 --system api-gateway && \

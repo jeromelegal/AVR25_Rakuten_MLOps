@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "rakutenmlops-473110",
+  "private_key_id": "c5f3ea17815b7f48393f81104015582e6566701f",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDWUipdhX5azZd7\nZcbLDkGphSvA7Va207kwNlxll8pur3+eo7SJezAq7gIV/S2gmzQamXTLTx8voULb\n+Xb5DFnrQWNx/89EwrIXeuSxaAx6islTEY5n2394QGcNn6vtD2aJIFVypV/zNMSy\nlsKDt4a+gHqfKGvofe+1g3TB5beDaaaa+Xd1P5U6dHjNnqOfJpkhpeFZoMpaVBiv\nlrZqN42as65uiryfWjHPGo07gVutIl/vNFW5D+CJpcBz6eHaVuNm7POBCkX3ArFo\n76cSoO+K28uBrh1tB3NmZUuG9/79pLYk4p71ZfLfy5bRpHG4A8x1PQo/jxKMg2rV\n7UKrilTtAgMBAAECggEAFRTe+vULIUZw3J/9xnKADfs9+wu9iF1aLX5jZ1DfhjS4\nInQq6Y0XB1oDFYOibdZmcSlgHjGJuUctCvNGeyf2Xlg/vnJxwms+VmXtwe+grpsh\nQ40KC3hBWSRInsPyhu6JYPqvvQe8YPFzWbfPqWIvnGSJ60bwGl3s6tdj8EC25POc\n5jnbWFmDRzEjlTuzJPLicszuFf0UEAMQ3QidvOM5oD+7LEdrwvRKHujUWiQFwWam\nbvteWf75VZ78qMVN3oIJ663+2yL1IixJCDpXBpnADjR0ix/dXJmxKGTrkT1tRLwo\naEEZJ2eQcFSPtT+FIAJ1e4xBJWIZhgUy01Fo0W3ikQKBgQDykD9TEmzOF3RuzjGh\nhuTSsIliE6Sqh8eT/WHI9jLO+FYKYlxUKC14H0uqJjgchLgbYS1+KU29nVic+OI6\niWWNF0zLIqGdR6mTUqlERP+viACa6xu5iN1TtMjs/p8reEUINF2e6/ajVCRFgItU\njsuJdoHpj3uspNRqHUkaOA2hqQKBgQDiMWpwOguZlFweeV5W88fih8WDgYF+RclX\nZrdPM+z6EEDLJKPLJ0sFr8U6DW2gZPqV+lj96IpPDv8TFuEHU3zn7KDU1Jj6IMRt\n/GhyxQV5wOALakHqWw79mRsR+32ZRxbXzIVXYdLpzxVqiogczWxiIOnC2BhdntL3\nudfWS2PrpQKBgQCr4OjuTYUJ+HbJuZRTmAl2/h8rfy3UpMgYJpju1P4lyLT3QMGZ\n5KprjwmHtPNXyffHdvHMjyoGLYPIH1f3ELsD4jnJS23nzAruWMmWlan0UNPU8ro/\nmyryEI272aUiIWQRL0ITxbKMA6h8E10netPhQTdHMCP7rwTReJT/Xi7SmQKBgC8J\n8cWm/JSSutmHievxRIdCjvu7Ke/VmXp4nPR2qviR+reERh/QaxSiqhRZiIvLlCUu\na+VZv7GTP857eo6oeRhOKGA6WhniSJdK33nGqU3Zo34cOdr/1s08UtnZgBQpKYH1\nQWGbsV34N87xQj8jJT/+8j4X7HFDv0HPPyiMgxoVAoGAC2J5GoJ4lGVm5uLGmK0V\nNijWaDMuS8jNgxRWuMcaOEsZ60G22+/UmIUsycdvZrcdFoICC7dl/NDkIc9ONdr9\nAGVi0FD12JkwOCQRWKqxxc4vRrLKLA+j4F65a4YRd+vW7hkxZ7hsf4Ih1blpBD8B\nwME1JiuGKRQUJz1kGR0jcW8=\n-----END PRIVATE KEY-----\n",
+  "client_email": "images-retriever@rakutenmlops-473110.iam.gserviceaccount.com",
+  "client_id": "101910609775567529668",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/images-retriever%40rakutenmlops-473110.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}
