@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Modal, Button, Form, Spinner } from 'react-bootstrap';
 import ValidateButton from './ValidateButton';
 import { rakutenCategories } from '../constants/rakutenCategories';
+import { getAuthToken } from '../services/authService';
+import axios from 'axios';
 
-const ProductCategoryModal = ({ show, onHide, onSelect }) => {
+const ProductCategoryModal = ({ show, onHide, onSelect, description, designation, files }) => {
   const [changingCategory, setChangingCategory] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('');
 
@@ -16,20 +18,68 @@ const ProductCategoryModal = ({ show, onHide, onSelect }) => {
   const categoriesToShow = rakutenCategories;
 
   // Fonction pour appeler ton API
+  // const fetchCategory = async () => {
+  //   setLoading(true);
+  //   setElapsed(0);
+  //   setCategoryProposal(null);
+
+  //   const start = Date.now();
+  //   try {
+  //     // ⚠️ adapte l’URL à ton backend
+  //     const res = await fetch('/api/predict-category');
+  //     const data = await res.json();
+      
+  //     setCategoryProposal(data.category);
+  //   } catch (err) {
+  //     setCategoryProposal('⚠️ Erreur de prédiction');
+  //   } finally {
+  //     const end = Date.now();
+  //     setElapsed(((end - start) / 1000).toFixed(1));
+  //     setLoading(false);
+  //   }
+  // };
+
   const fetchCategory = async () => {
     setLoading(true);
     setElapsed(0);
     setCategoryProposal(null);
 
     const start = Date.now();
+
     try {
-      // ⚠️ adapte l’URL à ton backend
-      const res = await fetch('/api/predict-category');
-      const data = await res.json();
-      
-      setCategoryProposal(data.category);
+      const token = getAuthToken(); // ou ton store Redux/Context
+      if (!token) throw new Error("Missing JWT token");
+
+      const formData = new FormData();
+      if (description) formData.append("description", description);
+      if (designation) formData.append("designation", designation);
+      if (files && files.length > 0) {
+        files.forEach((file) => formData.append("files", file));
+      }
+
+      // Exemple : prendre une image de test côté frontend
+      // ⚠️ en pratique, tu récupères le File depuis un input <input type="file" />
+      const response = await axios.post(
+        "/api/protected/api-processing/predict",
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            // ⚠️ NE PAS mettre Content-Type → Axios le gère avec FormData
+          },
+        }
+      );
+
+      if (response.status !== 200) {
+        throw new Error(`Erreur API: ${response.status}`);
+      }
+
+      // Ton backend renvoie { category, probability, overall_probabilities }
+      setCategoryProposal(response.data.category);
+
     } catch (err) {
-      setCategoryProposal('⚠️ Erreur de prédiction');
+      console.error(err);
+      setCategoryProposal("⚠️ Erreur de prédiction");
     } finally {
       const end = Date.now();
       setElapsed(((end - start) / 1000).toFixed(1));

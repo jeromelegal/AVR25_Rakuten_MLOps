@@ -118,6 +118,9 @@ const NewProduct = () => {
         show={categoryModalShow}
         onHide={() => setCategoryModalShow(false)}
         onSelect={handleCategorySelect}
+        description={description}
+        designation={title}
+        files={picture ? [picture] : []}
       />
     </div>
   );
