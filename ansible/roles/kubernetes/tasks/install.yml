@@ -435,13 +435,19 @@
       register: data_join_command
       when: inventory_hostname == groups['masters'][0]
 
+    # Génère la commande de jointure pour les nœuds de travailleurs
+    - name: Generate join command for network nodes
+      command: kubeadm token create --print-join-command
+      register: network_join_command
+      when: inventory_hostname == groups['masters'][0]
+
     # Définit les faits pour les commandes de jointure
     - name: Set join command facts
       set_fact:
         kube_control_plane_join_command: "{{ control_plane_join_command.stdout }}"
         kube_worker_join_command: "{{ worker_join_command.stdout }}"
-        kube_network_join_command: "{{ network_join_command.stdout }}"
         kube_data_join_command: "{{ data_join_command.stdout }}"
+        kube_network_join_command: "{{ network_join_command.stdout }}"
       when: inventory_hostname == groups['masters'][0]
 
     # Réinitialise kubeadm sur les maîtres supplémentaires si nécessaire
