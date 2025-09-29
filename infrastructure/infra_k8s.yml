@@ -553,7 +553,7 @@ vms:
     disk_size: 20
     networks:
       - name: "k8s-net"
-        ip: "192.168.200.30"
+        ip: "192.168.200.40"
     clone_init:
       source_vm: "kubernetes-origin"
       meta_data:
@@ -594,7 +594,7 @@ vms:
             ethernets:
               enp3s0:
                 dhcp4: false
-                addresses: [192.168.200.30/24]
+                addresses: [192.168.200.40/24]
                 gateway4: 192.168.200.1
                 nameservers:
                   addresses: [8.8.8.8, 8.8.4.4]
@@ -663,60 +663,60 @@ vms:
     post_install_scripts:
       - nginx/install.sh
 
-  # - name: "k8s-network3"
-  #   cpu: 2
-  #   ram: 8192
-  #   disk_size: 20
-  #   networks:
-  #     - name: "k8s-net"
-  #       ip: "192.168.200.42"
-  #   clone_init:
-  #     source_vm: "kubernetes-origin"
-  #     meta_data:
-  #       instance-id: k8s-network3
-  #       local-hostname: k8s-network3
-  #     user_data:
-  #       #cloud-config
-  #       autoinstall:
-  #         version: 1
-  #         identity:
-  #           hostname: k8s-network3
-  #           username: ubuntu
-  #           password: ubuntu
-  #         ssh:
-  #           install-server: true
-  #           authorized-keys:
-  #             - "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQC9x/mtoDy50VqHXcDKVQPVNacZAhMtkECMO1qVInBMm+7WfXbguBRKAAvLEHMCuEjUolTlcU7gwOFCtgurgzuVFBHc03PGYQQpy2AsxxQfT52VxZWTgQRqKPT+sqdqniNDTKZMFynQ3F5xvCIfwST4C8nunnMVmb68NnT4hIlw2ZGO0GCE07cXxlYuLbigxtrpR4W/+BvAbESy6lGbEW4Ytjii6vP/UhUFQkdrW+btT8wAiyvl1pBfxsSsjrZDRk3BKM3KPH5eELbAkJynObri8svMB44YbXK3XKgDDq+0YHczdHHTT9X6UaUIALKKEXdDpHjEFrULfz8RobkyJ32+owe2mUCt86xmQMRLUpP5rdA7v7E3JVBlfWQwQzKZ8HgN1BqCFpMF8k44nWitdJQePnbV8PO658eyOlVPRQaNeJS8NhiI4U5ayuZhsvDzVgnhwhxOU29uHud73T60aDFgJWhJd6Id/l+PFhAt2UF+6QvIjC8lftNxo21jkVmn8NV6CuIkeHtacrKf0ynXIY9gVMzKrH1T3JGutKa+gA3us/FKgdn+7pDB8PUSPg59PCF/I5pgg11Z9ZhAPAVlA7Y6gO5UTl/dbgrzJaL9Xo3sIDXnTz+sZcHvPiu1sWcGaGrmrhmLkx7E6E/bg9cLDolxhghhuAxqECk4GeEIHC7y/w== philipperisser@msn.com"
-  #         storage:
-  #           layout:
-  #             name: lvm
-  #           disks:
-  #             - name: system
-  #               path: "/var/lib/libvirt/images/k8s-network3.qcow2"
-  #               size: 40
-  #               partition: "/dev/nvme0n1p3"
-  #               resize: true
-  #               mount_point: "/"
-  #               filesystem: ext4
-  #               resize_config:
-  #                 enable: true
-  #                 partition: "/dev/nvme0n1p3"
-  #                 disk: "/dev/nvme0n1"
-  #                 methods:
-  #                   fdisk: true
-  #                   lvm: true
-  #         network:
-  #           version: 2
-  #           ethernets:
-  #             enp3s0:
-  #               dhcp4: false
-  #               addresses: [192.168.200.42/24]
-  #               gateway4: 192.168.200.1
-  #               nameservers:
-  #                 addresses: [8.8.8.8, 8.8.4.4]
-  #         shutdown: poweroff
-  #   copy_files:
-  #     - source: nginx/
-  #       destination: /opt/
-  #   post_install_scripts:
-  #     - nginx/install.sh
+  - name: "k8s-network3"
+    cpu: 2
+    ram: 8192
+    disk_size: 20
+    networks:
+      - name: "k8s-net"
+        ip: "192.168.200.42"
+    clone_init:
+      source_vm: "kubernetes-origin"
+      meta_data:
+        instance-id: k8s-network3
+        local-hostname: k8s-network3
+      user_data:
+        #cloud-config
+        autoinstall:
+          version: 1
+          identity:
+            hostname: k8s-network3
+            username: ubuntu
+            password: ubuntu
+          ssh:
+            install-server: true
+            authorized-keys:
+              - "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQC9x/mtoDy50VqHXcDKVQPVNacZAhMtkECMO1qVInBMm+7WfXbguBRKAAvLEHMCuEjUolTlcU7gwOFCtgurgzuVFBHc03PGYQQpy2AsxxQfT52VxZWTgQRqKPT+sqdqniNDTKZMFynQ3F5xvCIfwST4C8nunnMVmb68NnT4hIlw2ZGO0GCE07cXxlYuLbigxtrpR4W/+BvAbESy6lGbEW4Ytjii6vP/UhUFQkdrW+btT8wAiyvl1pBfxsSsjrZDRk3BKM3KPH5eELbAkJynObri8svMB44YbXK3XKgDDq+0YHczdHHTT9X6UaUIALKKEXdDpHjEFrULfz8RobkyJ32+owe2mUCt86xmQMRLUpP5rdA7v7E3JVBlfWQwQzKZ8HgN1BqCFpMF8k44nWitdJQePnbV8PO658eyOlVPRQaNeJS8NhiI4U5ayuZhsvDzVgnhwhxOU29uHud73T60aDFgJWhJd6Id/l+PFhAt2UF+6QvIjC8lftNxo21jkVmn8NV6CuIkeHtacrKf0ynXIY9gVMzKrH1T3JGutKa+gA3us/FKgdn+7pDB8PUSPg59PCF/I5pgg11Z9ZhAPAVlA7Y6gO5UTl/dbgrzJaL9Xo3sIDXnTz+sZcHvPiu1sWcGaGrmrhmLkx7E6E/bg9cLDolxhghhuAxqECk4GeEIHC7y/w== philipperisser@msn.com"
+          storage:
+            layout:
+              name: lvm
+            disks:
+              - name: system
+                path: "/var/lib/libvirt/images/k8s-network3.qcow2"
+                size: 40
+                partition: "/dev/nvme0n1p3"
+                resize: true
+                mount_point: "/"
+                filesystem: ext4
+                resize_config:
+                  enable: true
+                  partition: "/dev/nvme0n1p3"
+                  disk: "/dev/nvme0n1"
+                  methods:
+                    fdisk: true
+                    lvm: true
+          network:
+            version: 2
+            ethernets:
+              enp3s0:
+                dhcp4: false
+                addresses: [192.168.200.42/24]
+                gateway4: 192.168.200.1
+                nameservers:
+                  addresses: [8.8.8.8, 8.8.4.4]
+          shutdown: poweroff
+    copy_files:
+      - source: nginx/
+        destination: /opt/
+    post_install_scripts:
+      - nginx/install.sh
