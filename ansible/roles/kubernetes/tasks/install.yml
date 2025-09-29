@@ -440,6 +440,7 @@
       set_fact:
         kube_control_plane_join_command: "{{ control_plane_join_command.stdout }}"
         kube_worker_join_command: "{{ worker_join_command.stdout }}"
+        kube_network_join_command: "{{ network_join_command.stdout }}"
         kube_data_join_command: "{{ data_join_command.stdout }}"
       when: inventory_hostname == groups['masters'][0]
 
@@ -529,4 +530,14 @@
   when:
     - inventory_hostname in groups['datas']
     - hostvars[groups['masters'][0]]['kube_data_join_command'] is defined
+  tags: install
+
+
+# Joint les nœuds de travailleurs au cluster
+- name: Join network nodes to cluster
+  command: "{{ hostvars[groups['masters'][0]]['kube_network_join_command'] }}"
+  register: join_result
+  when:
+    - inventory_hostname in groups['networks']
+    - hostvars[groups['masters'][0]]['kube_network_join_command'] is defined
   tags: install
