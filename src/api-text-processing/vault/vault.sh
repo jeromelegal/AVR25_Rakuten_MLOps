@@ -9,6 +9,15 @@ until [ $HTTP_CODE -eq 200 ]; do
     sleep 1
 done
 
+# Appeler le script Vault pour récupérer les certificats et la clé privée
+HTTP_CODE=$(curl -k -o /dev/null -s -w "%{http_code}\n" https://$MLFLOW_SERVICE_NAME/health)
+# Vous pouvez ajouter une logique conditionnelle ici
+until [ $HTTP_CODE -eq 200 ]; do
+    HTTP_CODE=$(curl -k -o /dev/null -s -w "%{http_code}\n" https://$MLFLOW_SERVICE_NAME/health)
+    echo "Waiting for MLFlow service to be healthy."
+    sleep 1
+done
+
 # Se connecter à Vault et récupérer un token
 export VAULT_SKIP_VERIFY="1"
 
@@ -24,7 +33,7 @@ vault kv get -field=certificate secret/vault/ca > vault_ca.crt
 vault kv get -field=certificate secret/consul/ca > consul_ca.crt
 vault kv get -field=certificate secret/api-text-processing/ca > api-text-processing_ca.crt
 vault kv get -field=certificate secret/mlflow/ca > mlflow_ca.crt
-vault kv get -field=certificate secret/api-gateway/ca > api-gateway_ca.crt
+# vault kv get -field=certificate secret/api-gateway/ca > api-gateway_ca.crt
 
 mkdir -p $(dirname $API_TEXT_PROCESSING_PEM_PATH)
 mkdir -p $(dirname $API_TEXT_PROCESSING_CA_PATH)
@@ -37,7 +46,7 @@ cp api-text-processing_ca.crt $API_TEXT_PROCESSING_CA_PATH
 cp vault_ca.crt /usr/local/share/ca-certificates/
 cp consul_ca.crt /usr/local/share/ca-certificates/
 cp api-text-processing_ca.crt /usr/local/share/ca-certificates/
-cp api-gateway_ca.crt /usr/local/share/ca-certificates/
+# cp api-gateway_ca.crt /usr/local/share/ca-certificates/
 cp mlflow_ca.crt /usr/local/share/ca-certificates/
 
 update-ca-certificates
@@ -154,3 +163,14 @@ EOF
 cat <<EOF > $MLFLOW_API_TEXT_PROCESSING_CA_PATH
 $(printf "%s" "$MLFLOW_API_TEXT_PROCESSING_CA")
 EOF
+
+cat <<EOF > "${MLFLOW_API_TEXT_PROCESSING_KEY_PATH}"
+$(printf "%s" "$MLFLOW_API_TEXT_PROCESSING_KEY")
+EOF
+
+cat <<EOF > "${MLFLOW_API_TEXT_PROCESSING_CERT_PATH}"
+$(printf "%s" "$MLFLOW_API_TEXT_PROCESSING_CERT")
+EOF
+
+chown mlflow:mlflow $MLFLOW_API_TEXT_PROCESSING_KEY_PATH
+chmod 600 $MLFLOW_API_TEXT_PROCESSING_KEY_PATH

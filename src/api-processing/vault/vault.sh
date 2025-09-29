@@ -9,6 +9,25 @@ until [ $HTTP_CODE -eq 200 ]; do
     sleep 1
 done
 
+
+# Appeler le script Vault pour récupérer les certificats et la clé privée
+HTTP_CODE=$(curl -k -o /dev/null -s -w "%{http_code}\n" https://$API_TEXT_PROCESSING_SERVICE_NAME/health)
+# Vous pouvez ajouter une logique conditionnelle ici
+until [ $HTTP_CODE -eq 200 ]; do
+    HTTP_CODE=$(curl -k -o /dev/null -s -w "%{http_code}\n" https://$API_TEXT_PROCESSING_SERVICE_NAME/health)
+    echo "Waiting for API Text processing service to be healthy."
+    sleep 1
+done
+
+# Appeler le script Vault pour récupérer les certificats et la clé privée
+HTTP_CODE=$(curl -k -o /dev/null -s -w "%{http_code}\n" https://$API_IMAGE_PROCESSING_SERVICE_NAME/health)
+# Vous pouvez ajouter une logique conditionnelle ici
+until [ $HTTP_CODE -eq 200 ]; do
+    HTTP_CODE=$(curl -k -o /dev/null -s -w "%{http_code}\n" https://$API_IMAGE_PROCESSING_SERVICE_NAME/health)
+    echo "Waiting for API Image processing service to be healthy."
+    sleep 1
+done
+
 # Se connecter à Vault et récupérer un token
 export VAULT_SKIP_VERIFY="1"
 
@@ -115,6 +134,17 @@ cat <<EOF > $API_TEXT_PROCESSING_API_PROCESSING_CA_PATH
 $(printf "%s" "$API_TEXT_PROCESSING_API_PROCESSING_CA")
 EOF
 
+cat <<EOF > "${API_TEXT_PROCESSING_API_PROCESSING_KEY_PATH}"
+$(printf "%s" "$API_TEXT_PROCESSING_API_PROCESSING_KEY")
+EOF
+
+cat <<EOF > "${API_TEXT_PROCESSING_API_PROCESSING_CERT_PATH}"
+$(printf "%s" "$API_TEXT_PROCESSING_API_PROCESSING_CERT")
+EOF
+
+chown mlflow:mlflow $API_TEXT_PROCESSING_API_PROCESSING_KEY_PATH
+chmod 600 $API_TEXT_PROCESSING_API_PROCESSING_KEY_PATH
+
 # Extraire le certificat et la clé privée de l'API de processing des images
 API_IMAGE_PROCESSING_API_PROCESSING_CA=$(vault kv get -field=ca secret/api-image-processing/api-processing/certs)
 API_IMAGE_PROCESSING_API_PROCESSING_KEY=$(vault kv get -field=cert secret/api-image-processing/api-processing/certs)
@@ -129,7 +159,16 @@ cat <<EOF > $API_IMAGE_PROCESSING_API_PROCESSING_CA_PATH
 $(printf "%s" "$API_IMAGE_PROCESSING_API_PROCESSING_CA")
 EOF
 
+cat <<EOF > "${API_IMAGE_PROCESSING_API_PROCESSING_KEY_PATH}"
+$(printf "%s" "$API_IMAGE_PROCESSING_API_PROCESSING_KEY")
+EOF
 
+cat <<EOF > "${API_IMAGE_PROCESSING_API_PROCESSING_CERT_PATH}"
+$(printf "%s" "$API_IMAGE_PROCESSING_API_PROCESSING_CERT")
+EOF
+
+chown mlflow:mlflow $API_IMAGE_PROCESSING_API_PROCESSING_KEY_PATH
+chmod 600 $API_IMAGE_PROCESSING_API_PROCESSING_KEY_PATH
 
 # Vérifier si le certificat et la clé Vault existent déjà
 if vault kv get -field=cert secret/api-processing/api-gateway/certs > /dev/null 2>&1 && vault kv get -field=key secret/api-processing/api-gateway/certs > /dev/null 2>&1; then
