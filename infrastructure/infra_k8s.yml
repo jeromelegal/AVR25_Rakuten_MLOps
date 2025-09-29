@@ -365,8 +365,8 @@ vms:
       - nginx/install.sh
 
   - name: "k8s-data1"
-    cpu: 2
-    ram: 8192
+    cpu: 6
+    ram: 16384
     disk_size: 20
     networks:
       - name: "k8s-net"
@@ -426,8 +426,8 @@ vms:
       - nginx/install.sh
 
   - name: "k8s-data2"
-    cpu: 2
-    ram: 8192
+    cpu: 6
+    ram: 16384
     disk_size: 20
     networks:
       - name: "k8s-net"
@@ -487,8 +487,8 @@ vms:
       - nginx/install.sh
 
   - name: "k8s-data3"
-    cpu: 2
-    ram: 8192
+    cpu: 6
+    ram: 16384
     disk_size: 20
     networks:
       - name: "k8s-net"
