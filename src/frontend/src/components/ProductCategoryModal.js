@@ -1,128 +1,116 @@
+// ProductCategoryModal.js
 import React, { useState, useEffect } from 'react';
-import { Modal, Button, Form, Spinner } from 'react-bootstrap';
+import { Modal, Button, Form, Spinner, Alert } from 'react-bootstrap';
 import ValidateButton from './ValidateButton';
-import { rakutenCategories } from '../constants/rakutenCategories';
-import { getAuthToken } from '../services/authService';
-import axios from 'axios';
+import axiosInstance from '../services/axiosInstance';
 
-const ProductCategoryModal = ({ show, onHide, onSelect, description, designation, files }) => {
+/**
+ * Props:
+ * - show: boolean
+ * - onHide: () => void
+ * - onSelect: (cat: { code: number|string, label: string } | null) => void
+ * - initialCategory?: { code: number|string, label: string } | null
+ * - enablePrediction?: boolean
+ */
+const ProductCategoryModal = ({ show, onHide, onSelect, initialCategory = null, enablePrediction = false }) => {
   const [changingCategory, setChangingCategory] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState('');
 
-  const [categoryProposal, setCategoryProposal] = useState(null);
-  const [loading, setLoading] = useState(false);
+  // Catégories depuis la gateway
+  const [categories, setCategories] = useState([]); // [{code, label}]
+  const [loadingCategories, setLoadingCategories] = useState(false);
+  const [errorCategories, setErrorCategories] = useState('');
+
+  // Sélection (on stocke le "code")
+  const [selectedCode, setSelectedCode] = useState(initialCategory?.code ?? '');
+
+  // Prédiction (optionnelle)
+  const [categoryProposal, setCategoryProposal] = useState(initialCategory?.label ?? null);
+  const [predictLoading, setPredictLoading] = useState(false);
   const [elapsed, setElapsed] = useState(0);
 
-  // Example category proposal
-  // const categoryProposal = "Electronics";
-  const categoriesToShow = rakutenCategories;
+  // 1) Charger la liste des catégories quand la modale s’ouvre
+  useEffect(() => {
+    if (!show) return;
+    let mounted = true;
+    setLoadingCategories(true);
+    setErrorCategories('');
 
-  // Fonction pour appeler ton API
-  // const fetchCategory = async () => {
-  //   setLoading(true);
-  //   setElapsed(0);
-  //   setCategoryProposal(null);
+    // Endpoint Gateway protégé
+    axiosInstance.get('/api/protected/get_categories')
+      .then(({ data }) => { if (mounted) setCategories(Array.isArray(data) ? data : []); })
+      .catch((e) => {
+        const detail = e?.response?.data?.detail || e.message;
+        if (mounted) setErrorCategories(detail);
+      })
+      .finally(() => { if (mounted) setLoadingCategories(false); });
 
-  //   const start = Date.now();
-  //   try {
-  //     // ⚠️ adapte l’URL à ton backend
-  //     const res = await fetch('/api/predict-category');
-  //     const data = await res.json();
-      
-  //     setCategoryProposal(data.category);
-  //   } catch (err) {
-  //     setCategoryProposal('⚠️ Erreur de prédiction');
-  //   } finally {
-  //     const end = Date.now();
-  //     setElapsed(((end - start) / 1000).toFixed(1));
-  //     setLoading(false);
-  //   }
-  // };
+    return () => { mounted = false; };
+  }, [show]);
 
-  const fetchCategory = async () => {
-    setLoading(true);
+  // 2) (Optionnel) Lancer la prédiction quand la modale s’ouvre si activé
+  useEffect(() => {
+    if (show && enablePrediction) {
+      handlePredict();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [show, enablePrediction]);
+
+  // Appel API de prédiction (optionnel)
+  const handlePredict = async () => {
+    setPredictLoading(true);
     setElapsed(0);
     setCategoryProposal(null);
 
     const start = Date.now();
-
     try {
-      const token = getAuthToken(); // ou ton store Redux/Context
-      if (!token) throw new Error("Missing JWT token");
-
-      const formData = new FormData();
-      if (description) formData.append("description", description);
-      if (designation) formData.append("designation", designation);
-      if (files && files.length > 0) {
-        files.forEach((file) => formData.append("files", file));
+      // On tente d’abord l’endpoint protégé (aligné Gateway).
+      const res = await axiosInstance.get('/api/protected/predict-category');
+      const data = res.data;
+      setCategoryProposal(data?.category || 'Indéterminée');
+    } catch (err1) {
+      try {
+        // Fallback : ancienne route non protégée si tu ne l’as pas encore migrée.
+        const res2 = await axiosInstance.get('/api/predict-category');
+        const data2 = res2.data;
+        setCategoryProposal(data2?.category || 'Indéterminée');
+      } catch (err2) {
+        setCategoryProposal('⚠️ Erreur de prédiction');
       }
-
-      // Exemple : prendre une image de test côté frontend
-      // ⚠️ en pratique, tu récupères le File depuis un input <input type="file" />
-      const response = await axios.post(
-        "/api/protected/api-processing/predict",
-        formData,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            // ⚠️ NE PAS mettre Content-Type → Axios le gère avec FormData
-          },
-        }
-      );
-
-      if (response.status !== 200) {
-        throw new Error(`Erreur API: ${response.status}`);
-      }
-
-      // Ton backend renvoie { category, probability, overall_probabilities }
-      setCategoryProposal(response.data.category);
-
-    } catch (err) {
-      console.error(err);
-      setCategoryProposal("⚠️ Erreur de prédiction");
     } finally {
       const end = Date.now();
       setElapsed(((end - start) / 1000).toFixed(1));
-      setLoading(false);
+      setPredictLoading(false);
     }
   };
 
-  // Déclenche automatiquement au montage
-  useEffect(() => {
-    if (show) {
-      fetchCategory();
-    }
-  }, [show]);
-
+  // 3) Validation : renvoie l’objet {code,label}
   const handleValidate = () => {
-    let categoryObject;
-    if (changingCategory && selectedCategory) {
-      // Find the category object by id
-      categoryObject = categoriesToShow.find(cat => String(cat.id) === String(selectedCategory));
+    let finalCategory = null;
+
+    if (changingCategory && selectedCode) {
+      const found = categories.find(c => String(c.code) === String(selectedCode));
+      if (found) finalCategory = { code: found.code, label: found.label };
     } else {
-      // Use the proposal as a fallback (find by name)
-      categoryObject = categoriesToShow.find(cat => cat.name === categoryProposal) || { name: categoryProposal };
+      if (categoryProposal) {
+        const found = categories.find(c => c.label === categoryProposal);
+        finalCategory = found ? { code: found.code, label: found.label } : { code: '', label: categoryProposal };
+      } else if (initialCategory) {
+        finalCategory = initialCategory;
+      }
     }
 
-    if (categoryObject){
-      const selected = {
-        id: categoryObject.id,
-        name: categoryObject.name
-      };
-      onSelect(selected);
-    }
+    onSelect(finalCategory);
     setChangingCategory(false);
-    setSelectedCategory('');
   };
 
-  const handleChangeCategoryClick = () => {
-    setChangingCategory(true);
-  };
+  const handleChangeCategoryClick = () => setChangingCategory(true);
+
+  const bodyBg = changingCategory ? '#f8d7da' : '#f8f9fa';
 
   return (
     <Modal show={show} onHide={onHide} centered>
       <Modal.Header>
-        <Modal.Title>Category</Modal.Title>
+        <Modal.Title>Catégorie</Modal.Title>
         <Button
           variant="link"
           onClick={onHide}
@@ -139,19 +127,22 @@ const ProductCategoryModal = ({ show, onHide, onSelect, description, designation
           ×
         </Button>
       </Modal.Header>
+
       <Modal.Body>
+        {/* Bloc proposition / état courant */}
         <div 
-         style={{
-          padding: '1rem',
-          background: changingCategory ? '#f8d7da' : '#f8f9fa',
-          borderRadius: '8px',
-          marginBottom: '1.5rem',
-          textAlign: 'center',
-          fontSize: '1.2rem',
-          fontWeight: '500',
-          opacity: changingCategory ? 0.6 : 1
-        }}>
-           <span>Category proposal:</span>
+          style={{
+            padding: '1rem',
+            background: bodyBg,
+            borderRadius: '8px',
+            marginBottom: '1.5rem',
+            textAlign: 'center',
+            fontSize: '1.1rem',
+            fontWeight: 500,
+            opacity: changingCategory ? 0.75 : 1
+          }}
+        >
+          <div>Proposition de catégorie :</div>
           <div
             style={{
               marginTop: '0.5rem',
@@ -159,77 +150,87 @@ const ProductCategoryModal = ({ show, onHide, onSelect, description, designation
               background: '#e3eafc',
               borderRadius: '6px',
               display: 'inline-block',
-              fontSize: '1.1rem',
               minWidth: '150px',
             }}
           >
-              {loading ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            {enablePrediction ? (
+              predictLoading ? (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
                   <Spinner animation="border" size="sm" />
-                  <span>Predicting...</span>
-                </div>
+                  <span>Prédiction…</span>
+                </span>
               ) : (
-                categoryProposal
-              )}
-            </div>
+                categoryProposal || '—'
+              )
+            ) : (
+              initialCategory?.label || categoryProposal || '—'
+            )}
           </div>
 
-          {!loading && elapsed > 0 && (
+          {!predictLoading && enablePrediction && elapsed > 0 && (
             <div style={{ marginTop: '0.5rem', fontSize: '0.9rem', color: '#555' }}>
-              Response time: {elapsed}s
+              Temps de réponse : {elapsed}s
             </div>
           )}
 
           {changingCategory && (
             <div style={{ color: '#a94442', marginTop: '0.5rem', fontSize: '0.95rem' }}>
-              This value is not taken into account, please select a new category below.
+              Cette valeur ne sera pas prise en compte : sélectionne une nouvelle catégorie ci-dessous.
             </div>
           )}
 
-          <div style={{ marginTop: '1rem' }}>
-            <Button variant="outline-primary" size="sm" onClick={fetchCategory}>
-              🔄 Force prediction
-            </Button>
+          {enablePrediction && (
+            <div style={{ marginTop: '1rem' }}>
+              <Button variant="outline-primary" size="sm" onClick={handlePredict}>
+                🔄 Relancer la prédiction
+              </Button>
+            </div>
+          )}
+        </div>
+
+        {/* Zone de chargement/erreur des catégories */}
+        {loadingCategories && (
+          <div className="d-flex align-items-center gap-2 mb-2">
+            <Spinner animation="border" size="sm" />
+            <span>Chargement des catégories…</span>
           </div>
-       
-        <div style={{ height: '1.5rem' }}></div>  
-        {changingCategory && (
+        )}
+        {errorCategories && <Alert variant="danger">Erreur catégories : {errorCategories}</Alert>}
+
+        {/* Sélecteur manuel */}
+        {changingCategory && !loadingCategories && !errorCategories && (
           <Form.Group controlId="selectCategory" style={{ marginBottom: '1.5rem' }}>
-            <Form.Label>Select a category</Form.Label>
+            <Form.Label>Choisir une catégorie</Form.Label>
             <Form.Select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
+              value={selectedCode}
+              onChange={(e) => setSelectedCode(e.target.value)}
             >
-              <option value="">-- Choose a category --</option>
-              {categoriesToShow.map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.name}
+              <option value="">— Sélectionne une catégorie —</option>
+              {categories.map((cat) => (
+                <option key={cat.code} value={cat.code}>
+                  {cat.label}
                 </option>
               ))}
             </Form.Select>
           </Form.Group>
         )}
 
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'center',
-            gap: '1rem',
-          }}
-        >
+        {/* Actions */}
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem' }}>
           {!changingCategory && (
             <Button
               style={{ backgroundColor: '#ffe5b4', color: '#333', border: 'none' }}
               onClick={handleChangeCategoryClick}
+              disabled={loadingCategories || !!errorCategories}
             >
-              Change category
+              Changer de catégorie
             </Button>
           )}
           <ValidateButton
             onClick={handleValidate}
-            disabled={changingCategory && !selectedCategory}
+            disabled={changingCategory && !selectedCode}
           >
-            Validate
+            Valider
           </ValidateButton>
         </div>
       </Modal.Body>

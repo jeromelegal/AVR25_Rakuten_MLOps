@@ -59,6 +59,8 @@ const Sidebar = () => {
           <Nav.Link as={Link} to="/dataload" className={styles.navLink}>DataLoad</Nav.Link>
           <Nav.Link as={Link} to="/dataanalyse" className={styles.navLink}>DataAnalyse</Nav.Link>
           <Nav.Link as={Link} to="/datalearn" className={styles.navLink}>DataLearn</Nav.Link>
+          <Nav.Link as={Link} to="/search" className={styles.navLink}>SearchAds</Nav.Link>
+          <Nav.Link as={Link} to="//ads" className={styles.navLink}>AdDetails</Nav.Link>
         </Nav>
       </Navbar>
     </div>
