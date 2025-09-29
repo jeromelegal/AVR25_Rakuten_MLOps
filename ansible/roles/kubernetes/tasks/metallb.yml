@@ -55,6 +55,43 @@
     KUBECONFIG: /etc/kubernetes/admin.conf
   tags: metallb
 
+# # Attendre que MetalLB soit prêt (CRDs + rollout controller/speaker)
+# - name: Wait for MetalLB CRDs to exist
+#   command: kubectl get crd ipaddresspools.metallb.io l2advertisements.metallb.io
+#   register: metallb_crds
+#   retries: 30
+#   delay: 5
+#   until: metallb_crds.rc == 0
+#   changed_when: false
+#   run_once: true
+#   delegate_to: "{{ groups['masters'][0] }}"
+#   become: yes
+#   environment:
+#     KUBECONFIG: /etc/kubernetes/admin.conf
+#   tags: metallb
+
+- name: Wait for metallb-controller rollout
+  command: kubectl -n metallb-system rollout status deploy/metallb-controller --timeout=300s
+  register: metallb_ctrl_rollout
+  changed_when: false
+  run_once: true
+  delegate_to: "{{ groups['masters'][0] }}"
+  become: yes
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  tags: metallb
+
+- name: Wait for metallb-speaker rollout
+  command: kubectl -n metallb-system rollout status ds/metallb-speaker --timeout=300s
+  register: metallb_speaker_rollout
+  changed_when: false
+  run_once: true
+  delegate_to: "{{ groups['masters'][0] }}"
+  become: yes
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  tags: metallb
+
 # Configuration MetalLB
 - name: Apply MetalLB configuration
   command: kubectl apply -f -
@@ -190,6 +227,36 @@
       environment:
         KUBECONFIG: /etc/kubernetes/admin.conf
       tags: metallb
+
+# Déclaration du service Hubble UI LoadBalancer
+# Déclaration du service Hubble UI LoadBalancer
+- name: Apply LoadBalancer Service (MetalLB)
+  vars:
+    service_name: "hubble-ui"
+    service_namespace: "kube-system"
+    service_labels:
+      k8s-app: hubble-ui
+    metallb_address_pool: "master-pool"
+    load_balancer_ip: ""
+    source_ranges: []
+    selector_labels:
+      k8s-app: hubble-ui
+    port: 80
+    target_port: 80
+  command: kubectl apply -f -
+  args:
+    stdin: |
+      {{ lookup('template', 'templates/metallb-serviceLB.j2') }}
+  run_once: true
+  delegate_to: "{{ groups['masters'][0] }}"
+  become: yes
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  tags: metallb
+
+
+
+
 
 # Vérifications
 - name: Wait for services IP assignment
