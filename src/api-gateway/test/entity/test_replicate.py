@@ -5,6 +5,9 @@ import time
 from fastapi.testclient import TestClient
 from main import app
 
+# TODO : FAire en sorte qu'il ne soit pas dépendant des tests précédents
+# ou de e qui est présent en base pgsql
+
 # Aligne le PYTHONPATH comme dans test_flow_ad.py
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
