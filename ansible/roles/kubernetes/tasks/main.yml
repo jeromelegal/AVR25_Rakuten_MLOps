@@ -23,12 +23,13 @@
   include_tasks: metallb.yml
   tags: metallb
 
+- name: Include CSI tasks
+  include_tasks: csi.yml
+  tags: csi
+
 - name: Include Dashboard tasks
   include_tasks: dashboard.yml
   when: install_dashboard | default(false)
   tags: dashboard
 
-# - name: Include CSI tasks
-#   include_tasks: csi.yml
-#   when: install_csi | default(false)
-#   tags: csi
+
