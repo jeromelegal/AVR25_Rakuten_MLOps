@@ -11,6 +11,14 @@ until [ $HTTP_CODE -eq 200 ]; do
 done
 echo "MLFlow service is up"
 
+# Keep it here not to have any issue with the Python package installation
+export AWS_ACCESS_KEY_ID=${MINIO_API_IMAGE_PROCESSING_USER}
+export AWS_SECRET_ACCESS_KEY=${MINIO_API_IMAGE_PROCESSING_PASSWORD}
+export AWS_CA_BUNDLE=${MINIO_API_IMAGE_PROCESSING_CA_PATH}
+# export REQUESTS_CA_BUNDLE=${API_IMAGE_PROCESSING_PEM_PATH}
+export MLFLOW_S3_ENDPOINT_URL=https://${MINIO_SERVICE_NAME}:${MINIO_SERVICE_PORT}
+
+
 echo "ENVIRONMENT: $ENVIRONMENT"
 if [[ "$ENVIRONMENT" == "test" ]]; then
     echo "Staring tests..."

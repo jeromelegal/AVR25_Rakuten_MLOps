@@ -142,7 +142,7 @@ cat <<EOF > "${API_TEXT_PROCESSING_API_PROCESSING_CERT_PATH}"
 $(printf "%s" "$API_TEXT_PROCESSING_API_PROCESSING_CERT")
 EOF
 
-chown mlflow:mlflow $API_TEXT_PROCESSING_API_PROCESSING_KEY_PATH
+chown api-processing:api-processing $API_TEXT_PROCESSING_API_PROCESSING_KEY_PATH
 chmod 600 $API_TEXT_PROCESSING_API_PROCESSING_KEY_PATH
 
 # Extraire le certificat et la clé privée de l'API de processing des images
@@ -167,7 +167,7 @@ cat <<EOF > "${API_IMAGE_PROCESSING_API_PROCESSING_CERT_PATH}"
 $(printf "%s" "$API_IMAGE_PROCESSING_API_PROCESSING_CERT")
 EOF
 
-chown mlflow:mlflow $API_IMAGE_PROCESSING_API_PROCESSING_KEY_PATH
+chown api-processing:api-processing $API_IMAGE_PROCESSING_API_PROCESSING_KEY_PATH
 chmod 600 $API_IMAGE_PROCESSING_API_PROCESSING_KEY_PATH
 
 # Vérifier si le certificat et la clé Vault existent déjà

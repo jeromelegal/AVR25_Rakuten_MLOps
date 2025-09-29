@@ -260,3 +260,45 @@ else
   # Nettoyage des fichiers temporaires
   rm -f minio_prometheus_cert.json
 fi
+
+# Vérifier si le certificat et la clé Vault existent déjà pour le Prometheus
+if vault kv get -field=cert secret/minio/api-text-processing/certs > /dev/null 2>&1 && vault kv get -field=key secret/minio/api-text-processing/certs > /dev/null 2>&1; then
+  echo "Le certificat mTLS minio pour le service api-text-processing existe déjà"
+else
+  # Générer le certificat et la clé pour Vault
+  echo "Générer le certificat et la clé pour Vault pour le service api-text-processing"
+  vault write -format=json pki_minio/issue/minio common_name="minio"   ttl="72h" > minio_api-text-processing_cert.json
+  # TODO: Define certificate duration as an env variable
+
+  # Extraire le certificat et la clé privée
+  MINIO_API_TEXT_PROCESSING_CA=$(jq -r '.data.ca_chain[0]' minio_api-text-processing_cert.json)
+  MINIO_API_TEXT_PROCESSING_CERT=$(jq -r '.data.certificate' minio_api-text-processing_cert.json)
+  MINIO_API_TEXT_PROCESSING_KEY=$(jq -r '.data.private_key' minio_api-text-processing_cert.json)
+
+  # Enregistrer le certificat et la clé privée dans Vault
+  vault kv put secret/minio/api-text-processing/certs cert="$MINIO_API_TEXT_PROCESSING_CERT" key="$MINIO_API_TEXT_PROCESSING_KEY" ca="$MINIO_API_TEXT_PROCESSING_CA"
+
+  # Nettoyage des fichiers temporaires
+  rm -f minio_api-text-processing_cert.json
+fi
+
+# Vérifier si le certificat et la clé Vault existent déjà pour le Prometheus
+if vault kv get -field=cert secret/minio/api-image-processing/certs > /dev/null 2>&1 && vault kv get -field=key secret/minio/api-image-processing/certs > /dev/null 2>&1; then
+  echo "Le certificat mTLS minio pour le service api-image-processing existe déjà"
+else
+  # Générer le certificat et la clé pour Vault
+  echo "Générer le certificat et la clé pour Vault pour le service api-image-processing"
+  vault write -format=json pki_minio/issue/minio common_name="minio"   ttl="72h" > minio_api-image-processing_cert.json
+  # TODO: Define certificate duration as an env variable
+
+  # Extraire le certificat et la clé privée
+  MINIO_API_IMAGE_PROCESSING_CA=$(jq -r '.data.ca_chain[0]' minio_api-image-processing_cert.json)
+  MINIO_API_IMAGE_PROCESSING_CERT=$(jq -r '.data.certificate' minio_api-image-processing_cert.json)
+  MINIO_API_IMAGE_PROCESSING_KEY=$(jq -r '.data.private_key' minio_api-image-processing_cert.json)
+
+  # Enregistrer le certificat et la clé privée dans Vault
+  vault kv put secret/minio/api-image-processing/certs cert="$MINIO_API_TEXT_PROCESSING_CERT" key="$MINIO_API_TEXT_PROCESSING_KEY" ca="$MINIO_API_TEXT_PROCESSING_CA"
+
+  # Nettoyage des fichiers temporaires
+  rm -f minio_api-image-processing_cert.json
+fi

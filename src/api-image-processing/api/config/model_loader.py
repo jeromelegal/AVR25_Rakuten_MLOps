@@ -1,3 +1,5 @@
+import os
+import certifi
 from functools import lru_cache
 from typing import Annotated
 from api.config.config import Settings, get_settings
@@ -13,6 +15,7 @@ def load_image_classifier_model(
     model_version: str,
     mlflow_addr: str,
 ):
+    os.environ["AWS_CA_BUNDLE"] = certifi.where()
     mlflow.set_tracking_uri(mlflow_addr)
     return mlflow.tensorflow.load_model(
         model_uri=f"models:/{model_name}/{model_version}"
