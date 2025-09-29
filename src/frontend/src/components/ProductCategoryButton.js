@@ -1,9 +1,15 @@
+// ProductCategoryButton.js
 import React from 'react';
 import { Button } from 'react-bootstrap';
 
-const ProductCategoryButton = ({ onClick }) => (
+/**
+ * Props:
+ * - onClick: () => void
+ * - selectedCategory?: { code: number|string, label: string } | null
+ */
+const ProductCategoryButton = ({ onClick, selectedCategory }) => (
   <Button variant="primary" onClick={onClick}>
-    Choose Category
+    {selectedCategory?.label ? `Catégorie : ${selectedCategory.label}` : 'Choisir une catégorie'}
   </Button>
 );
 
