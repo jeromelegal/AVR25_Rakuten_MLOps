@@ -1,5 +1,5 @@
 ---
-# Déploiement MetalLB avec solution pour les webhooks
+# Déploiement MetalLB avec double LoadBalancer
 - name: Ensure masters group exists and is not empty
   assert:
     that:
@@ -55,7 +55,7 @@
     KUBECONFIG: /etc/kubernetes/admin.conf
   tags: metallb
 
-# Configuration MetalLB simplifiée
+# Configuration MetalLB
 - name: Apply MetalLB configuration
   command: kubectl apply -f -
   args:
@@ -84,59 +84,139 @@
     KUBECONFIG: /etc/kubernetes/admin.conf
   tags: metallb
 
-# Service & Endpoints pour API masters
-- name: Apply kubeapi-lb Service + Endpoints
-  command: kubectl apply -f -
-  args:
-    stdin: |
-      apiVersion: v1
-      kind: Service
-      metadata:
-        name: kubeapi-lb
-        namespace: default
-        annotations:
-          metallb.universe.tf/loadBalancerIPs: "{{ metallb_master_ip | default('192.168.200.101') }}"
-      spec:
-        type: LoadBalancer
-        ports:
-        - port: 6443
-          targetPort: 6443
-          protocol: TCP
-          name: https
-        externalTrafficPolicy: Local
-      ---
-      apiVersion: v1
-      kind: Endpoints
-      metadata:
-        name: kubeapi-lb
-        namespace: default
-      subsets:
-      {% for master in groups['masters'] %}
-      - addresses:
-        - ip: "{{ hostvars[master].ansible_host | default(hostvars[master].ansible_default_ipv4.address) }}"
-        ports:
-        - port: 6443
-          protocol: TCP
-      {% endfor %}
-  run_once: true
-  delegate_to: "{{ groups['masters'][0] }}"
-  become: yes
-  environment:
-    KUBECONFIG: /etc/kubernetes/admin.conf
-  tags: metallb
+# Configuration complète pour les masters
+- name: Configure kube-apiserver endpoints and services
+  block:
+    # Service externe principal pour l'API
+    - name: Apply external LoadBalancer service for API
+      command: kubectl apply -f -
+      args:
+        stdin: |
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: kubeapi-lb
+            namespace: default
+            annotations:
+              metallb.universe.tf/loadBalancerIPs: "{{ metallb_master_ip | default('192.168.200.101') }}"
+          spec:
+            type: LoadBalancer
+            ports:
+            - port: 6443
+              targetPort: 6443
+              protocol: TCP
+              name: https
+            externalTrafficPolicy: Local
+      run_once: true
+      delegate_to: "{{ groups['masters'][0] }}"
+      become: yes
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      tags: metallb
+
+    # Endpoints pour le service principal
+    - name: Apply endpoints for main service
+      command: kubectl apply -f -
+      args:
+        stdin: |
+          apiVersion: v1
+          kind: Endpoints
+          metadata:
+            name: kubeapi-lb
+            namespace: default
+          subsets:
+          {% for master in groups['masters'] %}
+          - addresses:
+            - ip: "{{ hostvars[master].ansible_host | default(hostvars[master].ansible_default_ipv4.address) }}"
+            ports:
+            - port: 6443
+              protocol: TCP
+          {% endfor %}
+      run_once: true
+      delegate_to: "{{ groups['masters'][0] }}"
+      become: yes
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      tags: metallb
+
+    # Service LoadBalancer supplémentaire pour les endpoints du control plane
+    - name: Apply additional LoadBalancer for control plane endpoints
+      command: kubectl apply -f -
+      args:
+        stdin: |
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: control-plane-lb
+            namespace: kube-system
+            annotations:
+              metallb.universe.tf/loadBalancerIPs: "{{ metallb_control_plane_ip | default('192.168.200.102') }}"
+          spec:
+            type: LoadBalancer
+            ports:
+            - port: 6443
+              targetPort: 6443
+              protocol: TCP
+              name: https
+            externalTrafficPolicy: Local
+      run_once: true
+      delegate_to: "{{ groups['masters'][0] }}"
+      become: yes
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      tags: metallb
+
+    # Endpoints pour le service supplémentaire
+    - name: Apply endpoints for control plane service
+      command: kubectl apply -f -
+      args:
+        stdin: |
+          apiVersion: v1
+          kind: Endpoints
+          metadata:
+            name: control-plane-lb
+            namespace: kube-system
+          subsets:
+          {% for master in groups['masters'] %}
+          - addresses:
+            - ip: "{{ hostvars[master].ansible_host | default(hostvars[master].ansible_default_ipv4.address) }}"
+            ports:
+            - port: 6443
+              protocol: TCP
+          {% endfor %}
+      run_once: true
+      delegate_to: "{{ groups['masters'][0] }}"
+      become: yes
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      tags: metallb
 
 # Vérifications
-- name: Wait for kubeapi-lb Service IP assignment
-  command: kubectl get svc kubeapi-lb -n default -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
-  register: kubeapi_lb_ip
-  until: kubeapi_lb_ip.stdout != ""
-  retries: 10
-  delay: 10
-  run_once: true
-  delegate_to: "{{ groups['masters'][0] }}"
-  environment:
-    KUBECONFIG: /etc/kubernetes/admin.conf
-  tags: metallb
+- name: Wait for services IP assignment
+  block:
+    - name: Wait for kubeapi-lb IP
+      command: kubectl get svc kubeapi-lb -n default -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+      register: kubeapi_lb_ip
+      until: kubeapi_lb_ip.stdout != ""
+      retries: 10
+      delay: 10
+      run_once: true
+      delegate_to: "{{ groups['masters'][0] }}"
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      tags: metallb
+
+    - name: Wait for control-plane-lb IP
+      command: kubectl get svc control-plane-lb -n kube-system -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+      register: control_plane_lb_ip
+      until: control_plane_lb_ip.stdout != ""
+      retries: 10
+      delay: 10
+      run_once: true
+      delegate_to: "{{ groups['masters'][0] }}"
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      tags: metallb
 
 - name: Verify MetalLB installation
   command: kubectl -n metallb-system get all
@@ -145,4 +225,21 @@
   become: yes
   environment:
     KUBECONFIG: /etc/kubernetes/admin.conf
+  tags: metallb
+
+- name: Verify all services and endpoints
+  command: kubectl get svc,endpoints -A
+  register: all_services
+  run_once: true
+  delegate_to: "{{ groups['masters'][0] }}"
+  become: yes
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  tags: metallb
+
+- name: Show relevant services and endpoints
+  debug:
+    msg: "{{ all_services.stdout_lines | select('match', 'kubeapi-lb|control-plane-lb') | list }}"
+  run_once: true
+  delegate_to: "{{ groups['masters'][0] }}"
   tags: metallb
