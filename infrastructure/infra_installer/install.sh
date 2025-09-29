@@ -130,3 +130,11 @@ sudo usermod -aG kvm $USERNAME
 
 
 
+
+
+sudo apt-get update
+sudo apt-get install -y swtpm swtpm-tools
+
+sudo mkdir -p /var/lib/swtpm-localca
+sudo chown -R tss:tss /var/lib/swtpm-localca
+sudo chmod 0750 /var/lib/swtpm-localca

@@ -2,60 +2,74 @@
   <name>{{ vm.name }}</name>
   <memory unit='KiB'>{{ vm.ram * 1024 }}</memory>
   <vcpu placement='static'>{{ vm.cpu }}</vcpu>
+
   <os>
     <type arch='x86_64' machine='pc-q35-6.2'>hvm</type>
-    <boot dev='hd'/>
+    {% if vm.get('uefi', True) %}
+    <loader readonly='yes' type='pflash'>{{ vm.ovmf_code }}</loader>
+    <nvram>{{ vm.ovmf_vars_path }}</nvram>
+    {% endif %}
+    {# NE PAS mettre de <boot dev='...'> pour éviter le conflit "boot per-device vs os/boot" #}
   </os>
-  <features>
-    <acpi/>
-    <apic/>
-  </features>
+
+  <features><acpi/><apic/></features>
   <cpu mode='host-passthrough'/>
   <clock offset='utc'/>
-  <on_poweroff>destroy</on_poweroff>
-  <on_reboot>restart</on_reboot>
-  <on_crash>restart</on_crash>
-  <channel type='unix'>
-    <source mode='bind' path='/var/lib/libvirt/qemu/{{ vm.name }}.agent'/>
-    <target type='virtio' name='org.qemu.guest_agent.0'/>
-  </channel>
+
   <devices>
-    <!-- Disques -->
-    {% if 'cloud_init' in vm %}
-      {% for disk in vm.cloud_init.disks %}
-      <disk type='file' device='disk'>
-        <driver name='qemu' type='qcow2'/>
-        <source file='{{ disk.path }}'/>
-        <target dev='vd{{ 'abcdefghijklmnopqrstuvwxyz'[loop.index0] }}' bus='virtio'/>
-      </disk>
-      {% endfor %}
-    {% elif 'clone_init' in vm %}
-      {% for disk in vm.clone_init.disks %}
-      <disk type='file' device='disk'>
-        <driver name='qemu' type='qcow2'/>
-        <source file='{{ disk.path }}'/>
-        <target dev='vd{{ 'abcdefghijklmnopqrstuvwxyz'[loop.index0] }}' bus='virtio'/>
-      </disk>
-      {% endfor %}
+    {# QEMU guest agent (doit être DANS <devices>) #}
+    <channel type='unix'>
+      <source mode='bind' path='/var/lib/libvirt/qemu/{{ vm.name }}.agent'/>
+      <target type='virtio' name='org.qemu.guest_agent.0'/>
+    </channel>
+
+    {# Contrôleur NVMe obligatoire si on a des disques NVMe #}
+    <controller type='nvme' index='0'>
+      <serial>{{ vm.nvme_controller_serial }}</serial>
+    </controller>
+
+    {# Si on utilise un CD-ROM en sata/scsi, prévoir le contrôleur correspondant #}
+    {% set needs_sata = (vm.cdroms | selectattr('bus', 'equalto', 'sata') | list) | length > 0 %}
+    {% set needs_scsi = (vm.cdroms | selectattr('bus', 'equalto', 'scsi') | list) | length > 0 %}
+    {% if needs_sata %}
+    <controller type='sata' index='0'/>
     {% endif %}
-    <!-- Interfaces réseau -->
+    {% if needs_scsi %}
+    <controller type='scsi' index='0' model='lsilogic'/>
+    {% endif %}
+
+    {# DISQUES NVMe #}
+    {% for d in vm.disks %}
+    <disk type='file' device='disk'>
+      <driver name='qemu' type='qcow2'/>
+      <source file='{{ d.path }}'/>
+      <target dev='{{ d.target_dev }}' bus='{{ d.bus }}'/>
+      <serial>{{ d.serial }}</serial> {# <- identique au contrôleur #}
+    </disk>
+    {% endfor %}
+
+    {# CD-ROM(s) #}
+    {% for c in vm.cdroms %}
+    <disk type='file' device='cdrom'>
+      <driver name='qemu' type='raw'/>
+      {% if c.path %}<source file='{{ c.path }}'/>{% endif %}
+      <target dev='{{ c.get("target_dev","sda") }}' bus='{{ c.get("bus","sata") }}'/>
+      <readonly/>
+    </disk>
+    {% endfor %}
+
+    {# Réseaux #}
     {% for net in vm.networks %}
     <interface type='network'>
       <source network='{{ net.name }}'/>
       <model type='virtio'/>
-      {% if net.get('mac') %}
-      <mac address='{{ net.mac }}'/>
-      {% endif %}
+      {% if net.get('mac') %}<mac address='{{ net.mac }}'/>{% endif %}
     </interface>
     {% endfor %}
-    <!-- Console série -->
+
     <serial type='pty'>
-      <target type='isa-serial' port='0'>
-        <model name='isa-serial'/>
-      </target>
+      <target type='isa-serial' port='0'><model name='isa-serial'/></target>
     </serial>
-    <console type='pty'>
-      <target type='serial' port='0'/>
-    </console>
+    <console type='pty'><target type='serial' port='0'/></console>
   </devices>
 </domain>
