@@ -126,7 +126,7 @@ async def read_ad(
     user_ad = read_psql_relation("ads_users", ad_id, postgresql_client, postgresql_token)
     ad_image = read_psql_relation("ads_images", ad_id, postgresql_client, postgresql_token)
     cat_id = ad_cat[0]["cat_id"]
-    user_id = user_ad[0]["user_id"]
+    user_id = user_ad.get("user_id")
     image_id = ad_image[0]["image_id"] 
 
     ### Retrieves data ###
@@ -165,3 +165,18 @@ async def read_ad(
         ),
     )
 
+@router.get("/list_ids/{table}", response_model=ReadAdResponse)
+async def get_list(
+    table: str,
+    request: Request,
+    user_data: dict = Depends(get_user_data_from_token),
+    client_manager: ClientManager = Depends(get_client_manager),
+):
+    logger.info("Getting ids list.")
+    
+    postgresql_token = user_data.get('tokens', {}).get('postgresql') 
+    if not postgresql_token:
+        raise HTTPException(status_code=401, detail="Missing PostgreSQL token")
+    
+    postgresql_client = client_manager.get_client("postgresql")
+    

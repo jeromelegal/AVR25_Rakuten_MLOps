@@ -3,7 +3,7 @@ import os.path
 from requests import Session, HTTPError
 from urllib3.util.ssl_ import create_urllib3_context
 from requests.adapters import HTTPAdapter
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from config.settings import Settings
 
 # Configurer le logger pour ce module
@@ -217,6 +217,22 @@ class PostgreSQLClient:
         session = self.get_session()
 
         endpoint = f"{base_url}/api/internal/postgresql/entity/category/{table}/{code}"
+        logger.debug(f"Request URL: {endpoint}")
+
+        response = session.get(endpoint, headers=headers)
+        logger.debug(f"Response Status Code: {response.status_code}")
+        logger.debug(f"Response Content: {response.text}")
+        response.raise_for_status()
+
+        return response.json()
+    
+    def get_ids(self, token: str, table: str) -> List[Any]:
+        """ Récupère l'id d'une catégorie. """
+        base_url = self.settings.API_POSTGRESQL_BASE_URL
+        headers = self.get_headers(token)
+        session = self.get_session()
+
+        endpoint = f"{base_url}/api/internal/postgresql/entity/{table}/ids"
         logger.debug(f"Request URL: {endpoint}")
 
         response = session.get(endpoint, headers=headers)

@@ -110,8 +110,7 @@ def insert_image_minio(payload, files, minio_client):
     try:
         logger.debug("Push image to bucket")
         response = minio_client.create_entity(
-            token=None, 
-            #object="image", 
+            token=None,  
             object="image-multipart",
             params={"bucket": DEFAULT_BUCKET}, 
             payload=payload, 
@@ -169,7 +168,6 @@ async def create_ad(
 
     ### PostgreSQL ###  
     try:
-
         image_data = {
             "image_name":  minio_response["image_name"],
             "image_uuid":  minio_response["image_id"],

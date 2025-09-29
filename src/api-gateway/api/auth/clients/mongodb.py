@@ -135,3 +135,27 @@ class MongoDBClient:
         response.raise_for_status()
 
         return response.json()
+
+    def search_ads(self, token: str, q: Optional[str] = None,
+                   category: Optional[str] = None, skip: int = 0, limit: int = 20
+                   ) -> Dict[str, Any]:
+        base_url = self.settings.API_MONGODB_BASE_URL
+        headers = self.get_headers(token)
+        session = self.get_session()
+
+        params = {"skip": skip, "limit": limit}
+        if q is not None:
+            params["q"] = q
+        if category is not None:
+            params["category"] = category
+
+        endpoint = f"{base_url}/api/internal/mongodb/entity/ad/search"
+        logger.debug(f"Request URL: {endpoint}")
+        logger.debug(f"Request Params: {params}")
+
+        response = session.get(endpoint, headers=headers, params=params)
+        logger.debug(f"Response Status Code: {response.status_code}")
+        logger.debug(f"Response Content: {response.text}")
+        response.raise_for_status()
+        
+        return response.json()

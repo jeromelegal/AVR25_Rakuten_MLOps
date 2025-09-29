@@ -5,7 +5,7 @@ from typing import Optional
 from datetime import datetime, timezone
 from config.settings import Settings
 from api.auth import get_current_user
-from typing import Dict
+from typing import Dict, List
 
 router = APIRouter()
 
@@ -106,6 +106,20 @@ async def delete_ad(ad_id: int, current_user: Dict = Depends(get_current_user), 
         if result == "DELETE 1":
             return {"message": "Ad deleted successfully"}
         raise HTTPException(status_code=404, detail="Ad not found")
+    
+@router.get("/api/internal/postgresql/entity/{table}/ids", response_model=List[int])
+async def list_ids(table: str,current_user: Dict = Depends(get_current_user), request: Request = None):
+    settings: Settings = request.app.state.settings
+    
+    #TODO SETUP ROLE
+    # if "superadmin" not in current_user.get("roles", []):
+    #     raise HTTPException(status_code=403, detail="Not enough permissions")
 
-
-
+    async with get_db_client(settings) as conn:
+        result = await conn.fetch(
+            f"SELECT id FROM {table} ORDER BY id")
+        
+        ids = [r["id"] for r in result]
+        if ids:
+            return ids
+        raise HTTPException(status_code=404, detail=f"Can't get ids in table {table}.")
