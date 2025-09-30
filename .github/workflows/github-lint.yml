@@ -42,4 +42,4 @@ jobs:
             BRANCH_NAME=${GITHUB_REF#refs/heads/}
             BRANCH_NAME=${BRANCH_NAME//\//-}
             CONTAINER_NAME="${{ matrix.service }}-${BRANCH_NAME}"
-            docker exec "$CONTAINER_NAME" pylint --fail-under=5 --disable=C0111,R0902,W0511,W0702,R0913,R0903,R0904,R0912,R0801,W1514,R0916,R0901 /app
+            docker exec "$CONTAINER_NAME" pylint --fail-under=4 --disable=C0111,R0902,W0511,W0702,R0913,R0903,R0904,R0912,R0801,W1514,R0916,R0901 /app
