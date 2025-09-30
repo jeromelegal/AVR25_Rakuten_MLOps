@@ -1,5 +1,6 @@
 from dataclasses import dataclass
-from typing import Dict, Optional, Tuple
+from typing import Annotated, Dict, List, Optional, Tuple
+from fastapi import File, UploadFile
 import requests
 import logging
 from threading import Lock
@@ -108,7 +109,9 @@ class ImageTextClassifier:
         self,
         description: Optional[str] = None,
         designation: Optional[str] = None,
-        files: Optional[Tuple] = None,
+        files: Annotated[
+            List[UploadFile], File(description="Multiple files as bytes")
+        ] = None,
     ):
         with self._lock_image:
             self._thread_image = ThreadWithReturnValue(
@@ -123,22 +126,38 @@ class ImageTextClassifier:
             self._thread_text.start()
         image_predictions = self._thread_image.join()
         text_predictions = self._thread_text.join()
+        logging.debug(f"image_predictions: {image_predictions}")
+        logging.debug(f"text_predictions: {text_predictions}")
 
         return self._combine_probabilities(
             image_predictions=image_predictions, text_predictions=text_predictions
         )
 
-    def _get_api_result(self, url, json=None, files=None):
-        r = requests.post(url=url, json=json, files=files, timeout=self._timeout)
+    def _get_api_result(self, url, data=None, files=None):
+        r = requests.post(
+            url=url,
+            data=data,
+            files=files,
+            timeout=self._timeout,
+        )
         if r.status_code != 200:
+            logging.debug(f"url: {url} - code: {r.status_code} - text: {r.text}")
             return None
         return r.json()
 
-    def _predict_image(self, files: Optional[Tuple]):
+    def _predict_image(
+        self,
+        files: Annotated[List[UploadFile], File(description="Multiple files as bytes")],
+    ):
         if files is None or self._text_classifier_weight == 1:
             return None
 
-        data = self._get_api_result(url=self._image_api_url, files=files)
+        files_payload = []
+        for f in files:
+            content = f.file.read()
+            files_payload.append(("files", (f.filename, content, f.content_type)))
+
+        data = self._get_api_result(url=self._image_api_url, files=files_payload)
         if data is None:
             return None
 
@@ -171,7 +190,7 @@ class ImageTextClassifier:
         data.update({"description": description})
         data.update({"designation": designation})
 
-        data = self._get_api_result(url=self._text_api_url, json={"inputs": [data]})
+        data = self._get_api_result(url=self._text_api_url, data={"inputs": [data]})
         if data is None:
             return None
 

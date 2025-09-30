@@ -1,6 +1,7 @@
-from typing import Annotated, Dict, Optional
+import logging
+from typing import Annotated, Dict, List, Optional, cast
 
-from fastapi import APIRouter, Depends, File, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from pydantic import BaseModel
 from api.config.config import Settings, get_settings
 from api.config.dependencies import get_classifier
@@ -8,11 +9,8 @@ from api.processing.classifier import ImageTextClassifier
 
 router = APIRouter()
 
-
-class AdToClassify(BaseModel):
-    description: Optional[str]
-    designation: Optional[str]
-    file: Annotated[list[bytes], File(description="Multiple files as bytes")]
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)  # Configurez le niveau de logging approprié
 
 
 class Prediction(BaseModel):
@@ -33,14 +31,24 @@ def get_version(settings: Annotated[Settings, Depends(get_settings)]):
 
 @router.post("/api/internal/api-processing/predict")
 async def get_categories(
-    ad: AdToClassify,
+    files: Annotated[List[UploadFile], File(description="Multiple files as bytes")],
     model: Annotated[ImageTextClassifier, Depends(get_classifier)],
+    designation: Annotated[Optional[str], Form()] = None,
+    description: Annotated[Optional[str], Form()] = None,
 ) -> Prediction:
     try:
         prediction = model.predict(
-            description=ad.description, designation=ad.designation, files=[ad.file]
+            description=description,
+            designation=designation,
+            files=files,
         )
-        return Prediction(**prediction)
+        return Prediction(
+            category=prediction.category,
+            probability=prediction.probability,
+            overall_probabilities=prediction.overall_probabilities,
+            image_probabilities=prediction.image_probabilities,
+            text_probabilities=prediction.text_probabilities,
+        )
     except Exception as exc:
         error_msg = f"Impossible to process the ad. {exc}"
         raise HTTPException(status_code=500, detail=error_msg) from exc

@@ -1,10 +1,13 @@
+import certifi
 import json
 from functools import lru_cache
+import os
 import mlflow
 
 
 @lru_cache
 def load_text_classifier_model(model_name: str, model_version: str, server_addr: str):
+    os.environ["AWS_CA_BUNDLE"] = certifi.where()
 
     mlflow.set_tracking_uri(server_addr)
     classifier_components = mlflow.transformers.load_model(

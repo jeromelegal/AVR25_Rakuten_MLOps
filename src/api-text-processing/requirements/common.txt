@@ -8,7 +8,8 @@ fastapi-jwt-auth
 python-multipart
 anyio
 pydantic-settings
-mlflow
+mlflow[extras]
+boto3
 transformers
 fasttext
 torch

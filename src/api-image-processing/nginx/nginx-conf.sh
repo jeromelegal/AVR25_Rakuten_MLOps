@@ -25,6 +25,20 @@ http {
         }
 
         # Autres configurations de votre serveur
+        location / {
+            proxy_pass https://$SERVICE_NAME:$SERVICE_PORT;
+            proxy_set_header Host \$host;
+            proxy_set_header X-Real-IP \$remote_addr;
+            proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto \$scheme;
+
+            proxy_ssl_certificate     $API_IMAGE_PROCESSING_CERT_PATH;
+            proxy_ssl_certificate_key $API_IMAGE_PROCESSING_KEY_PATH;
+            proxy_ssl_trusted_certificate $API_IMAGE_PROCESSING_CA_PATH;
+            proxy_ssl_verify on;
+            proxy_ssl_verify_depth 2;
+
+        }
     }
 }
 EOF

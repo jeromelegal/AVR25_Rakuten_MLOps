@@ -11,6 +11,13 @@ until [ $HTTP_CODE -eq 200 ]; do
 done
 echo "MLFlow service is up"
 
+# Keep it here not to have any issue with the Python package installation
+export AWS_ACCESS_KEY_ID=${MINIO_API_TEXT_PROCESSING_USER}
+export AWS_SECRET_ACCESS_KEY=${MINIO_API_TEXT_PROCESSING_PASSWORD}
+export AWS_CA_BUNDLE=${MINIO_API_TEXT_PROCESSING_CA_PATH}
+# export REQUESTS_CA_BUNDLE=$(python3 -c "import certifi; print(certifi.where())")
+export MLFLOW_S3_ENDPOINT_URL=https://${MINIO_SERVICE_NAME}:${MINIO_SERVICE_PORT}
+
 echo "ENVIRONMENT: $ENVIRONMENT"
 if [[ "$ENVIRONMENT" == "test" ]]; then
     echo "Staring tests..."
@@ -23,7 +30,6 @@ else
     vault.sh
 
     set -m
-
     exec uvicorn main:app --host 0.0.0.0 --port $SERVICE_PORT --ssl-keyfile $API_TEXT_PROCESSING_KEY_PATH --ssl-certfile $API_TEXT_PROCESSING_CERT_PATH  --ssl-ca-certs $API_TEXT_PROCESSING_CA_PATH --ssl-cert-reqs 2 &
 
 

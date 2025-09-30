@@ -11,6 +11,7 @@ from api.routes.ad.read import router as read_router
 from api.routes.ad.update import router as update_router
 from api.routes.ad.search_mongodb import router as search_router
 from api.routes.category.get import router as categories_router
+from api.routes.models.predict import router as models_routers
 from api.routes.category.get_category_from_image_id import router as cat_image_id_router
 from api.routes.image.get import router as get_image_router
 from api.routes.image.save import router as save_image_router
@@ -53,6 +54,7 @@ def create_app(settings: Settings):
     app.include_router(read_router, prefix=settings.PROTECTED_ENDPOINT_URL, tags=["ad_read"])
     app.include_router(update_router, prefix=settings.PROTECTED_ENDPOINT_URL, tags=["ad_update"])
     app.include_router(categories_router, prefix=settings.PROTECTED_ENDPOINT_URL, tags=["categories"])
+    app.include_router(models_routers, prefix=settings.PROTECTED_ENDPOINT_URL, tags=["models"])
     app.include_router(cat_image_id_router, prefix=settings.PROTECTED_ENDPOINT_URL, tags=["cat_image_id"])
     app.include_router(get_image_router, prefix=settings.PROTECTED_ENDPOINT_URL, tags=["get_image"])
     app.include_router(save_image_router, prefix=settings.PROTECTED_ENDPOINT_URL, tags=["save_image"])

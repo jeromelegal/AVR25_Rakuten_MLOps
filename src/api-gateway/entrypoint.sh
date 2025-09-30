@@ -28,6 +28,15 @@ until [ $HTTP_CODE -eq 200 ]; do
     sleep 1
 done
 
+# Vérifier la santé du service API processing
+HTTP_CODE=$(curl -k -o /dev/null -s -w "%{http_code}\n" https://$API_PROCESSING_SERVICE_NAME/health)
+# Vous pouvez ajouter une logique conditionnelle ici
+until [ $HTTP_CODE -eq 200 ]; do
+    HTTP_CODE=$(curl -k -o /dev/null -s -w "%{http_code}\n" https://$API_PROCESSING_SERVICE_NAME/health)
+    echo "Waiting for API processing service to be healthy."
+    sleep 1
+done
+
 vault.sh
 
 API_GATEWAY_INTERNAL_SECRET_KEY=$(cat $API_GATEWAY_INTERNAL_SECRET_KEY_PATH)
@@ -36,6 +45,7 @@ set -m
 
 
 uvicorn main:app \
+  --reload \
   --host 0.0.0.0 \
   --port $SERVICE_PORT \
   --ssl-keyfile $API_GATEWAY_KEY_PATH \
