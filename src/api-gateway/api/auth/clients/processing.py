@@ -68,7 +68,7 @@ class ProcessingClient:
             # TODO: remove the port from API_PROCESSING_BASE_URL instead
             if ":" in base:
                 # Remove port
-                base = base.split(":")[0]
+                base = ":".join(base.split(":")[0:2])
             base = str(base).rstrip("/")
 
             logger.debug(f"ProcessingClient base URL (BASE_URL) resolved to: {base}")
