@@ -49,9 +49,14 @@ const NewProduct = () => {
       const formData = new FormData();
       formData.append("designation", title);
       formData.append("description", description);
-      formData.append("category_code", selectedCategory.id);
-      formData.append("category_label", selectedCategory.name);
+      formData.append("category_code", selectedCategory.code);
+      formData.append("category_label", selectedCategory.label);
       formData.append("file", picture);
+
+
+      for (const [k, v] of formData.entries()) {
+        console.debug("[create_ad][form]", k, v instanceof File ? `${v.name} (${v.size}B)` : v);
+      }
 
       const headers = {
         'Accept': 'application/json',
@@ -67,16 +72,12 @@ const NewProduct = () => {
       alert(`Annonce créée avec ID: ${adId}`);
 
     } catch (err) {
-       // Better error surfacing
-      const status = err.response?.status;
-      const detail = err.response?.data?.detail || err.message;
+      const res = err?.response;
+      console.error("[create_ad][err]", res?.status, res?.headers, res?.data);
       console.error("Erreur lors de la création:", err);
        // Provide more specific feedback for auth errors
-      if (status === 401 || status === 422) {
-        alert(`Authentication failed: ${JSON.stringify(detail)}. Please log in again.`);
-      } else {
-        alert(`Failed to create ad${status ? ` (HTTP ${status})` : ''}: ${detail}`);
-      }
+      const msg = typeof res?.data === "string" ? res.data : JSON.stringify(res?.data);
+      alert(`Failed to create ad: ${res?.status}\n${msg}`);
     }
   };
 
@@ -90,7 +91,10 @@ const NewProduct = () => {
         <div style={{ height: '2rem' }}></div> 
         <ProductDescriptionInput value={description} onChange={handleDescriptionChange} />
         <div style={{ height: '2rem' }}></div> 
-        <ProductCategoryButton onClick={handleCategoryButtonClick} />
+        <ProductCategoryButton
+          onClick={handleCategoryButtonClick}
+          selectedCategory={selectedCategory}
+        />
         {selectedCategory && (
         <div
           style={{
@@ -103,7 +107,7 @@ const NewProduct = () => {
             textAlign: 'center'
           }}
         >
-          Selected Category: {selectedCategory.name}
+          Selected Category: {selectedCategory.label}
         </div>
       )}
         <div style={{ height: '1rem' }}></div> 
