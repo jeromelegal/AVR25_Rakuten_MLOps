@@ -127,8 +127,8 @@ API_PROCESSING_INTERNAL_SECRET_KEY=$(vault kv get -field=value secret/api-proces
 
 # Extraire le certificat et la clé privée de l'API de processing des textes
 API_TEXT_PROCESSING_API_PROCESSING_CA=$(vault kv get -field=ca secret/api-text-processing/api-processing/certs)
-API_TEXT_PROCESSING_API_PROCESSING_KEY=$(vault kv get -field=cert secret/api-text-processing/api-processing/certs)
-API_TEXT_PROCESSING_API_PROCESSING_CERT=$(vault kv get -field=key secret/api-text-processing/api-processing/certs)
+API_TEXT_PROCESSING_API_PROCESSING_CERT=$(vault kv get -field=cert secret/api-text-processing/api-processing/certs)
+API_TEXT_PROCESSING_API_PROCESSING_KEY=$(vault kv get -field=key secret/api-text-processing/api-processing/certs)
 
 cat <<EOF > $API_TEXT_PROCESSING_API_PROCESSING_PEM_PATH
 $(printf "%s" "$API_TEXT_PROCESSING_API_PROCESSING_KEY")
@@ -152,8 +152,8 @@ chmod 600 $API_TEXT_PROCESSING_API_PROCESSING_KEY_PATH
 
 # Extraire le certificat et la clé privée de l'API de processing des images
 API_IMAGE_PROCESSING_API_PROCESSING_CA=$(vault kv get -field=ca secret/api-image-processing/api-processing/certs)
-API_IMAGE_PROCESSING_API_PROCESSING_KEY=$(vault kv get -field=cert secret/api-image-processing/api-processing/certs)
-API_IMAGE_PROCESSING_API_PROCESSING_CERT=$(vault kv get -field=key secret/api-image-processing/api-processing/certs)
+API_IMAGE_PROCESSING_API_PROCESSING_CERT=$(vault kv get -field=cert secret/api-image-processing/api-processing/certs)
+API_IMAGE_PROCESSING_API_PROCESSING_KEY=$(vault kv get -field=key secret/api-image-processing/api-processing/certs)
 
 cat <<EOF > $API_IMAGE_PROCESSING_API_PROCESSING_PEM_PATH
 $(printf "%s" "$API_IMAGE_PROCESSING_API_PROCESSING_KEY")

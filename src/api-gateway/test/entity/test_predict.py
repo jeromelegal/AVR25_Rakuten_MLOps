@@ -5,7 +5,9 @@ from fastapi.testclient import TestClient
 from main import app
 
 # Configuration propre du PYTHONPATH
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+sys.path.insert(
+    0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+)
 
 from test.config.config import config
 from test.config.test_settings import test_settings
@@ -39,7 +41,8 @@ def _signup_and_login():
     token = r.json()["access_token"]
     headers = {
         "Authorization": f"Bearer {token}",
-        "Referer": test_settings.API_GATEWAY_HOST + test_settings.PROTECTED_ENDPOINT_URL,
+        "Referer": test_settings.API_GATEWAY_HOST
+        + test_settings.PROTECTED_ENDPOINT_URL,
         "X-API-Key": token,
     }
     return headers
@@ -53,11 +56,16 @@ def test_predict_success():
         response = client.post(
             f"{test_settings.PROTECTED_ENDPOINT_URL}/api-processing/predict",
             headers=headers,
-            data={"description": "Robot aspirateur de piscine", "designation": "Robot aspirateur NETOWATOU 3000"},
+            data={
+                "description": "Robot aspirateur de piscine",
+                "designation": "Robot aspirateur NETOWATOU 3000",
+            },
             files={"files": ("demo_image.jpg", f, "image/jpeg")},
         )
 
-    assert response.status_code == 200, f"Predict failed: {response.status_code} {response.text}"
+    assert (
+        response.status_code == 200
+    ), f"Predict failed: {response.status_code} {response.text}"
     payload = response.json()
 
     # Vérifie que la réponse contient bien les champs attendus

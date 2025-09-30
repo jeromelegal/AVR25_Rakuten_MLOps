@@ -63,7 +63,7 @@ class TestImageTextClassifier:
     def test_predict_correct_api_answer(self, mocked_request: Mock):
         description = "my-description"
         designation = "my-designation"
-        files = [0, 1, 2, 3]
+        files = []
         expected_text_api_url = "text_api_url"
         expected_image_api_url = "image_api_url"
         expected_timeout = 7
@@ -89,7 +89,7 @@ class TestImageTextClassifier:
         expected_post_calls = [
             call(
                 url=expected_text_api_url,
-                json={
+                data={
                     "inputs": [{"description": description, "designation": designation}]
                 },
                 files=None,
@@ -97,7 +97,7 @@ class TestImageTextClassifier:
             ),
             call(
                 url=expected_image_api_url,
-                json=None,
+                data=None,
                 files=files,
                 timeout=expected_timeout,
             ),

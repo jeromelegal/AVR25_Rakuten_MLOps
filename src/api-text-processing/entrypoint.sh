@@ -30,7 +30,6 @@ else
     vault.sh
 
     set -m
-
     exec uvicorn main:app --host 0.0.0.0 --port $SERVICE_PORT --ssl-keyfile $API_TEXT_PROCESSING_KEY_PATH --ssl-certfile $API_TEXT_PROCESSING_CERT_PATH  --ssl-ca-certs $API_TEXT_PROCESSING_CA_PATH --ssl-cert-reqs 2 &
 
 

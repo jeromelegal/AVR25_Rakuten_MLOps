@@ -1,6 +1,15 @@
 import logging
-from fastapi import APIRouter, Depends, HTTPException, Request, Header, File, UploadFile
-from typing import Optional, Dict, List
+from fastapi import (
+    APIRouter,
+    Depends,
+    Form,
+    HTTPException,
+    Request,
+    Header,
+    File,
+    UploadFile,
+)
+from typing import Annotated, Optional, Dict, List
 from pydantic import BaseModel
 from config.settings import Settings
 from api.auth.clients.manager import ClientManager, create_client_manager
@@ -17,17 +26,20 @@ router = APIRouter()
 def get_settings(request: Request) -> Settings:
     return request.app.state.settings
 
+
 def get_token_manager(request: Request) -> TokenManager:
     settings = get_settings(request)
     return create_token_manager(settings)
+
 
 def get_client_manager(request: Request) -> ClientManager:
     settings = get_settings(request)
     return create_client_manager(settings)
 
+
 def get_user_data_from_token(
     token_manager: TokenManager = Depends(get_token_manager),
-    authorization: str = Header(...)
+    authorization: str = Header(...),
 ) -> Dict:
     """Récupère les données utilisateur à partir du token JWT."""
     logger.info("Extracting user data from token...")
@@ -58,10 +70,10 @@ def get_version(settings: Settings = Depends(get_settings)):
 
 @router.post("/api-processing/predict", response_model=Prediction)
 async def get_categories(
-    description: Optional[str] = None,
-    designation: Optional[str] = None,
     files: List[UploadFile] = File(..., description="Multiple files"),
     client_manager: ClientManager = Depends(get_client_manager),
+    description: Annotated[Optional[str], Form()] = None,
+    designation: Annotated[Optional[str], Form()] = None,
 ):
     """
     Endpoint de prédiction image + texte.
@@ -74,15 +86,22 @@ async def get_categories(
     processing_client = client_manager.get_client("processing")
 
     try:
-    # Lire les fichiers uploadés
-        file_bytes = [await f.read() for f in files]
-    # Appel du modèle
-        prediction = processing_client.predict(
+        # Appel du modèle
+        prediction = await processing_client.predict(
             description,
             designation,
-            files=file_bytes,
+            files=files,
         )
-        return Prediction(**prediction)
-    
+        logging.debug(f"prediction: {prediction}")
+        return Prediction(
+            category=prediction["category"],
+            probability=prediction["probability"],
+            overall_probabilities=prediction["overall_probabilities"],
+            image_probabilities=prediction["image_probabilities"],
+            text_probabilities=prediction["text_probabilities"],
+        )
+
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Impossible to process the ad. {exc}")
+        raise HTTPException(
+            status_code=500, detail=f"Impossible to process the ad. {exc}"
+        )

@@ -60,12 +60,10 @@ cp api-image-processing_ca.crt /usr/local/share/ca-certificates/
 # cp api-gateway_ca.crt /usr/local/share/ca-certificates/
 cp mlflow_ca.crt /usr/local/share/ca-certificates/
 cp minio_ca.crt /usr/local/share/ca-certificates/
-cp api-processing_ca.crt /usr/local/share/ca-certificates/
 
 cat mlflow_ca.crt >> $(python3 -c "import certifi; print(certifi.where())")
 cat api-image-processing_ca.crt >> $(python3 -c "import certifi; print(certifi.where())")
 cat minio_ca.crt >> $(python3 -c "import certifi; print(certifi.where())")
-cat api-processing_ca.crt >> $(python3 -c "import certifi; print(certifi.where())")
 
 update-ca-certificates
 
