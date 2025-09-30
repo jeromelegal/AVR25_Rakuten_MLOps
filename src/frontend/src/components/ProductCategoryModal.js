@@ -1,4 +1,4 @@
-// ProductCategoryModal.js
+// ProductCategoryModal.js (fusion des comportements de (1) et (2))
 import React, { useState, useEffect } from 'react';
 import { Modal, Button, Form, Spinner, Alert } from 'react-bootstrap';
 import ValidateButton from './ValidateButton';
@@ -11,8 +11,20 @@ import axiosInstance from '../services/axiosInstance';
  * - onSelect: (cat: { code: number|string, label: string } | null) => void
  * - initialCategory?: { code: number|string, label: string } | null
  * - enablePrediction?: boolean
+ * - description?: string
+ * - designation?: string
+ * - files?: File[]   // images éventuelles
  */
-const ProductCategoryModal = ({ show, onHide, onSelect, initialCategory = null, enablePrediction = false }) => {
+const ProductCategoryModal = ({
+  show,
+  onHide,
+  onSelect,
+  initialCategory = null,
+  enablePrediction = true,
+  description,
+  designation,
+  files = [],
+}) => {
   const [changingCategory, setChangingCategory] = useState(false);
 
   // Catégories depuis la gateway
@@ -20,34 +32,47 @@ const ProductCategoryModal = ({ show, onHide, onSelect, initialCategory = null, 
   const [loadingCategories, setLoadingCategories] = useState(false);
   const [errorCategories, setErrorCategories] = useState('');
 
-  // Sélection (on stocke le "code")
+  // Sélection (stocke le "code")
   const [selectedCode, setSelectedCode] = useState(initialCategory?.code ?? '');
 
-  // Prédiction (optionnelle)
-  const [categoryProposal, setCategoryProposal] = useState(initialCategory?.label ?? null);
+  // Prédiction
+  const [categoryProposal, setCategoryProposal] = useState(initialCategory?.label ?? null); // string label
   const [predictLoading, setPredictLoading] = useState(false);
   const [elapsed, setElapsed] = useState(0);
 
-  // 1) Charger la liste des catégories quand la modale s’ouvre
+  // Charger la liste des catégories quand la modale s’ouvre
   useEffect(() => {
     if (!show) return;
     let mounted = true;
+
     setLoadingCategories(true);
     setErrorCategories('');
-
-    // Endpoint Gateway protégé
-    axiosInstance.get('/api/protected/get_categories')
-      .then(({ data }) => { if (mounted) setCategories(Array.isArray(data) ? data : []); })
-      .catch((e) => {
-        const detail = e?.response?.data?.detail || e.message;
-        if (mounted) setErrorCategories(detail);
+    axiosInstance
+      .get('/api/protected/get_categories')
+      .then(({ data }) => {
+        if (!mounted) return;
+        const arr = Array.isArray(data) ? data : [];
+        setCategories(arr);
+        // Si on avait une proposition texte, tenter de la “résoudre” vers {code,label}
+        if (arr.length && categoryProposal && !changingCategory) {
+          const found = findByLabel(arr, categoryProposal);
+          if (found) setSelectedCode(found.code);
+        }
       })
-      .finally(() => { if (mounted) setLoadingCategories(false); });
+      .catch((e) => {
+        if (!mounted) return;
+        const detail = e?.response?.data?.detail || e.message || 'Erreur de chargement';
+        setErrorCategories(detail);
+      })
+      .finally(() => {
+        if (mounted) setLoadingCategories(false);
+      });
 
     return () => { mounted = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [show]);
 
-  // 2) (Optionnel) Lancer la prédiction quand la modale s’ouvre si activé
+  // Lancer la prédiction automatiquement quand la modale s’ouvre
   useEffect(() => {
     if (show && enablePrediction) {
       handlePredict();
@@ -55,27 +80,40 @@ const ProductCategoryModal = ({ show, onHide, onSelect, initialCategory = null, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [show, enablePrediction]);
 
-  // Appel API de prédiction (optionnel)
+  // Helpers de matching label
+  const norm = (s) => (s || '').toString().trim().toLowerCase();
+  const findByLabel = (arr, label) => arr.find(c => norm(c.label) === norm(label));
+
+  // Prédiction via le même endpoint que (2)
   const handlePredict = async () => {
     setPredictLoading(true);
     setElapsed(0);
-    setCategoryProposal(null);
+    // ne pas écraser une sélection manuelle en cours
+    const hadManualChange = changingCategory;
 
     const start = Date.now();
     try {
-      // On tente d’abord l’endpoint protégé (aligné Gateway).
-      const res = await axiosInstance.get('/api/protected/predict-category');
-      const data = res.data;
-      setCategoryProposal(data?.category || 'Indéterminée');
-    } catch (err1) {
-      try {
-        // Fallback : ancienne route non protégée si tu ne l’as pas encore migrée.
-        const res2 = await axiosInstance.get('/api/predict-category');
-        const data2 = res2.data;
-        setCategoryProposal(data2?.category || 'Indéterminée');
-      } catch (err2) {
-        setCategoryProposal('⚠️ Erreur de prédiction');
+      const formData = new FormData();
+      if (description) formData.append('description', description);
+      if (designation) formData.append('designation', designation);
+      if (files?.length) files.forEach((f) => formData.append('files', f));
+
+      // axiosInstance gère déjà l’auth (interceptors). Ne PAS fixer Content-Type manuellement.
+      const res = await axiosInstance.post('/api/protected/api-processing/predict', formData);
+      if (res.status !== 200) throw new Error(`Erreur API: ${res.status}`);
+
+      // attendu: { category: <string>, probability, overall_probabilities, ... }
+      const predictedLabel = res?.data?.category || 'Indéterminée';
+      setCategoryProposal(predictedLabel);
+
+      // Tenter de résoudre vers une catégorie {code,label}
+      if (categories.length && !hadManualChange) {
+        const resolved = findByLabel(categories, predictedLabel);
+        if (resolved) setSelectedCode(resolved.code);
       }
+    } catch (err) {
+      console.error(err);
+      setCategoryProposal('⚠️ Erreur de prédiction');
     } finally {
       const end = Date.now();
       setElapsed(((end - start) / 1000).toFixed(1));
@@ -83,23 +121,28 @@ const ProductCategoryModal = ({ show, onHide, onSelect, initialCategory = null, 
     }
   };
 
-  // 3) Validation : renvoie l’objet {code,label}
+  // Validation : renvoie toujours {code,label} (ou null)
   const handleValidate = () => {
-    let finalCategory = null;
+    let finalCat = null;
 
-    if (changingCategory && selectedCode) {
-      const found = categories.find(c => String(c.code) === String(selectedCode));
-      if (found) finalCategory = { code: found.code, label: found.label };
+    if (changingCategory) {
+      // Sélection manuelle obligatoire
+      if (selectedCode) {
+        const found = categories.find(c => String(c.code) === String(selectedCode));
+        if (found) finalCat = { code: found.code, label: found.label };
+      }
     } else {
+      // Sinon, on priorise la résolution de la proposition de prédiction
       if (categoryProposal) {
-        const found = categories.find(c => c.label === categoryProposal);
-        finalCategory = found ? { code: found.code, label: found.label } : { code: '', label: categoryProposal };
+        const found = findByLabel(categories, categoryProposal);
+        // Si pas trouvé, on passe un “label libre” avec code vide pour que le backend réagisse proprement
+        finalCat = found ? { code: found.code, label: found.label } : { code: '', label: categoryProposal };
       } else if (initialCategory) {
-        finalCategory = initialCategory;
+        finalCat = initialCategory;
       }
     }
 
-    onSelect(finalCategory);
+    onSelect(finalCat);
     setChangingCategory(false);
   };
 
@@ -130,7 +173,7 @@ const ProductCategoryModal = ({ show, onHide, onSelect, initialCategory = null, 
 
       <Modal.Body>
         {/* Bloc proposition / état courant */}
-        <div 
+        <div
           style={{
             padding: '1rem',
             background: bodyBg,
