@@ -1,0 +1,6 @@
+---
+- name: Docker registry
+  hosts: k8s
+  become: no
+  roles:
+    - docker

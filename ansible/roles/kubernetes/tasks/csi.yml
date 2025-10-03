@@ -1,240 +1,380 @@
----
-# Déploiement Cilium robuste en 2 phases (garde kube-proxy puis bascule optionnelle)
-# Variables utiles (à mettre dans group_vars ou extra_vars si tu veux)
-# cilium_chart_version: "1.18.2"
-# kubeadm_api_port: 6443
-# kubeadm_api_host: "192.168.200.10"     # IP d’un master joignable par TOUS les nœuds au bootstrap (pas le VIP MetalLB tant qu’il n’existe pas)
-# kubernetes_pod_subnet: "10.244.0.0/16"
-# pin_cilium_to_network_nodes: true      # place operator/hubble sur `network`. Le DS cilium, lui, tourne partout.
-# cilium_enable_kpr_free: false          # si true, fera la phase B (bascule kube-proxy-free) à la fin.
-- name: Cilium deploy (2 phases, safe)
-  run_once: true
-  delegate_to: "{{ groups['masters'][0] }}"
-  become: yes
-  tags: cni
+- name: Mayastor NVMe-only — déploiement minimal (sans Loki/MinIO/Alloy)
+  vars:
+    # Namespace du chart OpenEBS (Mayastor inclus)
+    mayastor_namespace: openebs
+    # Groupe d'inventaire qui contient les nœuds "data"
+    data_node_group: datas
+    # Disque NVMe par défaut (RECOMMANDÉ : /dev/disk/by-id/... via host_vars/<node>.yml)
+    mayastor_disk_device_default: "/dev/nvme0n2"
+    # Réserver (taint) les nœuds data pour les workloads qui le tolèrent
+    taint_data_nodes: true
+    # Définir la StorageClass par défaut ?
+    set_default_sc: true
+    default_sc_name: mayastor-1
+    # Chemin vers le fichier YAML généré et mis à jour
+    openebs_rendered_yaml: "/etc/helm/rendered/openebs-mayastor-rendered.yaml"
   block:
-    - name: Assert masters group present
-      assert:
+    ###########################################################################
+    # 0) PRÉREQUIS NVMe/TCP SUR LES NŒUDS QUI MONTERONT LES VOLUMES (ici: data)
+    ###########################################################################
+    - name: Check kernel >= 5.13 (requis NVMe/TCP)
+      ansible.builtin.shell: |
+        cur=$(uname -r | cut -d- -f1)
+        printf "5.13\n%s\n" "$cur" | sort -C -V
+      register: kernelchk
+      failed_when: kernelchk.rc != 0
+      changed_when: false
+      when: inventory_hostname in groups[data_node_group]
+      tags: [mayastor, storage, nvme, csi]
+
+    - name: Install nvme-cli (utile mais optionnel)
+      ansible.builtin.package:
+        name: nvme-cli
+        state: present
+      when: inventory_hostname in groups[data_node_group]
+      tags: [mayastor, storage, nvme, csi]
+
+    - name: Load nvme_tcp module now
+      ansible.builtin.modprobe:
+        name: nvme_tcp
+        state: present
+      when: inventory_hostname in groups[data_node_group]
+      tags: [mayastor, storage, nvme, csi]
+
+    - name: Persist nvme_tcp at boot
+      ansible.builtin.copy:
+        dest: /etc/modules-load.d/nvme_tcp.conf
+        content: "nvme_tcp\n"
+        mode: "0644"
+      when: inventory_hostname in groups[data_node_group]
+      tags: [mayastor, storage, nvme, csi]
+
+    ###########################################################################
+    # 1) PRÉPA DES NŒUDS DATA (HugePages, labels/taints, wipe disque)
+    ###########################################################################
+    - name: Ensure HugePages (2 GiB en pages 2 MiB => 1024)
+      ansible.builtin.sysctl:
+        name: vm.nr_hugepages
+        value: "1024"
+        sysctl_set: true
+        reload: true
+      when: inventory_hostname in groups[data_node_group]
+      tags: [mayastor, storage, nvme, csi]
+
+    - name: Restart kubelet (pour que k8s voie les HugePages)
+      ansible.builtin.service:
+        name: kubelet
+        state: restarted
+      when: inventory_hostname in groups[data_node_group]
+      tags: [mayastor, storage, nvme, csi]
+
+    - name: Label node for Mayastor io-engine
+      ansible.builtin.command: kubectl label node {{ inventory_hostname }} openebs.io/engine=mayastor --overwrite
+      environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
+      register: label_ms
+      changed_when: >
+        'labeled' in (label_ms.stdout | default('')) or
+        'configured' in (label_ms.stdout | default('')) or
+        'labeled' in (label_ms.stderr | default('')) or
+        'configured' in (label_ms.stderr | default(''))
+      when: inventory_hostname in groups[data_node_group]
+      delegate_to: "{{ groups['masters'][0] }}"
+      tags: [mayastor, storage, nvme, csi]
+
+    - name: Label node for CSI topology (limiter csi-node/agent-ha-node aux nœuds data)
+      ansible.builtin.command: kubectl label node {{ inventory_hostname }} openebs.io/csi-node=mayastor --overwrite
+      environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
+      register: label_csi
+      changed_when: >
+        'labeled' in (label_csi.stdout | default('')) or
+        'configured' in (label_csi.stdout | default('')) or
+        'labeled' in (label_csi.stderr | default('')) or
+        'configured' in (label_csi.stderr | default(''))
+      when: inventory_hostname in groups[data_node_group]
+      delegate_to: "{{ groups['masters'][0] }}"
+      tags: [mayastor, storage, nvme, csi]
+
+    - name: Label node for "storage" visibility (correspond au taint)
+      ansible.builtin.command: kubectl label node {{ inventory_hostname }} openebs.io/storage=mayastor --overwrite
+      environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
+      register: label_storage
+      changed_when: >
+        'labeled' in (label_storage.stdout | default('')) or
+        'configured' in (label_storage.stdout | default('')) or
+        'labeled' in (label_storage.stderr | default('')) or
+        'configured' in (label_storage.stderr | default(''))
+      when: inventory_hostname in groups[data_node_group]
+      delegate_to: "{{ groups['masters'][0] }}"
+      tags: [mayastor, storage, nvme, csi]
+
+    - name: (Optionnel recommandé) Taint DATA nodes (réserver ces nœuds)
+      ansible.builtin.command: kubectl taint nodes {{ inventory_hostname }} openebs.io/storage=mayastor:NoSchedule --overwrite
+      environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
+      register: taint_out
+      changed_when: >
+        'tainted' in ((taint_out.stdout | default('')) + (taint_out.stderr | default(''))) or
+        'already has' in ((taint_out.stdout | default('')) + (taint_out.stderr | default('')))
+      when:
+        - taint_data_nodes
+        - inventory_hostname in groups[data_node_group]
+      delegate_to: "{{ groups['masters'][0] }}"
+      tags: [mayastor, storage, nvme, csi]
+
+    # >>> GARDE-FOU AVANT LE WIPE <<<
+    - name: "Guard - ensure device looks like a block path"
+      vars:
+        dev: "{{ hostvars[inventory_hostname].mayastor_disk_device | default(mayastor_disk_device_default) }}"
+      ansible.builtin.assert:
         that:
-          - groups['masters'] is defined
-          - groups['masters'] | length > 0
-        fail_msg: "Le groupe [masters] doit exister et contenir au moins 1 hôte."
-    # ---------- Préflight API ----------
-    - name: Pick API host (fallback = master1 ansible_host)
-      set_fact:
-        api_host_for_cilium: "{{ kubeadm_api_host | default(hostvars[groups['masters'][0]].ansible_host) }}"
-        api_port_for_cilium: "{{ kubeadm_api_port | default(6443) }}"
-    - name: Check API health from master1
-      shell: "curl -sk https://{{ api_host_for_cilium }}:{{ api_port_for_cilium }}/healthz || true"
-      register: api_health
-      changed_when: false
-    - name: Fail early if API is not reachable
-      fail:
-        msg: "API {{ api_host_for_cilium }}:{{ api_port_for_cilium }} injoignable (healthz). Corrige avant d’installer Cilium."
-      when: api_health.stdout is not search("ok")
-    # ---------- Helm repo + cleanup éventuels ----------
-    - name: Add Cilium Helm repository (idempotent)
-      command: helm repo add cilium https://helm.cilium.io/
+          - dev is match('^/dev/.+')
+        fail_msg: "mayastor_disk_device doit être un chemin /dev/... (idéalement /dev/disk/by-id/...)."
+      when: inventory_hostname in groups[data_node_group]
+      tags: [mayastor, storage, nvme, csi]
+
+    - name: (DANGEREUX) Wipe du disque NVMe dédié (efface TOUT)
+      vars:
+        dev: "{{ hostvars[inventory_hostname].mayastor_disk_device | default(mayastor_disk_device_default) }}"
+      ansible.builtin.shell: |
+        set -euo pipefail
+        wipefs -a "{{ dev }}"
+        sgdisk --zap-all "{{ dev }}" || true
+        udevadm settle || true
       args:
-        creates: /root/.cache/helm/repository/cilium-index.yaml
-    - name: Update Helm repositories
-      command: helm repo update
-      changed_when: false
-    - name: Clean up any stuck Helm release secrets for cilium (best effort)
-      shell: |
-        set -e
-        kubectl -n kube-system get secrets -o name | grep -E '^secret/sh\.helm\.release\.v1\.cilium\.v' || exit 0
-        kubectl -n kube-system delete $(kubectl -n kube-system get secrets -o name | grep -E '^secret/sh\.helm\.release\.v1\.cilium\.v')
+        executable: /bin/bash
+      when: inventory_hostname in groups[data_node_group]
+      tags: [mayastor, storage, nvme, csi]
+
+    ###########################################################################
+    # 2) INSTALL OPENEBS (MAYASTOR UNIQUEMENT) — SANS LOKI/MINIO/ALLOY
+    ###########################################################################
+    - name: Add OpenEBS helm repo
+      ansible.builtin.command: helm repo add openebs https://openebs.github.io/openebs
+      register: helm_repo_add
+      changed_when: >
+        'has been added' in (helm_repo_add.stdout | default('')) or
+        'already exists' in (helm_repo_add.stderr | default(''))
       environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
+      when: inventory_hostname == groups['masters'][0]
+      delegate_to: "{{ groups['masters'][0] }}"
+      run_once: true
+      tags: [mayastor, storage, nvme, csi]
+
+    - name: Helm repo update
+      ansible.builtin.command: helm repo update
       changed_when: false
-      failed_when: false
-    # ---------- Vérifier et annuler toute opération Helm en cours ----------
-    - name: Check for ongoing Helm operations
-      command: helm list --pending
-      register: helm_operations
       environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
-      changed_when: false
-    - name: Cancel ongoing Helm operations if any
-      command: helm rollback cilium 0 --wait --timeout 5m
-      when: "'cilium' in helm_operations.stdout"
-      environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
-      register: helm_rollback
-      changed_when: "'rolled back' in helm_rollback.stdout"
-      failed_when: false
-    - name: Wait for Helm operations to be canceled
-      pause:
-        seconds: 10
-      when: "'cilium' in helm_operations.stdout"
-    # ---------- Values selectors pour nodeSelector des composants "non DS cilium" ----------
-    - name: Render /etc/cilium/values-selectors.yaml
-      copy:
-        dest: /etc/cilium/values-selectors.yaml
-        mode: "0644"
+      when: inventory_hostname == groups['masters'][0]
+      delegate_to: "{{ groups['masters'][0] }}"
+      run_once: true
+      tags: [mayastor, storage, nvme, csi]
+
+    # Valeurs Helm : io-engine sur nœuds data + CSI topology + désactiver Loki/Alloy
+    - name: Render OpenEBS/Mayastor values (io-engine + CSI topology + disable Loki/Alloy)
+      ansible.builtin.copy:
+        dest: /tmp/openebs-mayastor-values.yml
         content: |
-          # IMPORTANT : le DaemonSet cilium (agent) NE DOIT PAS être restreint -> tourne sur tous les nœuds
-          {% if pin_cilium_to_network_nodes | default(true) %}
-          operator:
-            nodeSelector:
-              node-role.kubernetes.io/network: "true"
-          hubble:
-            relay:
-              enabled: false
+          # Désactive la pile d'observabilité ajoutée par défaut (Loki/Alloy).
+          loki:
+            enabled: false
+          alloy:
+            enabled: false
+          # (optionnel, normalement inutile si loki=false)
+          minio:
+            enabled: false
+          # Valeurs Mayastor (sous-chart)
+          mayastor:
+            io_engine:
               nodeSelector:
-                node-role.kubernetes.io/network: "true"
-            ui:
-              enabled: false
-              nodeSelector:
-                node-role.kubernetes.io/network: "true"
-          {% else %}
-          hubble:
-            relay:
-              enabled: false
-            ui:
-              enabled: false
-          operator: {}
-          {% endif %}
-    # ---------- PHASE A : kube-proxy conservé ----------
-    - name: Install/Upgrade Cilium (Phase A, kubeProxyReplacement=false)
-      command: >-
-        helm upgrade --install cilium cilium/cilium
-        --namespace kube-system
-        --version {{ cilium_chart_version | default('1.18.2') }}
-        --wait --atomic --timeout 10m
-        -f /etc/cilium/values-selectors.yaml
-        --set-string kubeProxyReplacement=false
-        --set-string k8sServiceHost={{ api_host_for_cilium }}
-        --set k8sServicePort={{ api_port_for_cilium }}
-        --set ipam.mode=cluster-pool
-        --set ipam.operator.clusterPoolIPv4PodCIDRList={{ kubernetes_pod_subnet | default('10.244.0.0/16') }}
-        --set ipam.operator.clusterPoolIPv4MaskSize=24
-        --set hubble.metrics.enabled="{dns:query;ignoreAAAA,drop,tcp,flow,icmp,http}"
-        --set prometheus.enabled=true
-        --set operator.prometheus.enabled=true
-        --set bpf.masquerade=true
-      environment:
-        KUBECONFIG: /etc/kubernetes/admin.conf
-    - name: Wait rollout cilium DS
-      command: kubectl -n kube-system rollout status ds/cilium --timeout=5m
+                openebs.io/engine: mayastor
+              tolerations:
+                - key: "openebs.io/storage"
+                  operator: "Equal"
+                  value: "mayastor"
+                  effect: "NoSchedule"
+            csi:
+              node:
+                topology:
+                  nodeSelector: true
+                  segments:
+                    openebs.io/csi-node: mayastor
+      when: inventory_hostname == groups['masters'][0]
+      delegate_to: "{{ groups['masters'][0] }}"
+      run_once: true
+      tags: [mayastor, storage, nvme, csi]
+
+    - name: Apply OpenEBS with Mayastor only (NVMe) from rendered YAML
+      ansible.builtin.command: kubectl apply -f {{ openebs_rendered_yaml }}
+      register: helm_install
       environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
-    - name: Wait rollout cilium-operator
-      command: kubectl -n kube-system rollout status deploy/cilium-operator --timeout=5m
-      environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
-    # Vérifie que tous les nodes redeviennent Ready (Cilium agent partout + kube-proxy actif)
-    - name: Wait for all nodes Ready
-      shell: |
-        set -e
-        kubectl get nodes --no-headers | awk '{print $1}' | \
-        xargs -I{} kubectl wait --for=condition=Ready node/{} --timeout=180s
-      environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
-    # ---------- PHASE B (optionnelle) : kube-proxy-free ----------
-    - name: Switch to kube-proxy-free (kubeProxyReplacement=true)
-      when: cilium_enable_kpr_free | default(false)
-      block:
-        - name: Check for ongoing Helm operations before switching to kube-proxy-free
-          command: helm list --pending
-          register: helm_operations_before_switch
-          environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
-          changed_when: false
-        - name: Cancel ongoing Helm operations before switching to kube-proxy-free
-          command: helm rollback cilium 0 --wait --timeout 5m
-          when: "'cilium' in helm_operations_before_switch.stdout"
-          environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
-          register: helm_rollback_before_switch
-          changed_when: "'rolled back' in helm_rollback_before_switch.stdout"
-          failed_when: false
-        - name: Wait for Helm operations to be canceled before switching to kube-proxy-free
-          pause:
-            seconds: 10
-          when: "'cilium' in helm_operations_before_switch.stdout"
-        - name: Upgrade Cilium to kube-proxy-free
-          command: >-
-            helm upgrade cilium cilium/cilium
-            -n kube-system
-            --reuse-values
-            --wait --atomic --timeout 10m
-            --set-string kubeProxyReplacement=true
-          environment:
-            KUBECONFIG: /etc/kubernetes/admin.conf
-        - name: Delete kube-proxy DaemonSet
-          command: kubectl -n kube-system delete ds kube-proxy --ignore-not-found=true
-          environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
-        - name: Wait rollout cilium after switch
-          command: kubectl -n kube-system rollout status ds/cilium --timeout=5m
-          environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
-        - name: Ensure nodes still Ready after switch
-          shell: |
-            set -e
-            kubectl get nodes --no-headers | awk '{print $1}' | \
-            xargs -I{} kubectl wait --for=condition=Ready node/{} --timeout=180s
-          environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
-    # ---------- Déploiement de Hubble ----------
-    - name: Render /etc/cilium/values-hubble.yaml
-      copy:
-        dest: /etc/cilium/values-hubble.yaml
-        mode: "0644"
-        content: |
-          # Configuration pour Hubble
-          {% if pin_cilium_to_network_nodes | default(true) %}
-          hubble:
-            relay:
-              enabled: true
-              nodeSelector:
-                node-role.kubernetes.io/network: "true"
-            ui:
-              enabled: true
-              nodeSelector:
-                node-role.kubernetes.io/network: "true"
-          {% else %}
-          hubble:
-            relay:
-              enabled: true
-            ui:
-              enabled: true
-          {% endif %}
-    - name: Check for ongoing Helm operations before installing Hubble
-      command: helm list --pending
-      register: helm_operations_before_hubble
-      environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
+      when: inventory_hostname == groups['masters'][0]
+      delegate_to: "{{ groups['masters'][0] }}"
+      run_once: true
+      tags: [mayastor, storage, nvme, csi]
+
+    - name: Wait for DiskPool CRD to be established
+      ansible.builtin.shell: kubectl get crd diskpools.openebs.io
+      register: crd
+      retries: 30
+      delay: 5
+      until: crd.rc == 0
       changed_when: false
-    - name: Cancel ongoing Helm operations before installing Hubble
-      command: helm rollback cilium 0 --wait --timeout 5m
-      when: "'cilium' in helm_operations_before_hubble.stdout"
       environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
-      register: helm_rollback_before_hubble
-      changed_when: "'rolled back' in helm_rollback_before_hubble.stdout"
+      when: inventory_hostname == groups['masters'][0]
+      delegate_to: "{{ groups['masters'][0] }}"
+      run_once: true
+      tags: [mayastor, storage, nvme, csi]
+
+    ###########################################################################
+    # 3) DISKPOOLS (UN PAR NŒUD DATA) — v1beta3
+    ###########################################################################
+    - name: Create DiskPool for each DATA node
+      vars:
+        target_dev: "{{ hostvars[item].mayastor_disk_device | default(mayastor_disk_device_default) }}"
+        pool_yaml: |
+          apiVersion: openebs.io/v1beta3
+          kind: DiskPool
+          metadata:
+            name: pool-{{ item }}
+            namespace: {{ mayastor_namespace }}
+          spec:
+            node: {{ item }}
+            disks:
+              - {{ target_dev }}
+      ansible.builtin.shell: |
+        cat <<'YAML' | kubectl apply -f -
+        {{ pool_yaml }}
+        YAML
+      loop: "{{ groups[data_node_group] | default([]) }}"
+      environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
+      when:
+        - inventory_hostname == groups['masters'][0]
+        - groups[data_node_group] is defined
+        - groups[data_node_group] | length > 0
+      delegate_to: "{{ groups['masters'][0] }}"
+      run_once: true
+      tags: [mayastor, storage, nvme, csi]
+
+    ###########################################################################
+    # 4) STORAGECLASS (NVMe/TCP, RWO, SANS RÉPLICATION) + défaut
+    ###########################################################################
+    - name: Create only SC mayastor-1 (no replication)
+      ansible.builtin.shell: |
+        cat <<'YAML' >/tmp/sc-mayastor-1.yml
+        apiVersion: storage.k8s.io/v1
+        kind: StorageClass
+        metadata: { name: mayastor-1 }
+        provisioner: io.openebs.csi-mayastor
+        allowVolumeExpansion: true
+        volumeBindingMode: WaitForFirstConsumer
+        parameters:
+          protocol: nvmf
+          repl: "1"
+        YAML
+        kubectl apply -f /tmp/sc-mayastor-1.yml
+      register: sc_apply
+      changed_when: >
+        'created' in (sc_apply.stdout | default('')) or
+        'configured' in (sc_apply.stdout | default(''))
+      environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
+      when: inventory_hostname == groups['masters'][0]
+      delegate_to: "{{ groups['masters'][0] }}"
+      run_once: true
+      tags: [mayastor, storage, nvme, csi]
+
+    # Définir mayastor-1 comme StorageClass par défaut (idempotent)
+    - name: Check if {{ default_sc_name }} is already default
+      ansible.builtin.command: kubectl get sc {{ default_sc_name }} -o jsonpath='{.metadata.annotations.storageclass\.kubernetes\.io/is-default-class}'
+      register: sc_default
+      changed_when: false
       failed_when: false
-    - name: Wait for Helm operations to be canceled before installing Hubble
-      pause:
-        seconds: 10
-      when: "'cilium' in helm_operations_before_hubble.stdout"
-    - name: Install/Upgrade Hubble
-      command: >-
-        helm upgrade --install cilium cilium/cilium
-        --namespace kube-system
-        --version {{ cilium_chart_version | default('1.18.2') }}
-        --wait --atomic --timeout 10m
-        -f /etc/cilium/values-hubble.yaml
-        --set-string kubeProxyReplacement={{ cilium_enable_kpr_free | default(false) | bool | lower }}
-        --set-string k8sServiceHost={{ api_host_for_cilium }}
-        --set k8sServicePort={{ api_port_for_cilium }}
-        --set ipam.mode=cluster-pool
-        --set ipam.operator.clusterPoolIPv4PodCIDRList={{ kubernetes_pod_subnet | default('10.244.0.0/16') }}
-        --set ipam.operator.clusterPoolIPv4MaskSize=24
-        --set hubble.metrics.enabled="{dns:query;ignoreAAAA,drop,tcp,flow,icmp,http}"
-        --set prometheus.enabled=true
-        --set operator.prometheus.enabled=true
-        --set bpf.masquerade=true
-      environment:
-        KUBECONFIG: /etc/kubernetes/admin.conf
-    - name: Wait rollout cilium DS after Hubble
-      command: kubectl -n kube-system rollout status ds/cilium --timeout=5m
       environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
-    - name: Wait rollout cilium-operator after Hubble
-      command: kubectl -n kube-system rollout status deploy/cilium-operator --timeout=5m
-      environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
-    - name: Ensure nodes still Ready after Hubble
-      shell: |
+      when: inventory_hostname == groups['masters'][0]
+      delegate_to: "{{ groups['masters'][0] }}"
+      run_once: true
+      tags: [mayastor, storage, nvme, csi]
+
+    - name: Remove default annotation from other SCs
+      when:
+        - set_default_sc
+        - inventory_hostname == groups['masters'][0]
+      ansible.builtin.shell: |
         set -e
-        kubectl get nodes --no-headers | awk '{print $1}' | \
-        xargs -I{} kubectl wait --for=condition=Ready node/{} --timeout=180s
+        for sc in $(kubectl get sc -o jsonpath='{.items[*].metadata.name}'); do
+          if [ "$sc" != "{{ default_sc_name }}" ]; then
+            kubectl annotate sc "$sc" storageclass.kubernetes.io/is-default-class- || true
+          fi
+        done
       environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
+      delegate_to: "{{ groups['masters'][0] }}"
+      run_once: true
+      tags: [mayastor, storage, nvme, csi]
+
+    - name: Annotate {{ default_sc_name }} as default
+      when:
+        - set_default_sc
+        - inventory_hostname == groups['masters'][0]
+        - sc_default.stdout | default('') != 'true'
+      ansible.builtin.command: kubectl annotate sc {{ default_sc_name }} storageclass.kubernetes.io/is-default-class="true" --overwrite
+      register: annotate_out
+      changed_when: >
+        'annotated' in (annotate_out.stdout | default('')) or
+        'annotated' in (annotate_out.stderr | default(''))
+      environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
+      delegate_to: "{{ groups['masters'][0] }}"
+      run_once: true
+      tags: [mayastor, storage, nvme, csi]
+
+    ###########################################################################
+    # 5) MANIFEST DE TEST (PVC + BUSYBOX) — optionnel
+    ###########################################################################
+    - name: Create test PVC and busybox pod
+      ansible.builtin.shell: |
+        cat <<'YAML' >/tmp/test-mayastor.yml
+        apiVersion: v1
+        kind: PersistentVolumeClaim
+        metadata:
+          name: test-pvc
+        spec:
+          accessModes: [ "ReadWriteOnce" ]
+          storageClassName: mayastor-1
+          resources:
+            requests:
+              storage: 5Gi
+        ---
+        apiVersion: v1
+        kind: Pod
+        metadata:
+          name: test-busybox
+          labels: { app: test-busybox }
+        spec:
+          nodeSelector:
+            openebs.io/engine: mayastor
+          tolerations:
+            - key: "openebs.io/storage"
+              operator: "Equal"
+              value: "mayastor"
+              effect: "NoSchedule"
+          containers:
+          - name: busybox
+            image: busybox
+            command: ['sh', '-c', 'echo "Hello, Mayastor!" > /mnt/test.txt && sleep 3600']
+            volumeMounts:
+            - name: test-volume
+              mountPath: /mnt
+          volumes:
+          - name: test-volume
+            persistentVolumeClaim:
+              claimName: test-pvc
+        YAML
+        kubectl apply -f /tmp/test-mayastor.yml
+      register: test_apply
+      changed_when: >
+        'created' in (test_apply.stdout | default('')) or
+        'configured' in (test_apply.stdout | default(''))
+      environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
+      when: inventory_hostname == groups['masters'][0]
+      delegate_to: "{{ groups['masters'][0] }}"
+      run_once: true
+      tags: [mayastor, storage, nvme, csi, test]
+  become: yes
+  tags: [mayastor, storage, nvme, csi]

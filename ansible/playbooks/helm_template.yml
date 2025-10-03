@@ -1,0 +1,6 @@
+---
+- name: Helm template
+  hosts: k8s
+  become: no
+  roles:
+    - helm

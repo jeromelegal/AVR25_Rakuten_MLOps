@@ -1,4 +1,3 @@
----
 # Déploiement MetalLB avec double LoadBalancer
 - name: Ensure masters group exists and is not empty
   assert:
@@ -19,15 +18,6 @@
   become: yes
   tags: metallb
 
-- name: Add Prometheus CRDs
-  command: kubectl apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/example/prometheus-operator-crd/monitoring.coreos.com_servicemonitors.yaml
-  run_once: true
-  delegate_to: "{{ groups['masters'][0] }}"
-  become: yes
-  environment:
-    KUBECONFIG: /etc/kubernetes/admin.conf
-  tags: metallb
-
 - name: Update Helm repositories
   command: helm repo update
   run_once: true
@@ -35,19 +25,11 @@
   become: yes
   tags: metallb
 
-- name: Install/Upgrade MetalLB with webhooks disabled
-  command: >-
-    helm upgrade --install metallb metallb/metallb
-    --namespace metallb-system
-    --create-namespace
-    --version {{ metallb_chart_version | default('0.13.12') }}
-    --set-string speaker.nodeSelector."node-role\.kubernetes\.io/network"="true"
-    --set-string controller.nodeSelector."node-role\.kubernetes\.io/network"="true"
-    --set prometheus.enabled=true
-    --set prometheus.serviceMonitor.enabled=true
-    --set prometheus.serviceAccount=default
-    --set prometheus.namespace=monitoring
-    --set webhook.enabled=false
+- name: Create metallb-system namespace
+  ansible.builtin.command: kubectl create namespace metallb-system
+  register: namespace_creation
+  changed_when: "'created' in namespace_creation.stdout"
+  failed_when: namespace_creation.rc != 0 and 'AlreadyExists' not in namespace_creation.stderr
   run_once: true
   delegate_to: "{{ groups['masters'][0] }}"
   become: yes
@@ -55,20 +37,34 @@
     KUBECONFIG: /etc/kubernetes/admin.conf
   tags: metallb
 
-# # Attendre que MetalLB soit prêt (CRDs + rollout controller/speaker)
-# - name: Wait for MetalLB CRDs to exist
-#   command: kubectl get crd ipaddresspools.metallb.io l2advertisements.metallb.io
-#   register: metallb_crds
-#   retries: 30
-#   delay: 5
-#   until: metallb_crds.rc == 0
-#   changed_when: false
+# - name: Install Prometheus Operator CRDs
+#   ansible.builtin.command: kubectl apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/example/prometheus-operator-crd/monitoring.coreos.com_servicemonitors.yaml
 #   run_once: true
 #   delegate_to: "{{ groups['masters'][0] }}"
 #   become: yes
 #   environment:
 #     KUBECONFIG: /etc/kubernetes/admin.conf
 #   tags: metallb
+
+# - name: Install Prometheus Operator CRDs
+#   ansible.builtin.command: kubectl apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/example/prometheus-operator-crd/monitoring.coreos.com_servicemonitors.yaml
+#   run_once: true
+#   delegate_to: "{{ groups['masters'][0] }}"
+#   become: yes
+#   environment:
+#     KUBECONFIG: /etc/kubernetes/admin.conf
+#   tags: metallb
+
+
+
+- name: Apply MetalLB manifests from rendered YAML
+  command: kubectl apply -f /etc/helm/rendered/rendered-metallb/metallb-rendered.yaml
+  run_once: true
+  delegate_to: "{{ groups['masters'][0] }}"
+  become: yes
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  tags: metallb
 
 - name: Wait for metallb-controller rollout
   command: kubectl -n metallb-system rollout status deploy/metallb-controller --timeout=300s
@@ -229,7 +225,6 @@
       tags: metallb
 
 # Déclaration du service Hubble UI LoadBalancer
-# Déclaration du service Hubble UI LoadBalancer
 - name: Apply LoadBalancer Service (MetalLB)
   vars:
     service_name: "hubble-ui"
@@ -242,7 +237,7 @@
     selector_labels:
       k8s-app: hubble-ui
     port: 80
-    target_port: 80
+    target_port: 8081
   command: kubectl apply -f -
   args:
     stdin: |
@@ -253,10 +248,6 @@
   environment:
     KUBECONFIG: /etc/kubernetes/admin.conf
   tags: metallb
-
-
-
-
 
 # Vérifications
 - name: Wait for services IP assignment
