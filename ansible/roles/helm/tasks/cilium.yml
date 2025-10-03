@@ -1,0 +1,56 @@
+---
+# roles/helm/tasks/cilium_render_and_fetch.yml
+- name: Cilium — génération + rapatriement (ultra-simple, autonome)
+  vars:
+    kube_system_ns: "kube-system"
+    cilium_version: "1.18.2"
+    render_dir: "/etc/helm/rendered/cilium"
+    local_render_dir: "{{ playbook_dir }}/rendered_local/cilium-rendered"
+    rendered_manifest: "{{ render_dir }}/cilium-phase1.yaml"
+
+    # <-- ajuste ici si besoin de plusieurs CIDR
+    pod_cidr_list: ["10.244.0.0/16"]
+  block:
+    - name: Créer le répertoire de rendu (remote)
+      file:
+        path: "{{ render_dir }}"
+        state: directory
+        mode: "0755"
+      run_once: true
+      delegate_to: "{{ groups['masters'][0] }}"
+      become: yes
+
+    - name: Rendre le manifest Cilium (phase 1 – kube-proxy présent)
+      shell: |
+        set -euo pipefail
+        helm repo add cilium https://helm.cilium.io || true
+        helm repo update
+        helm template cilium cilium/cilium \
+          --version {{ cilium_version }} \
+          --namespace {{ kube_system_ns }} \
+          --set-string kubeProxyReplacement=false \
+          --set ipam.mode=cluster-pool \
+          --set ipam.operator.clusterPoolIPv4PodCIDRList={{ '{' ~ (pod_cidr_list | join(',')) ~ '}' }} \
+          --set ipam.operator.clusterPoolIPv4MaskSize=24 \
+          > "{{ rendered_manifest }}"
+      args: { executable: /bin/bash }
+      run_once: true
+      delegate_to: "{{ groups['masters'][0] }}"
+      become: yes
+
+    - name: Créer le répertoire local
+      file:
+        path: "{{ local_render_dir }}"
+        state: directory
+        mode: "0755"
+      run_once: true
+      delegate_to: localhost
+
+    - name: Rapatrier le manifest (phase 1)
+      fetch:
+        src: "{{ rendered_manifest }}"
+        dest: "{{ local_render_dir }}/cilium-phase1.yaml"
+        flat: yes
+      run_once: true
+      delegate_to: "{{ groups['masters'][0] }}"
+      become: yes

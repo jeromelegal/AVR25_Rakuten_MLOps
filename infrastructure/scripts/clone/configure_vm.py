@@ -185,18 +185,18 @@ class VMConfigurator:
                 return False
         return True
 
-    def install_packages(self, config):
-        """Installe les paquets spécifiés"""
-        # Les paquets ne sont pas explicitement spécifiés dans la nouvelle structure
-        # On installe les paquets de base pour le moment
-        packages = ['nginx', 'docker.io', 'kubelet', 'kubeadm', 'kubectl']
-        if not packages:
-            self.log("INFO", "Aucun paquet à installer")
-            return True
+    # def install_packages(self, config):
+    #     """Installe les paquets spécifiés"""
+    #     # Les paquets ne sont pas explicitement spécifiés dans la nouvelle structure
+    #     # On installe les paquets de base pour le moment
+    #     packages = ['nginx', 'docker.io', 'kubelet', 'kubeadm', 'kubectl']
+    #     if not packages:
+    #         self.log("INFO", "Aucun paquet à installer")
+    #         return True
 
-        for pkg in packages:
-            self.install_package(pkg)
-        return True
+    #     for pkg in packages:
+    #         self.install_package(pkg)
+    #     return True
 
     def resize_partition(self, config):
         """Redimensionne la partition pour utiliser tout l'espace disponible sur le disque"""
@@ -484,7 +484,7 @@ class VMConfigurator:
         self.configure_network(config)
         self.configure_user(config)
         self.configure_sudo(config)
-        self.install_packages(config)
+        # self.install_packages(config)
         self.resize_partition(config)
         self.resize_logical_volume(config)
         self.configure_disks(config)

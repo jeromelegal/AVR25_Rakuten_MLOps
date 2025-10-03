@@ -1,0 +1,201 @@
+---
+# Render-only Mayastor/OpenEBS: chart → YAML, pas d'apply, fetch optionnel
+- name: Mayastor NVMe-only — render Helm chart to YAML (no kubectl)
+  vars:
+    # Namespace ciblé par les manifests rendus
+    mayastor_namespace: "openebs"
+
+    # Chart OpenEBS (Mayastor inclus)
+    openebs_chart_version: "4.1.0"
+
+    # (Optionnel) values fourni par l’utilisateur : mettre use_values_file: true si présent
+    mayastor_values_file: "/etc/openebs/values-mayastor.yaml"
+    use_values_file: false
+
+    # Auto-values générés si use_values_file=false (désactive Loki/Alloy/MinIO,
+    # isole io-engine sur les nœuds data, topologie CSI)
+    auto_values_remote: "/etc/openebs/values-mayastor-render.yaml"
+
+    # (Optionnel) forcer le registry local (si tu as mirrorré les images)
+    use_local_registry: false
+    local_registry: "registry.local:5000"
+    # Exemple de version générique (à adapter) si tu veux pinner les tags :
+    mayastor_image_tag: ""     # ex: "v2.9.2" (laisser vide pour laisser le chart décider)
+
+    # Répertoires (remote = master délégué ; local = machine Ansible)
+    charts_dir_remote: "/etc/helm/charts"
+    rendered_dir_remote: "/etc/helm/rendered"
+    openebs_chart_tgz: "/etc/helm/charts/openebs-{{ openebs_chart_version }}.tgz"
+    openebs_rendered_yaml: "/etc/helm/rendered/openebs-mayastor-rendered.yaml"
+
+    # Rapatrier le YAML rendu vers la machine de contrôle ?
+    download_rendered: true
+    download_dir_local: "./templates/rendered-openebs"
+
+  block:
+    ###########################################################################
+    # Prep (remote)
+    ###########################################################################
+    - name: Ensure masters group exists and is not empty
+      ansible.builtin.assert:
+        that:
+          - "'masters' in groups"
+          - "groups['masters'] | length > 0"
+        fail_msg: "Le groupe [masters] doit exister et contenir au moins un hôte"
+      run_once: true
+      delegate_to: "{{ groups['masters'][0] }}"
+
+    - name: Ensure artefact directories exist on remote
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ charts_dir_remote }}"
+        - "{{ rendered_dir_remote }}"
+        - "/etc/openebs"
+      run_once: true
+      delegate_to: "{{ groups['masters'][0] }}"
+      become: yes
+
+    - name: Add OpenEBS Helm repo (remote)
+      ansible.builtin.command: helm repo add openebs https://openebs.github.io/openebs
+      register: helm_repo_add
+      changed_when: >
+        'has been added' in (helm_repo_add.stdout | default('')) or
+        'already exists' in (helm_repo_add.stderr | default(''))
+      run_once: true
+      delegate_to: "{{ groups['masters'][0] }}"
+      become: yes
+
+    - name: Helm repo update (remote)
+      ansible.builtin.command: helm repo update
+      changed_when: false
+      run_once: true
+      delegate_to: "{{ groups['masters'][0] }}"
+      become: yes
+
+    - name: Pull OpenEBS chart locally on remote (tgz)
+      ansible.builtin.command: >
+        helm pull openebs/openebs
+        --version {{ openebs_chart_version }}
+        --destination {{ charts_dir_remote }}
+      args:
+        creates: "{{ openebs_chart_tgz }}"
+      run_once: true
+      delegate_to: "{{ groups['masters'][0] }}"
+      become: yes
+
+    ###########################################################################
+    # Values: on utilise le values fourni OU on génère un values minimal
+    ###########################################################################
+    - name: Probe optional user-provided values file
+      when: (use_values_file | default(false)) | bool
+      ansible.builtin.stat:
+        path: "{{ mayastor_values_file }}"
+      register: mayastor_values_stat
+      run_once: true
+      delegate_to: "{{ groups['masters'][0] }}"
+      become: yes
+
+    - name: Generate minimal Mayastor values (no Loki/Alloy/MinIO + scheduling)
+      when: not (use_values_file | default(false)) | bool
+      ansible.builtin.copy:
+        dest: "{{ auto_values_remote }}"
+        mode: "0644"
+        content: |
+          # Couper l'observabilité additionnelle
+          loki:
+            enabled: false
+          alloy:
+            enabled: false
+          minio:
+            enabled: false
+
+          # Sous-chart Mayastor: io-engine isolé sur nœuds "data" + tolération
+          mayastor:
+            {% if use_local_registry %}
+            image:
+              registry: {{ local_registry | quote }}
+              {% if mayastor_image_tag|length > 0 %}
+              tag: {{ mayastor_image_tag | quote }}
+              {% endif %}
+            csi:
+              image:
+                registry: {{ local_registry | quote }}
+            {% endif %}
+
+            io_engine:
+              nodeSelector:
+                openebs.io/engine: mayastor
+              tolerations:
+                - key: "openebs.io/storage"
+                  operator: "Equal"
+                  value: "mayastor"
+                  effect: "NoSchedule"
+
+            # CSI node topology (limiter csi-node/agent-ha-node aux nœuds data)
+            csi:
+              node:
+                topology:
+                  nodeSelector: true
+                  segments:
+                    openebs.io/csi-node: mayastor
+      run_once: true
+      delegate_to: "{{ groups['masters'][0] }}"
+      become: yes
+
+    - name: Decide which values file to use
+      set_fact:
+        values_path_effective: >-
+          {{
+            (mayastor_values_file)
+            if ((use_values_file | default(false)) | bool) and (mayastor_values_stat.stat.exists | default(false))
+            else (auto_values_remote)
+          }}
+      run_once: true
+      delegate_to: "{{ groups['masters'][0] }}"
+      delegate_facts: true
+
+    ###########################################################################
+    # Rendu YAML (include CRDs) — Mayastor only, sans Loki/Alloy/MinIO
+    ###########################################################################
+    - name: Render OpenEBS (Mayastor only) to a single YAML file
+      ansible.builtin.shell: >-
+        helm template openebs {{ openebs_chart_tgz }}
+        --namespace {{ mayastor_namespace }}
+        --create-namespace
+        --include-crds
+        --version {{ openebs_chart_version }}
+        -f {{ hostvars[groups['masters'][0]].values_path_effective }}
+        --set engines.local.lvm.enabled=false
+        --set engines.local.zfs.enabled=false
+        --set engines.replicated.mayastor.enabled=true
+        > {{ openebs_rendered_yaml }}
+      args:
+        executable: /bin/bash
+      run_once: true
+      delegate_to: "{{ groups['masters'][0] }}"
+      become: yes
+
+    ###########################################################################
+    # Rapatriement local (optionnel)
+    ###########################################################################
+    - name: Ensure local download directory exists
+      when: download_rendered | bool
+      delegate_to: localhost
+      become: false
+      ansible.builtin.file:
+        path: "{{ download_dir_local }}"
+        state: directory
+        mode: "0755"
+      run_once: true
+
+    - name: Fetch rendered OpenEBS/Mayastor YAML to local
+      when: download_rendered | bool
+      ansible.builtin.fetch:
+        src: "{{ openebs_rendered_yaml }}"
+        dest: "{{ download_dir_local }}/openebs-mayastor-rendered.yaml"
+        flat: true
+      run_once: true
+      delegate_to: "{{ groups['masters'][0] }}"
