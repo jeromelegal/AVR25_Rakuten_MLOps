@@ -4,6 +4,10 @@
   tags: install
 
 - name: Include Label Nodes tasks
+  include_tasks: taint_nodes.yml
+  tags: taint_nodes
+
+- name: Include Label Nodes tasks
   include_tasks: label_nodes.yml
   tags: label_nodes
 
@@ -11,9 +15,9 @@
   include_tasks: namespaces.yml
   tags: namespaces 
 
-- name: Include Helm install task
-  include_tasks: helm.yml
-  tags: helm
+# - name: Include Helm install task
+#   include_tasks: helm.yml
+#   tags: helm
 
 - name: Include CNI tasks
   include_tasks: cni.yml
