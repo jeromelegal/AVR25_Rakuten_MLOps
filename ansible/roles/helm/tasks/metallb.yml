@@ -1,148 +1,105 @@
 ---
-# Render-only MetalLB: chart → YAML, pas d'apply, rapatriement optionnel
-- name: MetalLB — render Helm chart to YAML (no kubectl) + optional fetch
+# roles/helm/tasks/metallb_render.yml
+- name: MetalLB — Génération des manifests
   vars:
-    metallb_chart_version: "0.13.12"
-
-    # NodeSelector pour isoler controller/speaker sur les nœuds "network"
-    network_node_selector_key: "node-role.kubernetes.io/network"
-    network_node_selector_value: "true"
-
-    # (Optionnel) fichier values ; passer use_values_file: true si présent
-    metallb_values_file: "/etc/metallb/values.yaml"
-    use_values_file: false
-
-    # Répertoires (remote = sur le master délégué ; local = machine Ansible)
-    charts_dir_remote: "/etc/helm/charts"
-    rendered_dir_remote: "/etc/helm/rendered"
-    metallb_chart_tgz: "/etc/helm/charts/metallb-{{ metallb_chart_version }}.tgz"
-    metallb_rendered_yaml: "/etc/helm/rendered/metallb-rendered.yaml"
-
-    # Rapatrier le YAML rendu vers la machine de contrôle ?
-    download_rendered: true
-    download_dir_local: "./templates/rendered-metallb"
-
+    metallb_namespace: "metallb-system"
+    metallb_version: "0.13.12"
+    render_dir: "/etc/helm/rendered/metallb"
+    download_dir: "{{ playbook_dir }}/templates/metallb-rendered"
   block:
-    ###########################################################################
-    # Sanity & prep
-    ###########################################################################
-    - name: Ensure masters group exists and is not empty
-      ansible.builtin.assert:
-        that:
-          - "'masters' in groups"
-          - "groups['masters'] | length > 0"
-        fail_msg: "Le groupe [masters] doit exister et contenir au moins un hôte"
-      run_once: true
-      delegate_to: "{{ groups['masters'][0] }}"
-
-    - name: Ensure artefact directories exist on remote
-      ansible.builtin.file:
+    # 1. Créer les répertoires
+    - name: Créer les répertoires
+      file:
         path: "{{ item }}"
         state: directory
         mode: "0755"
       loop:
-        - "{{ charts_dir_remote }}"
-        - "{{ rendered_dir_remote }}"
+        - "{{ render_dir }}"
+        - "{{ download_dir }}"
       run_once: true
       delegate_to: "{{ groups['masters'][0] }}"
       become: yes
+      when: item.startswith('/etc/')
 
-    - name: Add MetalLB Helm repository (remote)
-      ansible.builtin.command: helm repo add metallb https://metallb.github.io/metallb
-      args:
-        creates: /root/.cache/helm/repository/metallb-index.yaml
-      register: metallb_repo_add
-      changed_when: >
-        'has been added' in (metallb_repo_add.stdout | default('')) or
-        'already exists' in (metallb_repo_add.stderr | default(''))
+    - name: Créer les répertoires locaux
+      file:
+        path: "{{ download_dir }}"
+        state: directory
+        mode: "0755"
       run_once: true
-      delegate_to: "{{ groups['masters'][0] }}"
-      become: yes
+      delegate_to: localhost
+      become: no
 
-    - name: Helm repo update (remote)
-      ansible.builtin.command: helm repo update
-      changed_when: false
-      run_once: true
-      delegate_to: "{{ groups['masters'][0] }}"
-      become: yes
-
-    - name: Pull MetalLB chart locally on remote (tgz)
-      ansible.builtin.command: >
-        helm pull metallb/metallb
-        --version {{ metallb_chart_version }}
-        --destination {{ charts_dir_remote }}
-      args:
-        creates: "{{ metallb_chart_tgz }}"
-      run_once: true
-      delegate_to: "{{ groups['masters'][0] }}"
-      become: yes
-
-    ###########################################################################
-    # Flag --values optionnel + nodeSelector key échappée
-    ###########################################################################
-    - name: Probe optional MetalLB values file
-      when: (use_values_file | default(false)) | bool
-      ansible.builtin.stat:
-        path: "{{ metallb_values_file }}"
-      register: metallb_values_stat
-      run_once: true
-      delegate_to: "{{ groups['masters'][0] }}"
-      become: yes
-
-    - name: Compute Helm --values flag & escaped selector key
-      set_fact:
-        metallb_values_flag: >-
-          {{ ('-f ' ~ metallb_values_file)
-             if ((use_values_file | default(false)) | bool) and (metallb_values_stat.stat.exists | default(false))
-             else '' }}
-        network_selector_key_escaped: "{{ network_node_selector_key | replace('.', '\\.') }}"
-      run_once: true
-      delegate_to: "{{ groups['masters'][0] }}"
-      delegate_facts: true
-
-    ###########################################################################
-    # Rendu YAML (include CRDs) — AUCUN kubectl
-    ###########################################################################
-    - name: Render MetalLB manifests to a single YAML file
-      ansible.builtin.shell: >-
-        helm template metallb {{ metallb_chart_tgz }}
-        --namespace metallb-system
-        --create-namespace
-        --include-crds
-        --version {{ metallb_chart_version }}
-        {{ hostvars[groups['masters'][0]].metallb_values_flag | default('') }}
-        --set-string speaker.nodeSelector."{{ hostvars[groups['masters'][0]].network_selector_key_escaped }}"="{{ network_node_selector_value }}"
-        --set-string controller.nodeSelector."{{ hostvars[groups['masters'][0]].network_selector_key_escaped }}"="{{ network_node_selector_value }}"
-        --set prometheus.enabled=true
-        --set prometheus.serviceMonitor.enabled=true
-        --set prometheus.serviceAccount=default
-        --set prometheus.namespace=monitoring
-        --set webhook.enabled=false
-        > {{ metallb_rendered_yaml }}
+    # 2. Configurer le dépôt Helm
+    - name: Configurer le dépôt MetalLB
+      shell: |
+        set -euo pipefail
+        helm repo add metallb https://metallb.github.io/metallb || true
+        helm repo update
       args:
         executable: /bin/bash
       run_once: true
       delegate_to: "{{ groups['masters'][0] }}"
       become: yes
 
-    ###########################################################################
-    # Rapatriement local (optionnel)
-    ###########################################################################
-    - name: Ensure local download directory exists
-      when: download_rendered | bool
-      delegate_to: localhost
-      become: false
-      ansible.builtin.file:
-        path: "{{ download_dir_local }}"
-        state: directory
-        mode: "0755"
-      run_once: true
-
-    - name: Fetch rendered MetalLB YAML to local
-      when: download_rendered | bool
-      ansible.builtin.fetch:
-        src: "{{ metallb_rendered_yaml }}"
-        dest: "{{ download_dir_local }}/metallb-rendered.yaml"
-        flat: true
+    # 3. Générer le manifest complet
+    - name: Générer le manifest MetalLB
+      shell: |
+        set -euo pipefail
+        helm template metallb metallb/metallb \
+          --version {{ metallb_version }} \
+          --namespace {{ metallb_namespace }} \
+          --include-crds \
+          > "{{ render_dir }}/metallb-combined.yaml"
+      args:
+        executable: /bin/bash
       run_once: true
       delegate_to: "{{ groups['masters'][0] }}"
+      become: yes
+
+    # 4. Extraire les CRDs avec une méthode robuste
+    - name: Extraire les CRDs avec yq (version 4)
+      shell: |
+        set -euo pipefail
+        # Utiliser yq pour extraire proprement les CRDs
+        yq 'select(.kind == "CustomResourceDefinition")' "{{ render_dir }}/metallb-combined.yaml" > "{{ render_dir }}/metallb-crds.yaml"
+      args:
+        executable: /bin/bash
+      run_once: true
+      delegate_to: "{{ groups['masters'][0] }}"
+      become: yes
+
+    # 5. Vérifier et corriger le fichier CRDs
+    - name: Vérifier et corriger le fichier CRDs
+      shell: |
+        set -euo pipefail
+        # Vérifier que le fichier est valide
+        if ! yq eval '.' {{ render_dir }}/metallb-crds.yaml >/dev/null 2>&1; then
+          # Si invalide, utiliser une méthode alternative
+          grep -A 50 'kind: CustomResourceDefinition' {{ render_dir }}/metallb-combined.yaml | \
+          awk '/kind: CustomResourceDefinition/,/^---$/{print}' | \
+          sed '/^---$/d' > {{ render_dir }}/metallb-crds.yaml
+        fi
+        # Vérifier que le fichier se termine correctement
+        if [ -s {{ render_dir }}/metallb-crds.yaml ] && [ "$(tail -c1 {{ render_dir }}/metallb-crds.yaml)" != "" ]; then
+          echo "" >> {{ render_dir }}/metallb-crds.yaml
+        fi
+      args:
+        executable: /bin/bash
+      run_once: true
+      delegate_to: "{{ groups['masters'][0] }}"
+      become: yes
+
+    # 6. Rapatrier les fichiers
+    - name: Rapatrier les manifests
+      fetch:
+        src: "{{ render_dir }}/{{ item.src }}"
+        dest: "{{ download_dir }}/{{ item.dest }}"
+        flat: yes
+      loop:
+        - { src: "metallb-crds.yaml", dest: "metallb-crds.yaml" }
+        - { src: "metallb-combined.yaml", dest: "metallb-combined.yaml" }
+      run_once: true
+      delegate_to: "{{ groups['masters'][0] }}"
+      become: yes
+  tags: [metallb, render]

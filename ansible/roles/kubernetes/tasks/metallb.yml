@@ -1,303 +1,148 @@
-# Déploiement MetalLB avec double LoadBalancer
-- name: Ensure masters group exists and is not empty
-  assert:
-    that:
-      - "'masters' in groups"
-      - "groups['masters'] | length > 0"
-    fail_msg: "Le groupe [masters] doit exister et contenir au moins un hôte"
-  run_once: true
-  delegate_to: "{{ groups['masters'][0] }}"
-  tags: metallb
-
-- name: Add MetalLB Helm repository
-  command: helm repo add metallb https://metallb.github.io/metallb
-  args:
-    creates: /root/.cache/helm/repository/metallb-index.yaml
-  run_once: true
-  delegate_to: "{{ groups['masters'][0] }}"
-  become: yes
-  tags: metallb
-
-- name: Update Helm repositories
-  command: helm repo update
-  run_once: true
-  delegate_to: "{{ groups['masters'][0] }}"
-  become: yes
-  tags: metallb
-
-- name: Create metallb-system namespace
-  ansible.builtin.command: kubectl create namespace metallb-system
-  register: namespace_creation
-  changed_when: "'created' in namespace_creation.stdout"
-  failed_when: namespace_creation.rc != 0 and 'AlreadyExists' not in namespace_creation.stderr
-  run_once: true
-  delegate_to: "{{ groups['masters'][0] }}"
-  become: yes
-  environment:
-    KUBECONFIG: /etc/kubernetes/admin.conf
-  tags: metallb
-
-# - name: Install Prometheus Operator CRDs
-#   ansible.builtin.command: kubectl apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/example/prometheus-operator-crd/monitoring.coreos.com_servicemonitors.yaml
-#   run_once: true
-#   delegate_to: "{{ groups['masters'][0] }}"
-#   become: yes
-#   environment:
-#     KUBECONFIG: /etc/kubernetes/admin.conf
-#   tags: metallb
-
-# - name: Install Prometheus Operator CRDs
-#   ansible.builtin.command: kubectl apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/example/prometheus-operator-crd/monitoring.coreos.com_servicemonitors.yaml
-#   run_once: true
-#   delegate_to: "{{ groups['masters'][0] }}"
-#   become: yes
-#   environment:
-#     KUBECONFIG: /etc/kubernetes/admin.conf
-#   tags: metallb
-
-
-
-- name: Apply MetalLB manifests from rendered YAML
-  command: kubectl apply -f /etc/helm/rendered/rendered-metallb/metallb-rendered.yaml
-  run_once: true
-  delegate_to: "{{ groups['masters'][0] }}"
-  become: yes
-  environment:
-    KUBECONFIG: /etc/kubernetes/admin.conf
-  tags: metallb
-
-- name: Wait for metallb-controller rollout
-  command: kubectl -n metallb-system rollout status deploy/metallb-controller --timeout=300s
-  register: metallb_ctrl_rollout
-  changed_when: false
-  run_once: true
-  delegate_to: "{{ groups['masters'][0] }}"
-  become: yes
-  environment:
-    KUBECONFIG: /etc/kubernetes/admin.conf
-  tags: metallb
-
-- name: Wait for metallb-speaker rollout
-  command: kubectl -n metallb-system rollout status ds/metallb-speaker --timeout=300s
-  register: metallb_speaker_rollout
-  changed_when: false
-  run_once: true
-  delegate_to: "{{ groups['masters'][0] }}"
-  become: yes
-  environment:
-    KUBECONFIG: /etc/kubernetes/admin.conf
-  tags: metallb
-
-# Configuration MetalLB
-- name: Apply MetalLB configuration
-  command: kubectl apply -f -
-  args:
-    stdin: |
-      apiVersion: metallb.io/v1beta1
-      kind: IPAddressPool
-      metadata:
-        name: master-pool
-        namespace: metallb-system
-      spec:
-        addresses:
-        - {{ metallb_ip_range | default('192.168.200.100-192.168.200.200') }}
-      ---
-      apiVersion: metallb.io/v1beta1
-      kind: L2Advertisement
-      metadata:
-        name: master-advertisement
-        namespace: metallb-system
-      spec:
-        ipAddressPools:
-        - master-pool
-  run_once: true
-  delegate_to: "{{ groups['masters'][0] }}"
-  become: yes
-  environment:
-    KUBECONFIG: /etc/kubernetes/admin.conf
-  tags: metallb
-
-# Configuration complète pour les masters
-- name: Configure kube-apiserver endpoints and services
-  block:
-    # Service externe principal pour l'API
-    - name: Apply external LoadBalancer service for API
-      command: kubectl apply -f -
-      args:
-        stdin: |
-          apiVersion: v1
-          kind: Service
-          metadata:
-            name: kubeapi-lb
-            namespace: default
-            annotations:
-              metallb.universe.tf/loadBalancerIPs: "{{ metallb_master_ip | default('192.168.200.101') }}"
-          spec:
-            type: LoadBalancer
-            ports:
-            - port: 6443
-              targetPort: 6443
-              protocol: TCP
-              name: https
-            externalTrafficPolicy: Local
-      run_once: true
-      delegate_to: "{{ groups['masters'][0] }}"
-      become: yes
-      environment:
-        KUBECONFIG: /etc/kubernetes/admin.conf
-      tags: metallb
-
-    # Endpoints pour le service principal
-    - name: Apply endpoints for main service
-      command: kubectl apply -f -
-      args:
-        stdin: |
-          apiVersion: v1
-          kind: Endpoints
-          metadata:
-            name: kubeapi-lb
-            namespace: default
-          subsets:
-          {% for master in groups['masters'] %}
-          - addresses:
-            - ip: "{{ hostvars[master].ansible_host | default(hostvars[master].ansible_default_ipv4.address) }}"
-            ports:
-            - port: 6443
-              protocol: TCP
-          {% endfor %}
-      run_once: true
-      delegate_to: "{{ groups['masters'][0] }}"
-      become: yes
-      environment:
-        KUBECONFIG: /etc/kubernetes/admin.conf
-      tags: metallb
-
-    # Service LoadBalancer supplémentaire pour les endpoints du control plane
-    - name: Apply additional LoadBalancer for control plane endpoints
-      command: kubectl apply -f -
-      args:
-        stdin: |
-          apiVersion: v1
-          kind: Service
-          metadata:
-            name: control-plane-lb
-            namespace: kube-system
-            annotations:
-              metallb.universe.tf/loadBalancerIPs: "{{ metallb_control_plane_ip | default('192.168.200.102') }}"
-          spec:
-            type: LoadBalancer
-            ports:
-            - port: 6443
-              targetPort: 6443
-              protocol: TCP
-              name: https
-            externalTrafficPolicy: Local
-      run_once: true
-      delegate_to: "{{ groups['masters'][0] }}"
-      become: yes
-      environment:
-        KUBECONFIG: /etc/kubernetes/admin.conf
-      tags: metallb
-
-    # Endpoints pour le service supplémentaire
-    - name: Apply endpoints for control plane service
-      command: kubectl apply -f -
-      args:
-        stdin: |
-          apiVersion: v1
-          kind: Endpoints
-          metadata:
-            name: control-plane-lb
-            namespace: kube-system
-          subsets:
-          {% for master in groups['masters'] %}
-          - addresses:
-            - ip: "{{ hostvars[master].ansible_host | default(hostvars[master].ansible_default_ipv4.address) }}"
-            ports:
-            - port: 6443
-              protocol: TCP
-          {% endfor %}
-      run_once: true
-      delegate_to: "{{ groups['masters'][0] }}"
-      become: yes
-      environment:
-        KUBECONFIG: /etc/kubernetes/admin.conf
-      tags: metallb
-
-# Déclaration du service Hubble UI LoadBalancer
-- name: Apply LoadBalancer Service (MetalLB)
+---
+# roles/kubernetes/tasks/metallb.yml
+- name: MetalLB — Déploiement complet
   vars:
-    service_name: "hubble-ui"
-    service_namespace: "kube-system"
-    service_labels:
-      k8s-app: hubble-ui
-    metallb_address_pool: "master-pool"
-    load_balancer_ip: ""
-    source_ranges: []
-    selector_labels:
-      k8s-app: hubble-ui
-    port: 80
-    target_port: 8081
-  command: kubectl apply -f -
-  args:
-    stdin: |
-      {{ lookup('template', 'templates/metallb-serviceLB.j2') }}
-  run_once: true
-  delegate_to: "{{ groups['masters'][0] }}"
-  become: yes
-  environment:
-    KUBECONFIG: /etc/kubernetes/admin.conf
-  tags: metallb
-
-# Vérifications
-- name: Wait for services IP assignment
+    metallb_namespace: "metallb-system"
+    metallb_version: "0.13.12"
+    render_dir: "/etc/helm/rendered/metallb"
+    download_dir: "{{ playbook_dir }}/templates/metallb-rendered"
+    upload_dir: "{{ playbook_dir }}/rendered_local/metallb"
+    remote_render_dir: "/etc/helm/rendered/metallb"
   block:
-    - name: Wait for kubeapi-lb IP
-      command: kubectl get svc kubeapi-lb -n default -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
-      register: kubeapi_lb_ip
-      until: kubeapi_lb_ip.stdout != ""
-      retries: 10
+    # 1. Créer les répertoires
+    - name: Créer les répertoires
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ render_dir }}"
+        - "{{ download_dir }}"
+        - "{{ upload_dir }}"
+      run_once: true
+      delegate_to: "{{ groups['masters'][0] }}"
+      become: yes
+      when: item.startswith('/etc/')
+
+    - name: Créer les répertoires locaux
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ download_dir }}"
+        - "{{ upload_dir }}"
+      run_once: true
+      delegate_to: localhost
+      become: no
+
+    # 2. Configurer le dépôt Helm
+    - name: Configurer le dépôt MetalLB
+      shell: |
+        set -euo pipefail
+        helm repo add metallb https://metallb.github.io/metallb || true
+        helm repo update
+      args:
+        executable: /bin/bash
+      run_once: true
+      delegate_to: "{{ groups['masters'][0] }}"
+      become: yes
+
+    # 3. Générer le manifest complet
+    - name: Générer le manifest MetalLB
+      shell: |
+        set -euo pipefail
+        helm template metallb metallb/metallb \
+          --version {{ metallb_version }} \
+          --namespace {{ metallb_namespace }} \
+          --include-crds \
+          > "{{ render_dir }}/metallb-combined.yaml"
+      args:
+        executable: /bin/bash
+      run_once: true
+      delegate_to: "{{ groups['masters'][0] }}"
+      become: yes
+
+    # 4. Extraire les CRDs
+    - name: Extraire les CRDs avec yq
+      shell: |
+        set -euo pipefail
+        yq 'select(.kind == "CustomResourceDefinition")' "{{ render_dir }}/metallb-combined.yaml" > "{{ render_dir }}/metallb-crds.yaml"
+      args:
+        executable: /bin/bash
+      run_once: true
+      delegate_to: "{{ groups['masters'][0] }}"
+      become: yes
+
+    # 5. Rapatrier les fichiers
+    - name: Rapatrier les manifests
+      fetch:
+        src: "{{ render_dir }}/{{ item.src }}"
+        dest: "{{ download_dir }}/{{ item.dest }}"
+        flat: yes
+      loop:
+        - { src: "metallb-crds.yaml", dest: "metallb-crds.yaml" }
+        - { src: "metallb-combined.yaml", dest: "metallb-combined.yaml" }
+      run_once: true
+      delegate_to: "{{ groups['masters'][0] }}"
+      become: yes
+
+    # 6. Uploader les fichiers
+    - name: Uploader les manifests
+      copy:
+        src: "{{ download_dir }}/{{ item.src }}"
+        dest: "{{ remote_render_dir }}/{{ item.dest }}"
+        mode: "0644"
+      loop:
+        - { src: "metallb-crds.yaml", dest: "metallb-crds.yaml" }
+        - { src: "metallb-combined.yaml", dest: "metallb-combined.yaml" }
+      run_once: true
+      delegate_to: "{{ groups['masters'][0] }}"
+      become: yes
+
+    # 7. Créer le namespace
+    - name: Créer le namespace metallb-system
+      command: kubectl create namespace {{ metallb_namespace }}
+      register: ns_create
+      failed_when: ns_create.rc != 0 and 'already exists' not in ns_create.stderr
+      run_once: true
+      delegate_to: "{{ groups['masters'][0] }}"
+      become: yes
+      environment: { KUBECONFIG: "/etc/kubernetes/admin.conf" }
+
+    # 8. Appliquer les CRDs
+    - name: Appliquer les CRDs MetalLB
+      command: kubectl apply -f {{ remote_render_dir }}/metallb-crds.yaml
+      run_once: true
+      register: crd_apply
+      until: crd_apply.rc == 0
+      retries: 100
+      delay: 5
+      delegate_to: "{{ groups['masters'][0] }}"
+      become: yes
+      environment: { KUBECONFIG: "/etc/kubernetes/admin.conf" }
+
+    # 9. Appliquer le manifest principal
+    - name: Appliquer le manifest MetalLB
+      command: kubectl apply -f {{ remote_render_dir }}/metallb-combined.yaml
+      run_once: true
+      register: manifest_apply
+      until: manifest_apply.rc == 0
+      retries: 100
+      delay: 5
+      delegate_to: "{{ groups['masters'][0] }}"
+      become: yes
+      environment: { KUBECONFIG: "/etc/kubernetes/admin.conf" }
+
+    # 10. Vérifier l'installation
+    - name: Vérifier les pods MetalLB
+      command: kubectl -n {{ metallb_namespace }} get pods
+      register: metallb_pods
+      until: metallb_pods.stdout.find('Running') != -1
+      retries: 100
       delay: 10
       run_once: true
       delegate_to: "{{ groups['masters'][0] }}"
-      environment:
-        KUBECONFIG: /etc/kubernetes/admin.conf
-      tags: metallb
-
-    - name: Wait for control-plane-lb IP
-      command: kubectl get svc control-plane-lb -n kube-system -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
-      register: control_plane_lb_ip
-      until: control_plane_lb_ip.stdout != ""
-      retries: 10
-      delay: 10
-      run_once: true
-      delegate_to: "{{ groups['masters'][0] }}"
-      environment:
-        KUBECONFIG: /etc/kubernetes/admin.conf
-      tags: metallb
-
-- name: Verify MetalLB installation
-  command: kubectl -n metallb-system get all
-  run_once: true
-  delegate_to: "{{ groups['masters'][0] }}"
-  become: yes
-  environment:
-    KUBECONFIG: /etc/kubernetes/admin.conf
-  tags: metallb
-
-- name: Verify all services and endpoints
-  command: kubectl get svc,endpoints -A
-  register: all_services
-  run_once: true
-  delegate_to: "{{ groups['masters'][0] }}"
-  become: yes
-  environment:
-    KUBECONFIG: /etc/kubernetes/admin.conf
-  tags: metallb
-
-- name: Show relevant services and endpoints
-  debug:
-    msg: "{{ all_services.stdout_lines | select('match', 'kubeapi-lb|control-plane-lb') | list }}"
-  run_once: true
-  delegate_to: "{{ groups['masters'][0] }}"
-  tags: metallb
+      become: yes
+      environment: { KUBECONFIG: "/etc/kubernetes/admin.conf" }
+  tags: [metallb]

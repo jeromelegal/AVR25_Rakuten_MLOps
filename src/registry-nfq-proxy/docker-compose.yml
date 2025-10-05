@@ -1,0 +1,28 @@
+services:
+  registry-nfq:
+    build:
+      context: .
+    container_name: registry-nfq
+    ports:
+      - "443:443"     # Nginx health
+      - "8000:8000"   # FastAPI proxy (TLS)
+    environment:
+      REG_LOCAL_BASE_URL: "http://internal-registry:5000"   # ✅ bon port conteneur
+      TAMPON_REGISTRY: "internal-registry:5000"             # ✅ bon port conteneur
+      INSECURE_DEST: "true"
+      LISTEN_HOST: "0.0.0.0"
+      LISTEN_PORT: "8000"
+      APP_TLS: "true"
+      MIRROR_ALL_ARCHS: "false"
+      PLATFORM_OS: "linux"
+      PLATFORM_ARCH: "amd64"
+    depends_on:
+      - internal-registry
+
+  internal-registry:
+    image: registry:2
+    container_name: internal-registry
+    environment:
+      REGISTRY_STORAGE_DELETE_ENABLED: "true"              
+    ports:
+      - "6000:5000"    

@@ -92,6 +92,18 @@
 #   debug:
 #     var: update_output
 #   tags: install
+- name: Check if dpkg lock frontend file exists
+  stat:
+    path: /var/lib/dpkg/lock-frontend
+  register: dpkg_lock_frontend_file
+
+- name: Remove dpkg lock frontend file if it exists
+  file:
+    path: /var/lib/dpkg/lock-frontend
+    state: absent
+  when: dpkg_lock_frontend_file.stat.exists
+
+
 
 # Installation des prérequis système
 # Installe les paquets de base nécessaires pour Kubernetes

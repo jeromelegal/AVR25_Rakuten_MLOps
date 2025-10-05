@@ -45,47 +45,53 @@ spec:
       app.kubernetes.io/name: nats
       app.kubernetes.io/instance: openebs
 ---
+# Source: openebs/charts/alloy/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+automountServiceAccountToken: true
+metadata:
+  name: openebs-alloy
+  namespace: openebs
+  labels:
+    helm.sh/chart: alloy-1.0.1
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/instance: openebs
+    app.kubernetes.io/version: "v1.8.1"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: alloy
+    app.kubernetes.io/component: rbac
+---
 # Source: openebs/charts/localpv-provisioner/templates/rbac.yaml
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: openebs-localpv-provisioner
   labels:
-    chart: localpv-provisioner-4.1.0
+    chart: localpv-provisioner-4.3.0
     heritage: Helm
-    openebs.io/version: "4.1.0"
     app: localpv-provisioner
     release: openebs
     component: "localpv-provisioner"
     openebs.io/component-name: openebs-localpv-provisioner
 ---
-# Source: openebs/charts/mayastor/charts/loki-stack/charts/loki/templates/serviceaccount.yaml
+# Source: openebs/charts/loki/charts/minio/templates/serviceaccount.yaml
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  labels:
-    app: loki
-    chart: loki-2.16.0
-    release: openebs
-    heritage: Helm
-  annotations:
-    {}
-  name: openebs-loki
-  namespace: openebs
-automountServiceAccountToken: true
+  name: "minio-sa"
 ---
-# Source: openebs/charts/mayastor/charts/loki-stack/charts/promtail/templates/serviceaccount.yaml
+# Source: openebs/charts/loki/templates/serviceaccount.yaml
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: openebs-promtail
+  name: loki
   namespace: openebs
   labels:
-    helm.sh/chart: promtail-6.13.1
-    app.kubernetes.io/name: promtail
+    helm.sh/chart: loki-6.29.0
+    app.kubernetes.io/name: loki
     app.kubernetes.io/instance: openebs
-    app.kubernetes.io/version: "2.8.3"
-    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "3.4.2"
+automountServiceAccountToken: true
 ---
 # Source: openebs/charts/mayastor/charts/nats/templates/rbac.yaml
 apiVersion: v1
@@ -108,7 +114,22 @@ metadata:
   namespace: openebs
   labels:
     openebs.io/release: openebs
-    openebs.io/version: 2.7.0
+    openebs.io/version: 2.9.2
+---
+# Source: openebs/charts/loki/charts/minio/templates/secrets.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: openebs-minio
+  labels:
+    app: minio
+    chart: minio-5.4.0
+    release: openebs
+    heritage: Helm
+type: Opaque
+data:
+  rootUser: "cm9vdC11c2Vy"
+  rootPassword: "c3VwZXJzZWNyZXRwYXNzd29yZA=="
 ---
 # Source: openebs/charts/mayastor/charts/etcd/templates/token-secrets.yaml
 apiVersion: v1
@@ -123,171 +144,638 @@ metadata:
     app.kubernetes.io/managed-by: Helm
 type: Opaque
 data:
-  jwt-token.pem: "LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLQpNSUlKS1FJQkFBS0NBZ0VBN25PdUNta3EzeC9qOERxL3BUelIvNzRiTTBJTVpUSHJyOFlLKzJhMW95Z2Q5RGw4CkgxY01Kekd1UzBBQ29pcVFIT1U3RVRGU0dwQk4rK2NyMVI5QTBkTUg0a20wUHNEZjljeDZlZ0l3aHh2MlQ5aUkKR0RONHBxdUdnMk1vQ2xPQ0Z2SG1jUkJXbk4zQS9JazduWnNQS0dCRnhIcXdNdisxL2w4Tm4yTjRwUDVacHNZWApJWG5sTHlJYW1GcjlZTE90OTYwTTkwUlB2Slh5ZVY4NWFqdHcxSmNXYXNzVlpHbmtvOVV5NnBXM0NNY0VkdS9KCkt6ZjU2UlVkS0NyZXlwSGthdmQxZEFMSVMwOUZ4WUtaWnU5NHZNQWZSQSs3NU9zNGp2NzZOTTFUcTRRbkQ3Wm4KVzNGYVlNVHo1UlV2ZEVvOFFmYTUxTVQ2OXhoSE43TzRMTklyTUFRZ1BmTEN0WmhwV0o3RWgra0xweHhHaEdjegpaK1dHczlidEorM2RrelhhZnluNDlzMVZXSml1bytRY3BZdUdRb2NJeEtvSm9rZG0ydHdyL3FqV2dFcEtyYUtOCnZyNlVCZmk5NU1NM1FmZVUyQktZOGxyR0JNRzRaYkp5bFhYYWNWVktWSm1SN0RkVVJNZkNmWSt5Z1d3LytIVVYKdUw1UTU3blV4d2JoRXpLQTB3R3pSbGpScVExdUl3TnhRSVA2eUxrdUVWYjhsZnFhRmU4R1NUUk1LWCtxczMyeQpFMU5acHJaRWNYdE4rVWh3eTVXZUtubXlPak55bDJkbW9VZ3FmVVNjNGR1R3dBOTBXcFNBUXdURlZoU3lPUUhhCmMvejBxVUUzMjk1WWdjV3U1VlRuMWQzYTA4bG4vS3huRXFqamFPV0lIclpCdG9QOEg2T1NNSG1DcWlzQ0F3RUEKQVFLQ0FnQWFpQXlKWkFJOUtWTTNXNUlQVktFWkQ1SC9OZzRqQkZieEM5d1U5T3lvNXNIT2RzYjB4YjY0YmJLeQo5TUJXUXQ0ZUdQTmxpbE5VV1ZJVUFUakRVZUxvZGM2ZXd3eW5IdGJNaHAvcUMyeFMzQzJmM0x2bjFYSkxPVEtTClUrb1VuQTRSZDREb2U2VG5kMVVOeEVjNTFoTHRyeWlVSUFLUzZoalo0TUduUm00YURhTDBCMzV6WHhpOUVkSmIKdVdRUDZtNGs3TUJRa3UwOFVvTFVObUF4RGNRVUkydC9IbkdXNXFGbUNVYk5Dek4rYW9aNHBWMkF6WTJrL1pCcwo4N2d1V2VWTWNaUkVBRHRCQmVVQmdQS0luWVNWbTlyZXU5RndPeXZqM1VNQnRRYm1RcUlHQVltbWh3cERVaWJCCkNvWnBMZ2xlWFpGM3R5TWxjeklaWkluTmt1VHpEOFB1b1BnaWhKaDhROTY1cFY3WTNHUnBZbnRPcXB6aHN2YXkKdlRYZWlUQWJoS0VnU0dCcitJaVUxaXc1NzlBTDBIK2Z6b0JueW9XM1JyUUpOTENrdTRRYnJtOVVHZTczbGgxYQpMaHJmKzJCNy93WGNwYnRsbW5lb1M4L2JUd1g4UkZYbmVDU1IyQitaRWRkU3dZeFI4T0lXZHVEWS9Tbm8wMm9WCmgxQ0w3bEluUWRlTmVoZGcyd05HaG5VUUNyQzBZY1BEd29iS0M5RVpOV2FzU3hlQjFHRmZxK3F1VmFYd0hoeEEKT0FJZzBkSGlyU3F6L2hOK01xV1NCMHkza2o0eURHOU9XVjhWcXlZdXprN28vanRzYlk5Q3pSejV2d2gvZ1FOdgpnaWhOUjJLZ2p6YUdraEJBSjBhV1YzRjlmazRKREhBU1FkYVVQK1F4ZDJnVmVKc2VRUUtDQVFFQThkRUd2QXd5CjgxV2ZlRE5EVE9mRElDTXN3d2xud0xRbFFYVUNIUjBBUlFkQ2VRdnQ3U2NNVGNXc2RSZTI3aEc0cjIrcGcrd0IKNHp1dm9aa3NOVDNEaW5BTzRnZi9ZMml0bkZpTk13WEQzN1VLOC9ocktaK3hvenp4YytPbGk0WXdzK081NEZYZQpLaThqRDZmMTVzMkdKL25xakVrNXgzOXFYVEVleGJubEkzWW9rVmdNSmpLbVp1d2xvdjAzSUIyblpOSGdqZ2FPCklzT0psTE9GdmZKWHAxSjVSS1p5YlZBc05scm5HRjczZ1kxTTlaTE9CbGVnbWhrRFo2Y1pid2RVRG9md25qdEwKamxLM2RiK3pabFZwOUtjbkM4d1ROeDVSVVJLcE9SaFBYZkQ0cHdlRk9VZG9MOVJmQUl2QWdIQTRrbFM4QVB2Zgp6NzV0OVZ5U2s3NVZPUUtDQVFFQS9IQWgxa2hLM293S0trRUh6U0hZb3cvbW9yeEpQVVhXV1JKSEdaenFDZ0psClk2c0FaYlA1SUROWVgyVDdISnorcUxjQnFDVDlISDljeVAzVTBEYlBJODhpR201WThKNEZlSExRRWNWdUpWYkUKQWxYNDgrdnVGZ01tbXp4Qml4TFdocVN1SzlLR0Y4UlZ4SEtPcG9va2dwOWpyVWdUdno5ZjkwbmtCeFZmUDQ1NAozaloxaW4rN1hwcW1yQVNXOHpibGE2cCs3RUpuUGhsL0VKcFNmeEI3NkQydlMxdmZ6SGcyejgyRGZ4UEZIU2dsCmZKdXVKdnF0bXVjYkQyRXo2S211UHBtd2VuaVE3cytQQlk0c0EvT3cxSUVFVTViR0JWOVA0WEFIRHBRTlYrQjQKd3ZqM3V6bmowcUp4eVZvOEhqY2J2RmVGZDVoNk56NmhIOExiUFlOK2d3S0NBUUJHNkFUeWhSMDNqd2JZeHlkWAoyS20xdGJxOVlmZWpZTzkvdHlDc2lzRjJmRDk0b1EvZU4xSDdTQmhlcVZxQmluNitLcDdwU1Azd3RLSzJYdVRBCm8rQy9xa1lpN3pkcTNkbnllMkREOGsvU1BCTC9JUHZEVThsUjFWL3puSEFCYnBLL1hPbzNKdGFqUmZrZzhSNUEKMUVrZlZiLzU3TXJkZmJZaHAzS2ZoZmZ6b3dVWVFWb21wVGwzK295NnMwZER5bzQ0R1BhZ2pybUU1aE5rb0JONgpkQ0pSdFBSTU5nWmRtV0d0ZXBCQzdDM2xOaHEzODVrbjhPL3QzNkhJOWcyV0tlN3k1OWVkZmtPVWN4cktrekMyCnRCc0NtelR1MTZOV3lUUU04c3plS2d1enZ5SWFVREUzYjRIVWJKQ0M1M2ZGOGFJVS9uVzJVQ1Q3bEpwSGxTS0IKNGhDNUFvSUJBUUN1MnJEbGI0L0VsVFhaVE5BdGk3czJQNlplcEpNS2lSeE8rRFVkamE0akhzUENCTW15cUxYdwpVd0JzbTFMQTRCSVpKU0pWcU1GV0F2WnZGanRadWcxQzNZL2V4UDZBTk1UUFNKL05IM2NMRUEyWEhKdmp3VkZhCkYvYWU0bDc0Q1NWbGdCNVFwbk5SZFNKL2YyWkYvendJNm9TdG0xWnFTMmlhcnFqdkt5T2RyMzhUVkorWVBwKzMKaU9IWUZ4bkVBQXRyeDE1QklrSEhKdnYzc1IxaGZEYUhpR3FxaFVvQXBHZzdDanlDUWx4dnRNWTZpTTlabXB1egp4MDdjR1ZWT1hISWdWRzZFZG96VmpobWdISGxxaDFxOTUxdnExbTMxZks2bEZlY2Rkdm5ERys0cUJ5LzVsTUMwCnZ1YVlOUk9kVGtpODdkYTZIM2pRV1daYnpLbjE4dVluQW9JQkFRQ3FXcVQwVXJlYnlleUhaQ3ZxdHUzSXpNdmcKbThuRkFYd3VSVXFZNi9mekNhNGE2NUVsTXBEeXlUaU02WjlwT1RwbGZFRVZzWm1VTm1DTUFPVkhkWkJGUTRJdAplK2xKSUNsd1VZSDk4WmhsVDNSYWI5c2VHeDAyZjFiTVQ2OXNyQnA3Q2xFOG53NmZpcHZjNkZoRlFoUUhLQ0tSCkxWMEtUOWtucVI5UTd5TDlaYkM4c21BOS9SOWk3QkJ2Z2VUb1ZrbkNlTFFYQ2paT1FVYmcxVkIzWVVmbFNhNnEKdS8vaFVwVTVablhQdzQ3YlFlQU1rU0lrOFdDSHNQVFlsQ0FyL1ZmZWNibFZWOU1SeCttWS9OUGlmNEphUjh0bQo2cWtBeXhJVnNYRkpxMFVwVktDeXpqdlJtcjl5M2JINU9aRS9PaUF4TFd5eWRHUjdXaEN0NkZCWlJ0Y0cKLS0tLS1FTkQgUlNBIFBSSVZBVEUgS0VZLS0tLS0K"
+  jwt-token.pem: "LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLQpNSUlKS2dJQkFBS0NBZ0VBeDJQVnU2M09yWUMvMmVIOTZaZDJxVWVlcTcvYkdadzRMTGxMdU1zYUhIUUsxb2xGCkEzbHdDMG9rbXE2QmdmTXdtS2F0Ykp5emcwSGR0bWs4d1lRK3l2dGViK2FUZWZ6b0Jkb3dmRUNobDNhUVpnSFoKOENpOTlYQjcrQnE2S212cURQWHRWNy90Q0NPdjVaY2pLVE9qamhtWEg0VlVXaXA5TFlZR1N6ODJCUTRNYktVVQpRN1BJMHF3VTVFY3U5bTd0THJvWnNvOXVPRzg3NEhkM2x5cTNTLzhyaHVWM1JWZHJpdnlSdEZrTXBSb2d3NjdaCjc0YnJBM1pvUWVaWXRIZEQ3dU5tOHljNHZDMGJ4cUpDUVJJT21kUUhCZkt5TVhrdHlna3FLelpGS3htTnptUFgKU0VOUXdkblZOWFA2VDJTUFlPSDEyeVRGSVh1R3JDVS81d250TGhza1VpQVVvTFRPT3JVemNLZk1NcVVYSlVyYgpEcHJJN2haaDY4VjRsSWxlVEFkWm56VmVYekt6VlBWbWt2UGo1bDViU3lZSlZGTTk0bnpQRmRMdGxSYVRDUEc0CkF3V09FMnIwZkhxRnN5eWdIdzVXUFpVdHFVZUJGZ3c2UnVHa29UeEJkamNkdk84eGNEUjB4aXg3RlhOMll5VXIKYzlvb3lBcXBXeVNyeko5dUlRL1ZleDFWd1NGZzhaVHBUUktBVTIvZUY1eTZwNTg2NUw5T3BSaUZDWUtjdmdtTQpiZVAxaC9sb0thOUc1U04vSFFCUDZMVWZMYTBiaUszSGhaZlc2SjltT1NnazlQYW9xWVhiNkJBNDFwVUlsbGxxCnJ0WjFydG1oc1hjRmNKOG1vNjUzM1p1WGNvQVNpY1dlWFVJZkk1Ni9qNnZVYWlwaXFwNXVOVzhKdURVQ0F3RUEKQVFLQ0FnRUFoZVBjV2pMVVhsM2Vkb2p5NEREOVZaN3FSWnFIbmlMdzlkZFhxYmQ0eVRLRE5Kem80dlJnOExQUQo4SzNOK1YwOGZNVXdINGI2WkdHT2FEY3l2Ui80cW9VeFhTTVFWUkluSEFid0YvK3VndTd5K0F5Mk5EYW5tSEQ0ClRocGtlS2dPZXJXSnN5c0dHRGtlbktWb3p2b0dFaDNOQlRXYTl4RWhEYmk1OFQxNUlOdldLLzZPSlFoTkNtclQKZkpid1Nqc2l1Z1h0eTZIVStjQjRETHNzYXk0Yjk4UlpqalA0YTIvUW4zd0t1M2d3clkxbUF3RWZCMkVwM3lGYgowU1RFM0NwYVM4Z1lFWjk4MFovWXp3R1dTK3U4TWovV2wzL3BlSjlPeUNSdlZLVVV2V1JqZlB3K1RDQW4wb1JjClQ1Q1p2VVpob1VVYXV4VnQ2cFh3VVJpU1dLcXB3T0t2cWg3empzaDhYei9RQTVKNSs2eVFGQ0s2b1ZMRWw2Tm4KM3V6MlRMSjN2MDA2NUt4dGtsQW10SVZzTis3blVwU3RldGNvOEhpSGx0eEswTUpXNVhJa1RHVUduekVmUWtxUQphY0lWQzdwQVNWUVo0U2tTVW9KK1psWG52b1cxRVRZbHhjSmdoTEo2WWRtQ29zV3IrNEI0dnNiQ3F0Uk84MjNYCnhIMHgzQ0hqQ0NvSU5Hekk3cEtTMm9rY2JFVlgvb0RkOFlDS1YrT3IxQVoxbXJYdWt3OE9KTnlPTkxScnA3Tk4KYXo0UVFRRXp6dEVDUk83K2hRWG9BNzVyMTF6MnZJSWdYckdUQmhxazNHWW1HMzRtVTNrVU9LcHpWbHhEdkhnYwpJVktrNGhjZndwMjdVVUpEalhHdjlKVkRIS0hwWEl4NnVRb25lYjQzcHFIYXVSTmtPd0VDZ2dFQkFNa3BxZXNwCjE0RXZxcUdZWnM3VXA4SFZqeHZKMitJYnF4eGVUWVdlNWhxblVCeXh5SWRXVGpUc0h6N3pXSFA4N3VrWWdFVUcKV0J2MGRabUprM3JKelBWVW9xeDkwLy9EUktuK3pBY1J2NCs5QUV1Mi93ODBMb2ZSZkhMRjk0NlVkU3hnVWVuSApDYWN4NWFBN2lQZUgyNFcrbFVoSHM4VGZMU2hFcXpBZG9PaWI4dTZWb1l0c3kyQ1hFYnVwU1BJbndab2ZlVm9ZCnc2QXFTbWxFV3Q1VWZJemZ0NlhDaytwbGxBbkx1TDYzZlJWTHJWYjhSZ2R4bllVWEdOcWZJdGl5N2R4ZDhJVCsKZDB5aHVxY0hCNklUTmdGU0VZbTJCWTBqTkczdkFweVZZcXhmQVV3TEFjd1VQUFpzRGJJT002bnlzazBLMTNVQwpieXR4Z2VqVDBhODZrQzBDZ2dFQkFQMitkTzVWZ2lta1lhZWs0bloyWGRrdXNFWlh4V3ZQVUEyenYwTTNsVmcyCktNdStCcElBMEYxYjloNkFwWVE4QnhJNjFtU2trRldzMVBmc21CZjNucEQ0QzBocnVKWmtSRXVydDRLVm5GQkQKa2cycTVQZ1FIMGFMZTRMeERMNnVydk92RjREcFkrc1J0azBXeHR5SmZNYTk1Nld3T1lFT2pSVGVDdEFzUzdXMQpnR0M1Umh5YkNacWV0SFA5MnhJSXlHcjJmczlpYVdJSEJKei81OGZ2RVR0WnlRblFpNk5IMTlWdGNvQnVwbHdyClB0eldPdkNyMFdBY2xIVmpYR20xcmFVZ2tqOWRjL09WdHRLSC9PN0R3Q0h1aWdmOS83VTZzWXR1eHZkdzBXMU4KQzdaWDdFQ1J4dU9IUkxhdFZJVFRiU1MxZW9ZMWwrNlpkSUpuamVCT3hTa0NnZ0VCQUk3T2FoZE5HL1ZWSG9BYgpqaGlVOVFieEVlZzdWRUxmTzRrbkZVZWZ0MkVDbUNmV3VqSUJ2Z0ZxQXdDUWhxSEkxTjViaTJ2MUJnWEtkTlhyCnlldm9hUDFjK1NNVkxMUXNMb20wSGFtREd3Znl0OHdJZkdlUnR0cXFoL3QrdUxEYWlaaFlSSzUrbzBhemNIMWcKNW1vN1kwYytOZ0liRE83ZE5OU2FjeUQwVjYvcVRmcTc5UFBpNXpxSjVJZmh0S3hjTnQrd0tsa2dyWGY5cmRldgpOQWNUMlZ1MDBrMzFwVVpJbUdDZjVHWllJbzlFcXlqT2JQU0ozcmFGNEJvTDBSUWZhaWIvOVdpa3NaS1FXYzZMCmVnckFNcDJiWW1IdCsyRG50aWU0L3BTa3BHa1VCUHF6OGJHc1NGN3o5SUVML2ZkUEdPOENuRlF2eHpZREhhTnAKQkRtdWpIMENnZ0VCQUlCWlhGQktGR0wzOFNXWmM2dTBSOWhaazNTaFpRMFpla2JVQ3dUM0VxWGlEMVN2dENjYQpIa3Q2L3MyRENUWVFId3VMazNLcEF4RXpNUzZQRUlmZkN1Z05iN2VjTld4dEgxYWZiMTJ3UzdjVjFzVHZFbzZmCnFSSkg3NXZXVGpvTnBoVkJGY1J4U2NkWDJEeTZMckRUSXJoc3lzVzJrLy9CMm44WnFhS1BKV1N1Z0Zkc29CaE0KRzltSU9ZTUtmMHRxQWVhSTlLLzErWlJLTkgwdHZKSVhUVUlXTW1peWdrOS9RWitGa3d0LzdNcG1YWS9iRlVregp2OTY3MWlSaXRCWU1mZDh1MElzWXZGUVVBTHdSYVZGazFzVFRJaUxVeWdsanZQYm9lK0Fod3Uxa3NXMzBuMTR4CjNzYXNYNGQvdVdiT2cwQzBRMXVydEVST2Z1NlBidVp0TWJFQ2dnRUFlNWJMZkIwZWJSWlllSWZ1MWpsalVXOWkKYzRkb1NMeStVMmdvOThaWUtzdzZhc0x0MVVVSU9qUVFlVVJ3UzFraVFvNm1oVTlGZ3pOKzU3dlV3Wm80ZDlJZgp3Ynp5R2hyR3pIaWNaL3NIczJhTGdoTlR5aUVRWUlWNmVoSXZubS9PZC83b003NUFRZVUrODAweUhNaTRaa0krCnBCSEJ1dGxJZUI4eHNYc0RIZE51Y0t4dGgrMWtnTFpqSU9lbGNKWi9KamRwV3k0ZW5GOXFvMmFGV3AwamZUV3AKVHN0WGVSOVBkS0NDdk5NUWxqWm5VeEkxVnBZcHhOcjBSQk5IN2xzdkhsdi9jcEtiSHNxUUhwd294UEJoL0hQQQpxZHZ3RFBnSnNpeDVoS3hDTTMxTkZRUTJzcTNvK1ZrcmNmR2FrNnlvVDRZUGJJUk5sL29xRFJscnJmV1Uzdz09Ci0tLS0tRU5EIFJTQSBQUklWQVRFIEtFWS0tLS0tCg=="
 ---
-# Source: openebs/charts/mayastor/charts/loki-stack/charts/loki/templates/secret.yaml
+# Source: openebs/charts/alloy/templates/configmap.yaml
 apiVersion: v1
-kind: Secret
+kind: ConfigMap
 metadata:
-  name: openebs-loki
+  name: openebs-alloy
   namespace: openebs
   labels:
-    app: loki
-    chart: loki-2.16.0
-    release: openebs
-    heritage: Helm
-data:
-  loki.yaml: YXV0aF9lbmFibGVkOiBmYWxzZQpjaHVua19zdG9yZV9jb25maWc6CiAgbWF4X2xvb2tfYmFja19wZXJpb2Q6IDBzCmNvbXBhY3RvcjoKICBjb21wYWN0aW9uX2ludGVydmFsOiAyMG0KICByZXRlbnRpb25fZGVsZXRlX2RlbGF5OiAxaAogIHJldGVudGlvbl9kZWxldGVfd29ya2VyX2NvdW50OiA1MAogIHJldGVudGlvbl9lbmFibGVkOiB0cnVlCiAgc2hhcmVkX3N0b3JlOiBmaWxlc3lzdGVtCiAgd29ya2luZ19kaXJlY3Rvcnk6IC9kYXRhL2xva2kvYm9sdGRiLXNoaXBwZXItY29tcGFjdG9yCmluZ2VzdGVyOgogIGNodW5rX2Jsb2NrX3NpemU6IDI2MjE0NAogIGNodW5rX2lkbGVfcGVyaW9kOiAzbQogIGNodW5rX3JldGFpbl9wZXJpb2Q6IDFtCiAgbGlmZWN5Y2xlcjoKICAgIHJpbmc6CiAgICAgIHJlcGxpY2F0aW9uX2ZhY3RvcjogMQogIG1heF90cmFuc2Zlcl9yZXRyaWVzOiAwCiAgd2FsOgogICAgZGlyOiAvZGF0YS9sb2tpL3dhbApsaW1pdHNfY29uZmlnOgogIGVuZm9yY2VfbWV0cmljX25hbWU6IGZhbHNlCiAgbWF4X2VudHJpZXNfbGltaXRfcGVyX3F1ZXJ5OiA1MDAwCiAgcmVqZWN0X29sZF9zYW1wbGVzOiB0cnVlCiAgcmVqZWN0X29sZF9zYW1wbGVzX21heF9hZ2U6IDE2OGgKICByZXRlbnRpb25fcGVyaW9kOiAxNjhoCm1lbWJlcmxpc3Q6CiAgam9pbl9tZW1iZXJzOgogIC0gJ29wZW5lYnMtbG9raS1tZW1iZXJsaXN0JwpzY2hlbWFfY29uZmlnOgogIGNvbmZpZ3M6CiAgLSBmcm9tOiAiMjAyMC0xMC0yNCIKICAgIGluZGV4OgogICAgICBwZXJpb2Q6IDI0aAogICAgICBwcmVmaXg6IGluZGV4XwogICAgb2JqZWN0X3N0b3JlOiBmaWxlc3lzdGVtCiAgICBzY2hlbWE6IHYxMQogICAgc3RvcmU6IGJvbHRkYi1zaGlwcGVyCnNlcnZlcjoKICBncnBjX2xpc3Rlbl9wb3J0OiA5MDk1CiAgaHR0cF9saXN0ZW5fcG9ydDogMzEwMApzdG9yYWdlX2NvbmZpZzoKICBib2x0ZGJfc2hpcHBlcjoKICAgIGFjdGl2ZV9pbmRleF9kaXJlY3Rvcnk6IC9kYXRhL2xva2kvYm9sdGRiLXNoaXBwZXItYWN0aXZlCiAgICBjYWNoZV9sb2NhdGlvbjogL2RhdGEvbG9raS9ib2x0ZGItc2hpcHBlci1jYWNoZQogICAgY2FjaGVfdHRsOiAyNGgKICAgIHNoYXJlZF9zdG9yZTogZmlsZXN5c3RlbQogIGZpbGVzeXN0ZW06CiAgICBkaXJlY3Rvcnk6IC9kYXRhL2xva2kvY2h1bmtzCnRhYmxlX21hbmFnZXI6CiAgcmV0ZW50aW9uX2RlbGV0ZXNfZW5hYmxlZDogZmFsc2UKICByZXRlbnRpb25fcGVyaW9kOiAwcw==
----
-# Source: openebs/charts/mayastor/charts/loki-stack/charts/promtail/templates/secret.yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: openebs-promtail
-  namespace: openebs
-  labels:
-    helm.sh/chart: promtail-6.13.1
-    app.kubernetes.io/name: promtail
+    helm.sh/chart: alloy-1.0.1
+    app.kubernetes.io/name: alloy
     app.kubernetes.io/instance: openebs
-    app.kubernetes.io/version: "2.8.3"
+    app.kubernetes.io/version: "v1.8.1"
     app.kubernetes.io/managed-by: Helm
-stringData:
-  promtail.yaml: |
-    server:
-      log_level: info
-      log_format: logfmt
-      http_listen_port: 3101
-      health_check_target: false
+    app.kubernetes.io/part-of: alloy
+    app.kubernetes.io/component: config
+data:
+  config.alloy: |-
+    livedebugging {
+      enabled = false
+    }
     
-    clients:
-      - url: http://openebs-loki:3100/loki/api/v1/push
+    discovery.kubernetes "openebs_pods_name" {
+      role = "pod"
+    }
     
-    positions:
-      filename: /run/promtail/positions.yaml
+    discovery.relabel "openebs_pods_name" {
+      targets = discovery.kubernetes.openebs_pods_name.targets
     
-    scrape_configs:
-      - job_name: openebs-pods-name
-        pipeline_stages:
-          - docker: {}
-          - replace:
-              expression: '(\n)'
-              replace: ''
-          - multiline:
-              firstline: '^  \x1b\[2m(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2}).(\d{6})Z'
-              max_wait_time: 3s
-          - multiline:
-              firstline: '^  (\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2}).(\d{6})Z'
-              max_wait_time: 3s
-        kubernetes_sd_configs:
-        - role: pod
-        relabel_configs:
-        - source_labels:
-          - __meta_kubernetes_pod_node_name
-          target_label: hostname
-          action: replace
-        - action: labelmap
-          regex: __meta_kubernetes_pod_label_(.+)
-        - action: keep
-          source_labels:
-          - __meta_kubernetes_pod_label_openebs_io_logging
-          regex: true
-          target_label: openebs_component
-        - action: replace
-          replacement: $1
-          separator: /
-          source_labels:
-          - __meta_kubernetes_namespace
-          target_label: job
-        - action: replace
-          source_labels:
-          - __meta_kubernetes_pod_name
-          target_label: pod
-        - action: replace
-          source_labels:
-          - __meta_kubernetes_pod_container_name
-          target_label: container
-        - replacement: /var/log/pods/*$1/*.log
-          separator: /
-          source_labels:
-          - __meta_kubernetes_pod_uid
-          - __meta_kubernetes_pod_container_name
-          target_label: __path__
-      
-      
+      rule {
+        source_labels = [
+          "__meta_kubernetes_pod_label_openebs_io_logging",
+        ]
+        separator     = ";"
+        regex         = "^true$"
+        action        = "keep"
+      }
     
-    limits_config:
-      
+      rule {
+        regex  = "__meta_kubernetes_pod_label_(.+)"
+        action = "labelmap"
+      }
     
-    tracing:
-      enabled: false
+      rule {
+        regex  = "__meta_kubernetes_pod_label_(.+)"
+        action = "labelmap"
+      }
+    
+      rule {
+        source_labels = ["__meta_kubernetes_namespace"]
+        separator     = "/"
+        target_label  = "job"
+      }
+    
+      rule {
+        source_labels = ["__meta_kubernetes_pod_name"]
+        target_label  = "pod"
+      }
+    
+      rule {
+        source_labels = ["__meta_kubernetes_pod_container_name"]
+        target_label  = "container"
+      }
+    
+      rule {
+        source_labels = ["__meta_kubernetes_pod_node_name"]
+        target_label  = "hostname"
+      }
+    
+      rule {
+        source_labels = ["__meta_kubernetes_pod_uid", "__meta_kubernetes_pod_container_name"]
+        separator     = "/"
+        target_label  = "__path__"
+        replacement   = "/var/log/pods/*$1/*.log"
+      }
+    }
+    
+    local.file_match "openebs_pod_files" {
+      path_targets = discovery.relabel.openebs_pods_name.output
+    }
+    
+    loki.source.file "openebs_pod_logs" {
+      targets    = local.file_match.openebs_pod_files.targets
+      forward_to = [loki.process.openebs_process_logs.receiver]
+    }
+    
+    loki.process "openebs_process_logs" {
+      forward_to = [loki.write.default.receiver]
+    
+      stage.docker { }
+    
+      stage.replace {
+        expression = "(\\n)"
+        replace = ""
+      }
+    
+      stage.multiline {
+        firstline = "^  \\x1b\\[2m(\\d{4})-(\\d{2})-(\\d{2})T(\\d{2}):(\\d{2}):(\\d{2}).(\\d{6})Z"
+      }
+    
+      stage.multiline {
+        firstline = "^  (\\d{4})-(\\d{2})-(\\d{2})T(\\d{2}):(\\d{2}):(\\d{2}).(\\d{6})Z"
+      }
+    }
+    
+    loki.write "default" {
+        endpoint {
+        url       = "http://openebs-loki:3100/loki/api/v1/push"
+        tenant_id = "openebs"
+      }
+      external_labels = {}
+    }
 ---
-# Source: openebs/charts/mayastor/charts/loki-stack/templates/datasources.yaml
+# Source: openebs/charts/loki/charts/minio/templates/configmap.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: openebs-loki-stack
+  name: openebs-minio
+  labels:
+    app: minio
+    chart: minio-5.4.0
+    release: openebs
+    heritage: Helm
+data:
+  initialize: |-
+    #!/bin/sh
+    set -e # Have script exit in the event of a failed command.
+    MC_CONFIG_DIR="/etc/minio/mc/"
+    MC="/usr/bin/mc --insecure --config-dir ${MC_CONFIG_DIR}"
+    
+    # connectToMinio
+    # Use a check-sleep-check loop to wait for MinIO service to be available
+    connectToMinio() {
+    	SCHEME=$1
+    	ATTEMPTS=0
+    	LIMIT=29 # Allow 30 attempts
+    	set -e   # fail if we can't read the keys.
+    	ACCESS=$(cat /config/rootUser)
+    	SECRET=$(cat /config/rootPassword)
+    	set +e # The connections to minio are allowed to fail.
+    	echo "Connecting to MinIO server: $SCHEME://$MINIO_ENDPOINT:$MINIO_PORT"
+    	MC_COMMAND="${MC} alias set myminio $SCHEME://$MINIO_ENDPOINT:$MINIO_PORT $ACCESS $SECRET"
+    	$MC_COMMAND
+    	STATUS=$?
+    	until [ $STATUS = 0 ]; do
+    		ATTEMPTS=$(expr $ATTEMPTS + 1)
+    		echo \"Failed attempts: $ATTEMPTS\"
+    		if [ $ATTEMPTS -gt $LIMIT ]; then
+    			exit 1
+    		fi
+    		sleep 2 # 1 second intervals between attempts
+    		$MC_COMMAND
+    		STATUS=$?
+    	done
+    	set -e # reset `e` as active
+    	return 0
+    }
+    
+    # checkBucketExists ($bucket)
+    # Check if the bucket exists, by using the exit code of `mc ls`
+    checkBucketExists() {
+    	BUCKET=$1
+    	CMD=$(${MC} stat myminio/$BUCKET >/dev/null 2>&1)
+    	return $?
+    }
+    
+    # createBucket ($bucket, $policy, $purge)
+    # Ensure bucket exists, purging if asked to
+    createBucket() {
+    	BUCKET=$1
+    	POLICY=$2
+    	PURGE=$3
+    	VERSIONING=$4
+    	OBJECTLOCKING=$5
+    
+    	# Purge the bucket, if set & exists
+    	# Since PURGE is user input, check explicitly for `true`
+    	if [ $PURGE = true ]; then
+    		if checkBucketExists $BUCKET; then
+    			echo "Purging bucket '$BUCKET'."
+    			set +e # don't exit if this fails
+    			${MC} rm -r --force myminio/$BUCKET
+    			set -e # reset `e` as active
+    		else
+    			echo "Bucket '$BUCKET' does not exist, skipping purge."
+    		fi
+    	fi
+    
+    	# Create the bucket if it does not exist and set objectlocking if enabled (NOTE: versioning will be not changed if OBJECTLOCKING is set because it enables versioning to the Buckets created)
+    	if ! checkBucketExists $BUCKET; then
+    		if [ ! -z $OBJECTLOCKING ]; then
+    			if [ $OBJECTLOCKING = true ]; then
+    				echo "Creating bucket with OBJECTLOCKING '$BUCKET'"
+    				${MC} mb --with-lock myminio/$BUCKET
+    			elif [ $OBJECTLOCKING = false ]; then
+    				echo "Creating bucket '$BUCKET'"
+    				${MC} mb myminio/$BUCKET
+    			fi
+    		elif [ -z $OBJECTLOCKING ]; then
+    			echo "Creating bucket '$BUCKET'"
+    			${MC} mb myminio/$BUCKET
+    		else
+    			echo "Bucket '$BUCKET' already exists."
+    		fi
+    	fi
+    
+    	# set versioning for bucket if objectlocking is disabled or not set
+    	if [ $OBJECTLOCKING = false ]; then
+    		if [ ! -z $VERSIONING ]; then
+    			if [ $VERSIONING = true ]; then
+    				echo "Enabling versioning for '$BUCKET'"
+    				${MC} version enable myminio/$BUCKET
+    			elif [ $VERSIONING = false ]; then
+    				echo "Suspending versioning for '$BUCKET'"
+    				${MC} version suspend myminio/$BUCKET
+    			fi
+    		fi
+    	else
+    		echo "Bucket '$BUCKET' versioning unchanged."
+    	fi
+    
+    	# At this point, the bucket should exist, skip checking for existence
+    	# Set policy on the bucket
+    	echo "Setting policy of bucket '$BUCKET' to '$POLICY'."
+    	${MC} anonymous set $POLICY myminio/$BUCKET
+    }
+    
+    # Try connecting to MinIO instance
+    scheme=http
+    connectToMinio $scheme
+    
+    
+    
+    # Create the buckets
+    createBucket chunks "none" false false false
+    createBucket ruler "none" false false false
+    createBucket admin "none" false false false
+    
+  add-user: |-
+    #!/bin/sh
+    set -e ; # Have script exit in the event of a failed command.
+    MC_CONFIG_DIR="/etc/minio/mc/"
+    MC="/usr/bin/mc --insecure --config-dir ${MC_CONFIG_DIR}"
+    
+    # AccessKey and secretkey credentials file are added to prevent shell execution errors caused by special characters.
+    # Special characters for example : ',",<,>,{,}
+    MINIO_ACCESSKEY_SECRETKEY_TMP="/tmp/accessKey_and_secretKey_tmp"
+    
+    # connectToMinio
+    # Use a check-sleep-check loop to wait for MinIO service to be available
+    connectToMinio() {
+      SCHEME=$1
+      ATTEMPTS=0 ; LIMIT=29 ; # Allow 30 attempts
+      set -e ; # fail if we can't read the keys.
+      ACCESS=$(cat /config/rootUser) ; SECRET=$(cat /config/rootPassword) ;
+      set +e ; # The connections to minio are allowed to fail.
+      echo "Connecting to MinIO server: $SCHEME://$MINIO_ENDPOINT:$MINIO_PORT" ;
+      MC_COMMAND="${MC} alias set myminio $SCHEME://$MINIO_ENDPOINT:$MINIO_PORT $ACCESS $SECRET" ;
+      $MC_COMMAND ;
+      STATUS=$? ;
+      until [ $STATUS = 0 ]
+      do
+        ATTEMPTS=`expr $ATTEMPTS + 1` ;
+        echo \"Failed attempts: $ATTEMPTS\" ;
+        if [ $ATTEMPTS -gt $LIMIT ]; then
+          exit 1 ;
+        fi ;
+        sleep 2 ; # 1 second intervals between attempts
+        $MC_COMMAND ;
+        STATUS=$? ;
+      done ;
+      set -e ; # reset `e` as active
+      return 0
+    }
+    
+    # checkUserExists ()
+    # Check if the user exists, by using the exit code of `mc admin user info`
+    checkUserExists() {
+      CMD=$(${MC} admin user info myminio $(head -1 $MINIO_ACCESSKEY_SECRETKEY_TMP) > /dev/null 2>&1)
+      return $?
+    }
+    
+    # createUser ($policy)
+    createUser() {
+      POLICY=$1
+      #check accessKey_and_secretKey_tmp file
+      if [[ ! -f $MINIO_ACCESSKEY_SECRETKEY_TMP ]];then
+        echo "credentials file does not exist"
+        return 1
+      fi
+      if [[ $(cat $MINIO_ACCESSKEY_SECRETKEY_TMP|wc -l) -ne 2 ]];then
+        echo "credentials file is invalid"
+        rm -f $MINIO_ACCESSKEY_SECRETKEY_TMP
+        return 1
+      fi
+      USER=$(head -1 $MINIO_ACCESSKEY_SECRETKEY_TMP)
+      # Create the user if it does not exist
+      if ! checkUserExists ; then
+        echo "Creating user '$USER'"
+        cat $MINIO_ACCESSKEY_SECRETKEY_TMP | ${MC} admin user add myminio
+      else
+        echo "User '$USER' already exists."
+      fi
+      #clean up credentials files.
+      rm -f $MINIO_ACCESSKEY_SECRETKEY_TMP
+    
+      # set policy for user
+      if [ ! -z $POLICY -a $POLICY != " " ] ; then
+          echo "Adding policy '$POLICY' for '$USER'"
+          set +e ; # policy already attach errors out, allow it.
+          ${MC} admin policy attach myminio $POLICY --user=$USER
+          set -e
+      else
+          echo "User '$USER' has no policy attached."
+      fi
+    }
+    
+    # Try connecting to MinIO instance
+    scheme=http
+    connectToMinio $scheme
+    
+    
+    
+    # Create the users
+    echo logs-user > $MINIO_ACCESSKEY_SECRETKEY_TMP
+    echo supersecretpassword >> $MINIO_ACCESSKEY_SECRETKEY_TMP
+    createUser readwrite
+    
+  add-policy: |-
+    #!/bin/sh
+    set -e ; # Have script exit in the event of a failed command.
+    MC_CONFIG_DIR="/etc/minio/mc/"
+    MC="/usr/bin/mc --insecure --config-dir ${MC_CONFIG_DIR}"
+    
+    # connectToMinio
+    # Use a check-sleep-check loop to wait for MinIO service to be available
+    connectToMinio() {
+      SCHEME=$1
+      ATTEMPTS=0 ; LIMIT=29 ; # Allow 30 attempts
+      set -e ; # fail if we can't read the keys.
+      ACCESS=$(cat /config/rootUser) ; SECRET=$(cat /config/rootPassword) ;
+      set +e ; # The connections to minio are allowed to fail.
+      echo "Connecting to MinIO server: $SCHEME://$MINIO_ENDPOINT:$MINIO_PORT" ;
+      MC_COMMAND="${MC} alias set myminio $SCHEME://$MINIO_ENDPOINT:$MINIO_PORT $ACCESS $SECRET" ;
+      $MC_COMMAND ;
+      STATUS=$? ;
+      until [ $STATUS = 0 ]
+      do
+        ATTEMPTS=`expr $ATTEMPTS + 1` ;
+        echo \"Failed attempts: $ATTEMPTS\" ;
+        if [ $ATTEMPTS -gt $LIMIT ]; then
+          exit 1 ;
+        fi ;
+        sleep 2 ; # 1 second intervals between attempts
+        $MC_COMMAND ;
+        STATUS=$? ;
+      done ;
+      set -e ; # reset `e` as active
+      return 0
+    }
+    
+    # checkPolicyExists ($policy)
+    # Check if the policy exists, by using the exit code of `mc admin policy info`
+    checkPolicyExists() {
+      POLICY=$1
+      CMD=$(${MC} admin policy info myminio $POLICY > /dev/null 2>&1)
+      return $?
+    }
+    
+    # createPolicy($name, $filename)
+    createPolicy () {
+      NAME=$1
+      FILENAME=$2
+    
+      # Create the name if it does not exist
+      echo "Checking policy: $NAME (in /config/$FILENAME.json)"
+      if ! checkPolicyExists $NAME ; then
+        echo "Creating policy '$NAME'"
+      else
+        echo "Policy '$NAME' already exists."
+      fi
+      ${MC} admin policy create myminio $NAME /config/$FILENAME.json
+    
+    }
+    
+    # Try connecting to MinIO instance
+    scheme=http
+    connectToMinio $scheme
+    
+    
+    
+  add-svcacct: |-
+    #!/bin/sh
+    set -e ; # Have script exit in the event of a failed command.
+    MC_CONFIG_DIR="/etc/minio/mc/"
+    MC="/usr/bin/mc --insecure --config-dir ${MC_CONFIG_DIR}"
+    
+    # AccessKey and secretkey credentials file are added to prevent shell execution errors caused by special characters.
+    # Special characters for example : ',",<,>,{,}
+    MINIO_ACCESSKEY_SECRETKEY_TMP="/tmp/accessKey_and_secretKey_svcacct_tmp"
+    
+    # connectToMinio
+    # Use a check-sleep-check loop to wait for MinIO service to be available
+    connectToMinio() {
+      SCHEME=$1
+      ATTEMPTS=0 ; LIMIT=29 ; # Allow 30 attempts
+      set -e ; # fail if we can't read the keys.
+      ACCESS=$(cat /config/rootUser) ; SECRET=$(cat /config/rootPassword) ;
+      set +e ; # The connections to minio are allowed to fail.
+      echo "Connecting to MinIO server: $SCHEME://$MINIO_ENDPOINT:$MINIO_PORT" ;
+      MC_COMMAND="${MC} alias set myminio $SCHEME://$MINIO_ENDPOINT:$MINIO_PORT $ACCESS $SECRET" ;
+      $MC_COMMAND ;
+      STATUS=$? ;
+      until [ $STATUS = 0 ]
+      do
+        ATTEMPTS=`expr $ATTEMPTS + 1` ;
+        echo \"Failed attempts: $ATTEMPTS\" ;
+        if [ $ATTEMPTS -gt $LIMIT ]; then
+          exit 1 ;
+        fi ;
+        sleep 2 ; # 2 second intervals between attempts
+        $MC_COMMAND ;
+        STATUS=$? ;
+      done ;
+      set -e ; # reset `e` as active
+      return 0
+    }
+    
+    # checkSvcacctExists ()
+    # Check if the svcacct exists, by using the exit code of `mc admin user svcacct info`
+    checkSvcacctExists() {
+      CMD=$(${MC} admin user svcacct info myminio $(head -1 $MINIO_ACCESSKEY_SECRETKEY_TMP) > /dev/null 2>&1)
+      return $?
+    }
+    
+    # createSvcacct ($user)
+    createSvcacct () {
+      USER=$1
+      FILENAME=$2
+      #check accessKey_and_secretKey_tmp file
+      if [[ ! -f $MINIO_ACCESSKEY_SECRETKEY_TMP ]];then
+        echo "credentials file does not exist"
+        return 1
+      fi
+      if [[ $(cat $MINIO_ACCESSKEY_SECRETKEY_TMP|wc -l) -ne 2 ]];then
+        echo "credentials file is invalid"
+        rm -f $MINIO_ACCESSKEY_SECRETKEY_TMP
+        return 1
+      fi
+      SVCACCT=$(head -1 $MINIO_ACCESSKEY_SECRETKEY_TMP)
+      # Create the svcacct if it does not exist
+      if ! checkSvcacctExists ; then
+        echo "Creating svcacct '$SVCACCT'"
+        # Check if policy file is define
+        if [ -z $FILENAME ]; then
+          ${MC} admin user svcacct add --access-key $(head -1 $MINIO_ACCESSKEY_SECRETKEY_TMP) --secret-key $(tail -n1 $MINIO_ACCESSKEY_SECRETKEY_TMP) myminio $USER
+        else
+          ${MC} admin user svcacct add --access-key $(head -1 $MINIO_ACCESSKEY_SECRETKEY_TMP) --secret-key $(tail -n1 $MINIO_ACCESSKEY_SECRETKEY_TMP) --policy /config/$FILENAME.json myminio $USER
+        fi
+      else
+        echo "Svcacct '$SVCACCT' already exists."
+      fi
+      #clean up credentials files.
+      rm -f $MINIO_ACCESSKEY_SECRETKEY_TMP
+    }
+    
+    # Try connecting to MinIO instance
+    scheme=http
+    connectToMinio $scheme
+    
+    
+    
+  custom-command: |-
+    #!/bin/sh
+    set -e ; # Have script exit in the event of a failed command.
+    MC_CONFIG_DIR="/etc/minio/mc/"
+    MC="/usr/bin/mc --insecure --config-dir ${MC_CONFIG_DIR}"
+    
+    # connectToMinio
+    # Use a check-sleep-check loop to wait for MinIO service to be available
+    connectToMinio() {
+      SCHEME=$1
+      ATTEMPTS=0 ; LIMIT=29 ; # Allow 30 attempts
+      set -e ; # fail if we can't read the keys.
+      ACCESS=$(cat /config/rootUser) ; SECRET=$(cat /config/rootPassword) ;
+      set +e ; # The connections to minio are allowed to fail.
+      echo "Connecting to MinIO server: $SCHEME://$MINIO_ENDPOINT:$MINIO_PORT" ;
+      MC_COMMAND="${MC} alias set myminio $SCHEME://$MINIO_ENDPOINT:$MINIO_PORT $ACCESS $SECRET" ;
+      $MC_COMMAND ;
+      STATUS=$? ;
+      until [ $STATUS = 0 ]
+      do
+        ATTEMPTS=`expr $ATTEMPTS + 1` ;
+        echo \"Failed attempts: $ATTEMPTS\" ;
+        if [ $ATTEMPTS -gt $LIMIT ]; then
+          exit 1 ;
+        fi ;
+        sleep 2 ; # 1 second intervals between attempts
+        $MC_COMMAND ;
+        STATUS=$? ;
+      done ;
+      set -e ; # reset `e` as active
+      return 0
+    }
+    
+    # runCommand ($@)
+    # Run custom mc command
+    runCommand() {
+      ${MC} "$@"
+      return $?
+    }
+    
+    # Try connecting to MinIO instance
+    scheme=http
+    connectToMinio $scheme
+---
+# Source: openebs/charts/loki/templates/config.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: loki
   namespace: openebs
   labels:
-    app: loki-stack
-    chart: loki-stack-2.9.11
-    release: openebs
-    heritage: Helm
-    grafana_datasource: "1"
+    helm.sh/chart: loki-6.29.0
+    app.kubernetes.io/name: loki
+    app.kubernetes.io/instance: openebs
+    app.kubernetes.io/version: "3.4.2"
 data:
-  loki-stack-datasource.yaml: |-
-    apiVersion: 1
-    datasources:
-    - name: Loki
-      type: loki
-      access: proxy
-      url: "http://openebs-loki:3100"
-      version: 1
-      isDefault: true
-      jsonData:
-        {}
+  config.yaml: |
+    
+    auth_enabled: true
+    bloom_build:
+      builder:
+        planner_address: ""
+      enabled: false
+    bloom_gateway:
+      client:
+        addresses: ""
+      enabled: false
+    common:
+      compactor_address: 'http://openebs-loki:3100'
+      path_prefix: /var/loki
+      replication_factor: 3
+      storage:
+        s3:
+          access_key_id: root-user
+          bucketnames: chunks
+          endpoint: openebs-minio.openebs.svc:9000
+          insecure: true
+          s3forcepathstyle: true
+          secret_access_key: supersecretpassword
+    frontend:
+      scheduler_address: ""
+      tail_proxy_url: ""
+    frontend_worker:
+      scheduler_address: ""
+    index_gateway:
+      mode: simple
+    ingester:
+      chunk_encoding: snappy
+    limits_config:
+      ingestion_burst_size_mb: 1000
+      ingestion_rate_mb: 10000
+      max_cache_freshness_per_query: 10m
+      max_label_names_per_series: 20
+      query_timeout: 300s
+      reject_old_samples: true
+      reject_old_samples_max_age: 168h
+      split_queries_by_interval: 15m
+      volume_enabled: true
+    memberlist:
+      join_members:
+      - loki-memberlist
+    pattern_ingester:
+      enabled: false
+    querier:
+      max_concurrent: 1
+    query_range:
+      align_queries_with_step: true
+    ruler:
+      storage:
+        s3:
+          bucketnames: ruler
+        type: s3
+      wal:
+        dir: /var/loki/ruler-wal
+    runtime_config:
+      file: /etc/loki/runtime-config/runtime-config.yaml
+    schema_config:
+      configs:
+      - from: "2024-04-01"
+        index:
+          period: 24h
+          prefix: loki_index_
+        object_store: s3
+        schema: v13
+        store: tsdb
+    server:
+      grpc_listen_port: 9095
+      http_listen_port: 3100
+      http_server_read_timeout: 600s
+      http_server_write_timeout: 600s
+    storage_config:
+      bloom_shipper:
+        working_directory: /var/loki/data/bloomshipper
+      boltdb_shipper:
+        index_gateway_client:
+          server_address: ""
+      hedging:
+        at: 250ms
+        max_per_second: 20
+        up_to: 3
+      tsdb_shipper:
+        index_gateway_client:
+          server_address: ""
+    tracing:
+      enabled: true
 ---
-# Source: openebs/charts/mayastor/charts/loki-stack/templates/tests/loki-test-configmap.yaml
+# Source: openebs/charts/loki/templates/runtime-configmap.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: openebs-loki-stack-test
+  name: loki-runtime
+  namespace: openebs
   labels:
-    app: loki-stack
-    chart: loki-stack-2.9.11
-    release: openebs
-    heritage: Helm
+    helm.sh/chart: loki-6.29.0
+    app.kubernetes.io/name: loki
+    app.kubernetes.io/instance: openebs
+    app.kubernetes.io/version: "3.4.2"
 data:
-  test.sh: |
-    #!/usr/bin/env bash
-
-    LOKI_URI="http://${LOKI_SERVICE}:${LOKI_PORT}"
-
-    function setup() {
-      apk add -u curl jq
-      until (curl -s ${LOKI_URI}/loki/api/v1/label/app/values | jq -e '.data[] | select(. == "loki")'); do
-        sleep 1
-      done
-    }
-
-    @test "Has labels" {
-      curl -s ${LOKI_URI}/loki/api/v1/labels | \
-      jq -e '.data[] | select(. == "app")'
-    }
-
-    @test "Query log entry" {
-      curl -sG ${LOKI_URI}/api/prom/query?limit=10 --data-urlencode 'query={app="loki"}' | \
-      jq -e '.streams[].entries | length >=1'
-    }
-
-    @test "Push log entry" {
-      local timestamp=$(date +%s000000000)
-      local data=$(jq -n --arg timestamp "${timestamp}" '{"streams": [{"stream": {"app": "loki-test"}, "values": [[$timestamp, "foobar"]]}]}')
-
-      curl -s -X POST -H "Content-Type: application/json" ${LOKI_URI}/loki/api/v1/push --data-raw "${data}"
-
-      curl -sG ${LOKI_URI}/loki/api/v1/query_range?limit=1 --data-urlencode 'query={app="loki-test"}' | \
-      jq -e '.data.result[].values[][1] == "foobar"'
-    }
+  runtime-config.yaml: |
+    {}
 ---
 # Source: openebs/charts/mayastor/charts/nats/templates/configmap.yaml
 apiVersion: v1
@@ -376,22 +864,6 @@ provisioner: openebs.io/local
 reclaimPolicy: Delete
 volumeBindingMode: WaitForFirstConsumer
 ---
-# Source: openebs/charts/mayastor/templates/loki-stack/storage/localpv-storageclass.yaml
-apiVersion: storage.k8s.io/v1
-kind: StorageClass
-metadata:
-  annotations:
-    cas.openebs.io/config: |
-      - name: StorageType
-        value: "hostpath"
-      - name: BasePath
-        value: "/var/local/openebs/localpv-hostpath/loki"
-    openebs.io/cas-type: local
-  name: mayastor-loki-localpv
-provisioner: openebs.io/local
-reclaimPolicy: Delete
-volumeBindingMode: WaitForFirstConsumer
----
 # Source: openebs/charts/mayastor/templates/storageclass.yaml
 kind: StorageClass
 apiVersion: storage.k8s.io/v1
@@ -406,6 +878,38 @@ parameters:
   "protocol": "nvmf"
   "repl": "1"
 provisioner: io.openebs.csi-mayastor
+---
+# Source: openebs/templates/loki-storage/storage/localpv-storageclass.yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  annotations:
+    cas.openebs.io/config: |
+      - name: StorageType
+        value: "hostpath"
+      - name: BasePath
+        value: "/var/local/openebs/localpv-hostpath/loki"
+    openebs.io/cas-type: local
+  name: openebs-loki-localpv
+provisioner: openebs.io/local
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+---
+# Source: openebs/templates/loki-storage/storage/localpv-storageclass.yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  annotations:
+    cas.openebs.io/config: |
+      - name: StorageType
+        value: "hostpath"
+      - name: BasePath
+        value: "/var/local/openebs/localpv-hostpath/minio"
+    openebs.io/cas-type: local
+  name: openebs-minio-localpv
+provisioner: openebs.io/local
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
 ---
 # Source: openebs/charts/openebs-crds/templates/csi-volume-snapshot-class.yaml
 apiVersion: apiextensions.k8s.io/v1
@@ -451,9 +955,10 @@ spec:
             are non-namespaced
           properties:
             apiVersion:
-              description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+              description: |
+                APIVersion defines the versioned schema of this representation
+                of an object. Servers should convert recognized schemas to the latest
+                internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
               type: string
             deletionPolicy:
               description: deletionPolicy determines whether a VolumeSnapshotContent
@@ -472,9 +977,10 @@ spec:
                 VolumeSnapshotClass. Required.
               type: string
             kind:
-              description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+              description: |
+                Kind is a string value representing the REST resource this
+                object represents. Servers may infer this from the endpoint the client
+                submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
               type: string
             parameters:
               additionalProperties:
@@ -493,7 +999,8 @@ spec:
         - jsonPath: .driver
           name: Driver
           type: string
-        - description: Determines whether a VolumeSnapshotContent created through the
+        - description: |
+            Determines whether a VolumeSnapshotContent created through the
             VolumeSnapshotClass should be deleted when its bound VolumeSnapshot is deleted.
           jsonPath: .deletionPolicy
           name: DeletionPolicy
@@ -513,9 +1020,10 @@ spec:
             are non-namespaced
           properties:
             apiVersion:
-              description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+              description: |
+                APIVersion defines the versioned schema of this representation
+                of an object. Servers should convert recognized schemas to the latest
+                internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
               type: string
             deletionPolicy:
               description: deletionPolicy determines whether a VolumeSnapshotContent
@@ -534,9 +1042,10 @@ spec:
                 VolumeSnapshotClass. Required.
               type: string
             kind:
-              description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+              description: |
+                Kind is a string value representing the REST resource this
+                object represents. Servers may infer this from the endpoint the client
+                submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
               type: string
             parameters:
               additionalProperties:
@@ -625,14 +1134,16 @@ spec:
             object in the underlying storage system
           properties:
             apiVersion:
-              description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+              description: |
+                APIVersion defines the versioned schema of this representation
+                of an object. Servers should convert recognized schemas to the latest
+                internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
               type: string
             kind:
-              description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+              description: |
+                Kind is a string value representing the REST resource this
+                object represents. Servers may infer this from the endpoint the client
+                submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
               type: string
             spec:
               description: spec defines properties of a VolumeSnapshotContent created
@@ -708,17 +1219,18 @@ spec:
                       description: API version of the referent.
                       type: string
                     fieldPath:
-                      description: 'If referring to a piece of an object instead of
-                      an entire object, this string should contain a valid JSON/Go
-                      field access statement, such as desiredState.manifest.containers[2].
-                      For example, if the object reference is to a container within
-                      a pod, this would take on a value like: "spec.containers{name}"
-                      (where "name" refers to the name of the container that triggered
-                      the event) or if no container name is specified "spec.containers[2]"
-                      (container with index 2 in this pod). This syntax is chosen
-                      only to have some well-defined way of referencing a part of
-                      an object. TODO: this design is not final and this field is
-                      subject to change in the future.'
+                      description: |
+                        If referring to a piece of an object instead of
+                        an entire object, this string should contain a valid JSON/Go
+                        field access statement, such as desiredState.manifest.containers[2].
+                        For example, if the object reference is to a container within
+                        a pod, this would take on a value like: "spec.containers{name}"
+                        (where "name" refers to the name of the container that triggered
+                        the event) or if no container name is specified "spec.containers[2]"
+                        (container with index 2 in this pod). This syntax is chosen
+                        only to have some well-defined way of referencing a part of
+                        an object. TODO: this design is not final and this field is
+                        subject to change in the future.
                       type: string
                     kind:
                       description: 'Kind of the referent. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
@@ -730,8 +1242,9 @@ spec:
                       description: 'Namespace of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/'
                       type: string
                     resourceVersion:
-                      description: 'Specific resourceVersion to which this reference
-                      is made, if any. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency'
+                      description: |
+                        Specific resourceVersion to which this reference
+                        is made, if any. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
                       type: string
                     uid:
                       description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
@@ -748,7 +1261,8 @@ spec:
               description: status represents the current information of a snapshot.
               properties:
                 creationTime:
-                  description: creationTime is the timestamp when the point-in-time
+                  description: |
+                    creationTime is the timestamp when the point-in-time
                     snapshot is taken by the underlying storage system. In dynamic snapshot
                     creation case, this field will be filled in by the CSI snapshotter
                     sidecar with the "creation_time" value returned from CSI "CreateSnapshot"
@@ -766,9 +1280,10 @@ spec:
                     if any. Upon success after retry, this error field will be cleared.
                   properties:
                     message:
-                      description: 'message is a string detailing the encountered error
-                      during snapshot creation if specified. NOTE: message may be
-                      logged, and it should not contain sensitive information.'
+                      description: |
+                        message is a string detailing the encountered error
+                        during snapshot creation if specified. NOTE: message may be
+                        logged, and it should not contain sensitive information.
                       type: string
                     time:
                       description: time is the timestamp when the error was encountered.
@@ -864,14 +1379,16 @@ spec:
             object in the underlying storage system
           properties:
             apiVersion:
-              description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+              description: |
+                APIVersion defines the versioned schema of this representation
+                of an object. Servers should convert recognized schemas to the latest
+                internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
               type: string
             kind:
-              description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+              description: |
+                Kind is a string value representing the REST resource this
+                object represents. Servers may infer this from the endpoint the client
+                submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
               type: string
             spec:
               description: spec defines properties of a VolumeSnapshotContent created
@@ -936,17 +1453,18 @@ spec:
                       description: API version of the referent.
                       type: string
                     fieldPath:
-                      description: 'If referring to a piece of an object instead of
-                      an entire object, this string should contain a valid JSON/Go
-                      field access statement, such as desiredState.manifest.containers[2].
-                      For example, if the object reference is to a container within
-                      a pod, this would take on a value like: "spec.containers{name}"
-                      (where "name" refers to the name of the container that triggered
-                      the event) or if no container name is specified "spec.containers[2]"
-                      (container with index 2 in this pod). This syntax is chosen
-                      only to have some well-defined way of referencing a part of
-                      an object. TODO: this design is not final and this field is
-                      subject to change in the future.'
+                      description: |
+                        If referring to a piece of an object instead of
+                        an entire object, this string should contain a valid JSON/Go
+                        field access statement, such as desiredState.manifest.containers[2].
+                        For example, if the object reference is to a container within
+                        a pod, this would take on a value like: "spec.containers{name}"
+                        (where "name" refers to the name of the container that triggered
+                        the event) or if no container name is specified "spec.containers[2]"
+                        (container with index 2 in this pod). This syntax is chosen
+                        only to have some well-defined way of referencing a part of
+                        an object. TODO: this design is not final and this field is
+                        subject to change in the future.
                       type: string
                     kind:
                       description: 'Kind of the referent. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
@@ -958,8 +1476,9 @@ spec:
                       description: 'Namespace of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/'
                       type: string
                     resourceVersion:
-                      description: 'Specific resourceVersion to which this reference
-                      is made, if any. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency'
+                      description: |
+                        Specific resourceVersion to which this reference
+                        is made, if any. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
                       type: string
                     uid:
                       description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
@@ -993,9 +1512,10 @@ spec:
                     if any. Upon success after retry, this error field will be cleared.
                   properties:
                     message:
-                      description: 'message is a string detailing the encountered error
-                      during snapshot creation if specified. NOTE: message may be
-                      logged, and it should not contain sensitive information.'
+                      description: |
+                        message is a string detailing the encountered error
+                        during snapshot creation if specified. NOTE: message may be
+                        logged, and it should not contain sensitive information.
                       type: string
                     time:
                       description: time is the timestamp when the error was encountered.
@@ -1116,14 +1636,16 @@ spec:
             snapshot of a persistent volume, or binding to a pre-existing snapshot.
           properties:
             apiVersion:
-              description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+              description: |
+                APIVersion defines the versioned schema of this representation
+                of an object. Servers should convert recognized schemas to the latest
+                internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
               type: string
             kind:
-              description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+              description: |
+                Kind is a string value representing the REST resource this
+                object represents. Servers may infer this from the endpoint the client
+                submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
               type: string
             spec:
               description: 'spec defines the desired characteristics of a snapshot requested
@@ -1156,17 +1678,18 @@ spec:
                       type: string
                   type: object
                 volumeSnapshotClassName:
-                  description: 'VolumeSnapshotClassName is the name of the VolumeSnapshotClass
-                  requested by the VolumeSnapshot. VolumeSnapshotClassName may be
-                  left nil to indicate that the default SnapshotClass should be used.
-                  A given cluster may have multiple default Volume SnapshotClasses:
-                  one default per CSI Driver. If a VolumeSnapshot does not specify
-                  a SnapshotClass, VolumeSnapshotSource will be checked to figure
-                  out what the associated CSI Driver is, and the default VolumeSnapshotClass
-                  associated with that CSI Driver will be used. If more than one VolumeSnapshotClass
-                  exist for a given CSI Driver and more than one have been marked
-                  as default, CreateSnapshot will fail and generate an event. Empty
-                  string is not allowed for this field.'
+                  description: |
+                    VolumeSnapshotClassName is the name of the VolumeSnapshotClass
+                    requested by the VolumeSnapshot. VolumeSnapshotClassName may be
+                    left nil to indicate that the default SnapshotClass should be used.
+                    A given cluster may have multiple default Volume SnapshotClasses:
+                    one default per CSI Driver. If a VolumeSnapshot does not specify
+                    a SnapshotClass, VolumeSnapshotSource will be checked to figure
+                    out what the associated CSI Driver is, and the default VolumeSnapshotClass
+                    associated with that CSI Driver will be used. If more than one VolumeSnapshotClass
+                    exist for a given CSI Driver and more than one have been marked
+                    as default, CreateSnapshot will fail and generate an event. Empty
+                    string is not allowed for this field.
                   type: string
               required:
                 - source
@@ -1178,14 +1701,15 @@ spec:
                 point at each other) before using this object.
               properties:
                 boundVolumeSnapshotContentName:
-                  description: 'boundVolumeSnapshotContentName is the name of the VolumeSnapshotContent
-                  object to which this VolumeSnapshot object intends to bind to. If
-                  not specified, it indicates that the VolumeSnapshot object has not
-                  been successfully bound to a VolumeSnapshotContent object yet. NOTE:
-                  To avoid possible security issues, consumers must verify binding
-                  between VolumeSnapshot and VolumeSnapshotContent objects is successful
-                  (by validating that both VolumeSnapshot and VolumeSnapshotContent
-                  point at each other) before using this object.'
+                  description: |
+                    boundVolumeSnapshotContentName is the name of the VolumeSnapshotContent
+                    object to which this VolumeSnapshot object intends to bind to. If
+                    not specified, it indicates that the VolumeSnapshot object has not
+                    been successfully bound to a VolumeSnapshotContent object yet. NOTE:
+                    To avoid possible security issues, consumers must verify binding
+                    between VolumeSnapshot and VolumeSnapshotContent objects is successful
+                    (by validating that both VolumeSnapshot and VolumeSnapshotContent
+                    point at each other) before using this object.
                   type: string
                 creationTime:
                   description: creationTime is the timestamp when the point-in-time
@@ -1303,19 +1827,22 @@ spec:
             snapshot of a persistent volume, or binding to a pre-existing snapshot.
           properties:
             apiVersion:
-              description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+              description: |
+                APIVersion defines the versioned schema of this representation
+                of an object. Servers should convert recognized schemas to the latest
+                internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
               type: string
             kind:
-              description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+              description: |
+                Kind is a string value representing the REST resource this
+                object represents. Servers may infer this from the endpoint the client
+                submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
               type: string
             spec:
-              description: 'spec defines the desired characteristics of a snapshot requested
-              by a user. More info: https://kubernetes.io/docs/concepts/storage/volume-snapshots#volumesnapshots
-              Required.'
+              description: |
+                spec defines the desired characteristics of a snapshot requested
+                by a user. More info: https://kubernetes.io/docs/concepts/storage/volume-snapshots#volumesnapshots
+                Required.
               properties:
                 source:
                   description: source specifies where a snapshot will be created from.
@@ -1338,17 +1865,18 @@ spec:
                       type: string
                   type: object
                 volumeSnapshotClassName:
-                  description: 'VolumeSnapshotClassName is the name of the VolumeSnapshotClass
-                  requested by the VolumeSnapshot. VolumeSnapshotClassName may be
-                  left nil to indicate that the default SnapshotClass should be used.
-                  A given cluster may have multiple default Volume SnapshotClasses:
-                  one default per CSI Driver. If a VolumeSnapshot does not specify
-                  a SnapshotClass, VolumeSnapshotSource will be checked to figure
-                  out what the associated CSI Driver is, and the default VolumeSnapshotClass
-                  associated with that CSI Driver will be used. If more than one VolumeSnapshotClass
-                  exist for a given CSI Driver and more than one have been marked
-                  as default, CreateSnapshot will fail and generate an event. Empty
-                  string is not allowed for this field.'
+                  description: |
+                    VolumeSnapshotClassName is the name of the VolumeSnapshotClass
+                    requested by the VolumeSnapshot. VolumeSnapshotClassName may be
+                    left nil to indicate that the default SnapshotClass should be used.
+                    A given cluster may have multiple default Volume SnapshotClasses:
+                    one default per CSI Driver. If a VolumeSnapshot does not specify
+                    a SnapshotClass, VolumeSnapshotSource will be checked to figure
+                    out what the associated CSI Driver is, and the default VolumeSnapshotClass
+                    associated with that CSI Driver will be used. If more than one VolumeSnapshotClass
+                    exist for a given CSI Driver and more than one have been marked
+                    as default, CreateSnapshot will fail and generate an event. Empty
+                    string is not allowed for this field.
                   type: string
               required:
                 - source
@@ -1360,14 +1888,15 @@ spec:
                 point at each other) before using this object.
               properties:
                 boundVolumeSnapshotContentName:
-                  description: 'boundVolumeSnapshotContentName is the name of the VolumeSnapshotContent
-                  object to which this VolumeSnapshot object intends to bind to. If
-                  not specified, it indicates that the VolumeSnapshot object has not
-                  been successfully bound to a VolumeSnapshotContent object yet. NOTE:
-                  To avoid possible security issues, consumers must verify binding
-                  between VolumeSnapshot and VolumeSnapshotContent objects is successful
-                  (by validating that both VolumeSnapshot and VolumeSnapshotContent
-                  point at each other) before using this object.'
+                  description: |
+                    boundVolumeSnapshotContentName is the name of the VolumeSnapshotContent
+                    object to which this VolumeSnapshot object intends to bind to. If
+                    not specified, it indicates that the VolumeSnapshot object has not
+                    been successfully bound to a VolumeSnapshotContent object yet. NOTE:
+                    To avoid possible security issues, consumers must verify binding
+                    between VolumeSnapshot and VolumeSnapshotContent objects is successful
+                    (by validating that both VolumeSnapshot and VolumeSnapshotContent
+                    point at each other) before using this object.
                   type: string
                 creationTime:
                   description: creationTime is the timestamp when the point-in-time
@@ -1390,9 +1919,10 @@ spec:
                     will be cleared.
                   properties:
                     message:
-                      description: 'message is a string detailing the encountered error
-                      during snapshot creation if specified. NOTE: message may be
-                      logged, and it should not contain sensitive information.'
+                      description: |
+                        message is a string detailing the encountered error
+                        during snapshot creation if specified. NOTE: message may be
+                        logged, and it should not contain sensitive information.
                       type: string
                     time:
                       description: time is the timestamp when the error was encountered.
@@ -1438,15 +1968,114 @@ status:
   conditions: []
   storedVersions: []
 ---
+# Source: openebs/charts/alloy/templates/rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: openebs-alloy
+  labels:
+    helm.sh/chart: alloy-1.0.1
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/instance: openebs
+    app.kubernetes.io/version: "v1.8.1"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: alloy
+    app.kubernetes.io/component: rbac
+rules:
+  # Rules which allow discovery.kubernetes to function.
+  - apiGroups:
+      - ""
+      - "discovery.k8s.io"
+      - "networking.k8s.io"
+    resources:
+      - endpoints
+      - endpointslices
+      - ingresses
+      - nodes
+      - nodes/proxy
+      - nodes/metrics
+      - pods
+      - services
+    verbs:
+      - get
+      - list
+      - watch
+  # Rules which allow loki.source.kubernetes and loki.source.podlogs to work.
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+      - pods/log
+      - namespaces
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - "monitoring.grafana.com"
+    resources:
+      - podlogs
+    verbs:
+      - get
+      - list
+      - watch
+  # Rules which allow mimir.rules.kubernetes to work.
+  - apiGroups: ["monitoring.coreos.com"]
+    resources:
+      - prometheusrules
+    verbs:
+      - get
+      - list
+      - watch
+  - nonResourceURLs:
+      - /metrics
+    verbs:
+      - get
+  # Rules for prometheus.kubernetes.*
+  - apiGroups: ["monitoring.coreos.com"]
+    resources:
+      - podmonitors
+      - servicemonitors
+      - probes
+      - scrapeconfigs
+    verbs:
+      - get
+      - list
+      - watch
+  # Rules which allow eventhandler to work.
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - get
+      - list
+      - watch
+  # needed for remote.kubernetes.*
+  - apiGroups: [""]
+    resources:
+      - "configmaps"
+      - "secrets"
+    verbs:
+      - get
+      - list
+      - watch
+  # needed for otelcol.processor.k8sattributes
+  - apiGroups: ["apps"]
+    resources: ["replicasets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["extensions"]
+    resources: ["replicasets"]
+    verbs: ["get", "list", "watch"]
+---
 # Source: openebs/charts/localpv-provisioner/templates/rbac.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: openebs-localpv-provisioner
   labels:
-    chart: localpv-provisioner-4.1.0
+    chart: localpv-provisioner-4.3.0
     heritage: Helm
-    openebs.io/version: "4.1.0"
     app: localpv-provisioner
     release: openebs
     component: "localpv-provisioner"
@@ -1476,30 +2105,20 @@ rules:
 - nonResourceURLs: ["/metrics"]
   verbs: ["get"]
 ---
-# Source: openebs/charts/mayastor/charts/loki-stack/charts/promtail/templates/clusterrole.yaml
+# Source: openebs/charts/loki/templates/backend/clusterrole.yaml
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: openebs-promtail
   labels:
-    helm.sh/chart: promtail-6.13.1
-    app.kubernetes.io/name: promtail
+    helm.sh/chart: loki-6.29.0
+    app.kubernetes.io/name: loki
     app.kubernetes.io/instance: openebs
-    app.kubernetes.io/version: "2.8.3"
-    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "3.4.2"
+  name: openebs-loki-clusterrole
 rules:
-  - apiGroups:
-      - ""
-    resources:
-      - nodes
-      - nodes/proxy
-      - services
-      - endpoints
-      - pods
-    verbs:
-      - get
-      - watch
-      - list
+- apiGroups: [""] # "" indicates the core API group
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "watch", "list"]
 ---
 # Source: openebs/charts/mayastor/templates/mayastor/rbac/rbac.yaml
 kind: ClusterRole
@@ -1508,9 +2127,9 @@ metadata:
   name: openebs-cluster-role
   labels:
     openebs.io/release: openebs
-    openebs.io/version: 2.7.0
+    openebs.io/version: 2.9.2
 rules:
-  # must create mayastor crd if it doesn't exist, replace if exist,
+  # must create mayastor crd if it doesn't exist, replace if exists,
   # merge schema to existing CRD.
 - apiGroups: ["apiextensions.k8s.io"]
   resources: ["customresourcedefinitions"]
@@ -1550,7 +2169,7 @@ rules:
   # external provisioner
 - apiGroups: [""]
   resources: ["persistentvolumeclaims"]
-  verbs: ["get", "list", "watch", "update"]
+  verbs: ["get", "list", "watch", "update", "patch"]
 - apiGroups: ["storage.k8s.io"]
   resources: ["storageclasses"]
   verbs: ["get", "list", "watch"]
@@ -1602,6 +2221,33 @@ rules:
 - apiGroups: [""]
   resources: ["namespaces"]
   verbs: ["get"]
+
+  # get secrets for encryption
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "list"]
+---
+# Source: openebs/charts/alloy/templates/rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: openebs-alloy
+  labels:
+    helm.sh/chart: alloy-1.0.1
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/instance: openebs
+    app.kubernetes.io/version: "v1.8.1"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: alloy
+    app.kubernetes.io/component: rbac
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: openebs-alloy
+subjects:
+  - kind: ServiceAccount
+    name: openebs-alloy
+    namespace: openebs
 ---
 # Source: openebs/charts/localpv-provisioner/templates/rbac.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -1609,9 +2255,8 @@ kind: ClusterRoleBinding
 metadata:
   name: openebs-localpv-provisioner
   labels:
-    chart: localpv-provisioner-4.1.0
+    chart: localpv-provisioner-4.3.0
     heritage: Helm
-    openebs.io/version: "4.1.0"
     app: localpv-provisioner
     release: openebs
     component: "localpv-provisioner"
@@ -1625,24 +2270,23 @@ subjects:
   name: openebs-localpv-provisioner
   namespace: openebs
 ---
-# Source: openebs/charts/mayastor/charts/loki-stack/charts/promtail/templates/clusterrolebinding.yaml
+# Source: openebs/charts/loki/templates/backend/clusterrolebinding.yaml
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: openebs-promtail
+  name: openebs-loki-clusterrolebinding
   labels:
-    helm.sh/chart: promtail-6.13.1
-    app.kubernetes.io/name: promtail
+    helm.sh/chart: loki-6.29.0
+    app.kubernetes.io/name: loki
     app.kubernetes.io/instance: openebs
-    app.kubernetes.io/version: "2.8.3"
-    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "3.4.2"
 subjects:
   - kind: ServiceAccount
-    name: openebs-promtail
+    name: loki
     namespace: openebs
 roleRef:
   kind: ClusterRole
-  name: openebs-promtail
+  name: openebs-loki-clusterrole
   apiGroup: rbac.authorization.k8s.io
 ---
 # Source: openebs/charts/mayastor/templates/mayastor/rbac/rbac.yaml
@@ -1652,7 +2296,7 @@ metadata:
   name: openebs-cluster-role-binding
   labels:
     openebs.io/release: openebs
-    openebs.io/version: 2.7.0
+    openebs.io/version: 2.9.2
 subjects:
 - kind: ServiceAccount
   name: openebs-service-account
@@ -1662,36 +2306,176 @@ roleRef:
   name: openebs-cluster-role
   apiGroup: rbac.authorization.k8s.io
 ---
-# Source: openebs/charts/mayastor/charts/loki-stack/charts/loki/templates/role.yaml
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
+# Source: openebs/charts/alloy/templates/service.yaml
+apiVersion: v1
+kind: Service
 metadata:
-  name: openebs-loki
+  name: openebs-alloy
   namespace: openebs
   labels:
-    app: loki
-    chart: loki-2.16.0
-    release: openebs
-    heritage: Helm
+    helm.sh/chart: alloy-1.0.1
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/instance: openebs
+    app.kubernetes.io/version: "v1.8.1"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: alloy
+    app.kubernetes.io/component: networking
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/instance: openebs
+  internalTrafficPolicy: Cluster
+  ports:
+    - name: http-metrics
+      port: 12345
+      targetPort: 12345
+      protocol: "TCP"
 ---
-# Source: openebs/charts/mayastor/charts/loki-stack/charts/loki/templates/rolebinding.yaml
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
+# Source: openebs/charts/loki/charts/minio/templates/console-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: openebs-minio-console
+  labels:
+    app: minio
+    chart: minio-5.4.0
+    release: openebs
+    heritage: Helm
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 9001
+      protocol: TCP
+      targetPort: 9001
+  selector:
+    app: minio
+    release: openebs
+---
+# Source: openebs/charts/loki/charts/minio/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: openebs-minio
+  labels:
+    app: minio
+    chart: minio-5.4.0
+    release: openebs
+    heritage: Helm
+    monitoring: "true"
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 9000
+      protocol: TCP
+      targetPort: 9000
+  selector:
+    app: minio
+    release: openebs
+---
+# Source: openebs/charts/loki/charts/minio/templates/statefulset.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: openebs-minio-svc
+  labels:
+    app: minio
+    chart: minio-5.4.0
+    release: openebs
+    heritage: Helm
+spec:
+  publishNotReadyAddresses: true
+  clusterIP: None
+  ports:
+    - name: http
+      port: 9000
+      protocol: TCP
+      targetPort: 9000
+  selector:
+    app: minio
+    release: openebs
+---
+# Source: openebs/charts/loki/templates/service-memberlist.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: loki-memberlist
+  namespace: openebs
+  labels:
+    helm.sh/chart: loki-6.29.0
+    app.kubernetes.io/name: loki
+    app.kubernetes.io/instance: openebs
+    app.kubernetes.io/version: "3.4.2"
+  annotations:
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - name: tcp
+      port: 7946
+      targetPort: http-memberlist
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: loki
+    app.kubernetes.io/instance: openebs
+    app.kubernetes.io/part-of: memberlist
+---
+# Source: openebs/charts/loki/templates/single-binary/service-headless.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: loki-headless
+  namespace: openebs
+  labels:
+    helm.sh/chart: loki-6.29.0
+    app.kubernetes.io/name: loki
+    app.kubernetes.io/instance: openebs
+    app.kubernetes.io/version: "3.4.2"
+    app: loki
+    variant: headless
+    prometheus.io/service-monitor: "false"
+  annotations:
+spec:
+  clusterIP: None
+  ports:
+    - name: http-metrics
+      port: 3100
+      targetPort: http-metrics
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: loki
+    app.kubernetes.io/instance: openebs
+---
+# Source: openebs/charts/loki/templates/single-binary/service.yaml
+apiVersion: v1
+kind: Service
 metadata:
   name: openebs-loki
   namespace: openebs
   labels:
+    helm.sh/chart: loki-6.29.0
+    app.kubernetes.io/name: loki
+    app.kubernetes.io/instance: openebs
+    app.kubernetes.io/version: "3.4.2"
     app: loki
-    chart: loki-2.16.0
-    release: openebs
-    heritage: Helm
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: openebs-loki
-subjects:
-- kind: ServiceAccount
-  name: openebs-loki
+  annotations:
+spec:
+  type: ClusterIP
+  ports:
+    - name: http-metrics
+      port: 3100
+      targetPort: http-metrics
+      protocol: TCP
+    - name: grpc
+      port: 9095
+      targetPort: grpc
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: loki
+    app.kubernetes.io/instance: openebs
+    app.kubernetes.io/component: single-binary
 ---
 # Source: openebs/charts/mayastor/charts/etcd/templates/svc-headless.yaml
 apiVersion: v1
@@ -1749,77 +2533,6 @@ spec:
     app.kubernetes.io/name: etcd
     app.kubernetes.io/instance: openebs
 ---
-# Source: openebs/charts/mayastor/charts/loki-stack/charts/loki/templates/service-headless.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: openebs-loki-headless
-  namespace: openebs
-  labels:
-    app: loki
-    chart: loki-2.16.0
-    release: openebs
-    heritage: Helm
-    variant: headless
-spec:
-  clusterIP: None
-  ports:
-    - port: 3100
-      protocol: TCP
-      name: http-metrics
-      targetPort: http-metrics
-  selector:
-    app: loki
-    release: openebs
----
-# Source: openebs/charts/mayastor/charts/loki-stack/charts/loki/templates/service-memberlist.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: openebs-loki-memberlist
-  namespace: openebs
-  labels:
-    app: loki
-    chart: loki-2.16.0
-    release: openebs
-    heritage: Helm
-spec:
-  type: ClusterIP
-  clusterIP: None
-  publishNotReadyAddresses: true
-  ports:
-    - name: http
-      port: 7946
-      targetPort: memberlist-port
-      protocol: TCP
-  selector:
-    app: loki
-    release: openebs
----
-# Source: openebs/charts/mayastor/charts/loki-stack/charts/loki/templates/service.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: openebs-loki
-  namespace: openebs
-  labels:
-    app: loki
-    chart: loki-2.16.0
-    release: openebs
-    heritage: Helm
-  annotations:
-    {}
-spec:
-  type: ClusterIP
-  ports:
-    - port: 3100
-      protocol: TCP
-      name: http-metrics
-      targetPort: http-metrics
-  selector:
-    app: loki
-    release: openebs
----
 # Source: openebs/charts/mayastor/charts/nats/templates/service.yaml
 apiVersion: v1
 kind: Service
@@ -1866,7 +2579,7 @@ metadata:
   labels:
     app: agent-core
     openebs.io/release: openebs
-    openebs.io/version: 2.7.0
+    openebs.io/version: 2.9.2
 spec:
   selector:
     app: agent-core
@@ -1885,7 +2598,7 @@ metadata:
   labels:
     app: api-rest
     openebs.io/release: openebs
-    openebs.io/version: 2.7.0
+    openebs.io/version: 2.9.2
 spec:
   type: ClusterIP
   selector:
@@ -1909,7 +2622,7 @@ metadata:
   labels:
     app: metrics-exporter-io-engine
     openebs.io/release: openebs
-    openebs.io/version: 2.7.0
+    openebs.io/version: 2.9.2
 spec:
   ports:
     - name: metrics
@@ -1928,7 +2641,7 @@ metadata:
   labels:
     app: obs-callhome
     openebs.io/release: openebs
-    openebs.io/version: 2.7.0
+    openebs.io/version: 2.9.2
 spec:
   ports:
     - port: 9090
@@ -1943,92 +2656,89 @@ spec:
     app: obs-callhome
     openebs.io/release: openebs
 ---
-# Source: openebs/charts/mayastor/charts/loki-stack/charts/promtail/templates/daemonset.yaml
+# Source: openebs/charts/alloy/templates/controllers/daemonset.yaml
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: openebs-promtail
+  name: openebs-alloy
   namespace: openebs
   labels:
-    helm.sh/chart: promtail-6.13.1
-    app.kubernetes.io/name: promtail
+    helm.sh/chart: alloy-1.0.1
+    app.kubernetes.io/name: alloy
     app.kubernetes.io/instance: openebs
-    app.kubernetes.io/version: "2.8.3"
+    app.kubernetes.io/version: "v1.8.1"
     app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: alloy
 spec:
+  minReadySeconds: 10
   selector:
     matchLabels:
-      app.kubernetes.io/name: promtail
+      app.kubernetes.io/name: alloy
       app.kubernetes.io/instance: openebs
-  updateStrategy:
-    {}
   template:
     metadata:
-      labels:
-        app.kubernetes.io/name: promtail
-        app.kubernetes.io/instance: openebs
       annotations:
-        checksum/config: e67cf0d4573abbc19bbd0798f5a6dfeaa0bb173cca295c7523f09b09ba9fb133
+        kubectl.kubernetes.io/default-container: alloy
+        checksum/config: 8d2b075c96dbfaa06a9e06f9705b00381688d40bffe4c957e7e071d4dfb7cb1
+      labels:
+        app.kubernetes.io/name: alloy
+        app.kubernetes.io/instance: openebs
     spec:
-      serviceAccountName: openebs-promtail
-      enableServiceLinks: true
-      securityContext:
-        runAsGroup: 0
-        runAsUser: 0
+      serviceAccountName: openebs-alloy
       containers:
-        - name: promtail
-          image: "docker.io/grafana/promtail:2.8.3"
+        - name: alloy
+          image: docker.io/grafana/alloy:v1.8.1
           imagePullPolicy: IfNotPresent
           args:
-            - "-config.file=/etc/promtail/promtail.yaml"
-          volumeMounts:
-            - name: config
-              mountPath: /etc/promtail
-            - mountPath: /run/promtail
-              name: run
-            - mountPath: /var/lib/docker/containers
-              name: containers
-              readOnly: true
-            - mountPath: /var/log/pods
-              name: pods
-              readOnly: true
+            - run
+            - /etc/alloy/config.alloy
+            - --storage.path=/tmp/alloy
+            - --server.http.listen-addr=0.0.0.0:12345
+            - --server.http.ui-path-prefix=/
+            - --stability.level=generally-available
           env:
+            - name: ALLOY_DEPLOY_MODE
+              value: "helm"
             - name: HOSTNAME
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
           ports:
-            - name: http-metrics
-              containerPort: 3101
-              protocol: TCP
-          securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop:
-              - ALL
-            readOnlyRootFilesystem: true
+            - containerPort: 12345
+              name: http-metrics
           readinessProbe:
-            failureThreshold: 5
             httpGet:
-              path: '/ready'
-              port: http-metrics
+              path: /-/ready
+              port: 12345
+              scheme: HTTP
             initialDelaySeconds: 10
-            periodSeconds: 10
-            successThreshold: 1
             timeoutSeconds: 1
+          volumeMounts:
+            - name: config
+              mountPath: /etc/alloy
+            - name: varlog
+              mountPath: /var/log
+              readOnly: true
+        - name: config-reloader
+          image: quay.io/prometheus-operator/prometheus-config-reloader:v0.81.0
+          args:
+            - --watched-dir=/etc/alloy
+            - --reload-url=http://localhost:12345/-/reload
+          volumeMounts:
+            - name: config
+              mountPath: /etc/alloy
+          resources:
+            requests:
+              cpu: 10m
+              memory: 50Mi
+      dnsPolicy: ClusterFirst
       volumes:
         - name: config
-          secret:
-            secretName: openebs-promtail
-        - hostPath:
-            path: /run/promtail
-          name: run
-        - hostPath:
-            path: /var/lib/docker/containers
-          name: containers
-        - hostPath:
-            path: /var/log/pods
-          name: pods
+          configMap:
+            name: openebs-alloy
+        - name: varlog
+          hostPath:
+            path: /var/log
 ---
 # Source: openebs/charts/mayastor/templates/mayastor/agents/ha/ha-node-daemonset.yaml
 apiVersion: apps/v1
@@ -2038,7 +2748,7 @@ metadata:
   labels:
     app: agent-ha-node
     openebs.io/release: openebs
-    openebs.io/version: 2.7.0
+    openebs.io/version: 2.9.2
 spec:
   selector:
     matchLabels:
@@ -2054,7 +2764,7 @@ spec:
       labels:
         app: agent-ha-node
         openebs.io/release: openebs
-        openebs.io/version: 2.7.0
+        openebs.io/version: 2.9.2
         openebs.io/logging: "true"
     spec:
       hostNetwork: true
@@ -2065,15 +2775,22 @@ spec:
           - -c
           - trap "exit 1" TERM; until nc -vzw 5 openebs-agent-core 50052; do date;
             echo "Waiting for agent-cluster-grpc services..."; sleep 1; done;
-          image: busybox:latest
+          image: docker.io/openebs/alpine-sh:4.2.0
+          imagePullPolicy: IfNotPresent
           name: agent-cluster-grpc-probe
       imagePullSecrets:
+      priorityClassName: openebs-cluster-critical
       nodeSelector:
         kubernetes.io/arch: amd64
         openebs.io/csi-node: mayastor
+      tolerations: 
+        - effect: NoSchedule
+          key: openebs.io/storage
+          operator: Equal
+          value: mayastor
       containers:
       - name: agent-ha-node
-        image: "docker.io/openebs/mayastor-agent-ha-node:v2.7.0"
+        image: "docker.io/openebs/mayastor-agent-ha-node:v2.9.2"
         imagePullPolicy: IfNotPresent
         securityContext:
           privileged: true
@@ -2093,9 +2810,11 @@ spec:
         args:
         - "--node-name=$(MY_NODE_NAME)"
         - "--csi-socket=/csi/csi.sock"
-        - "--grpc-endpoint=$(MY_POD_IP):50053"
+        - "--grpc-ip=$(MY_POD_IP)"
+        - "--grpc-port=50053"
         - "--cluster-agent=https://openebs-agent-core:50052"
         - "--events-url=nats://openebs-nats:4222"
+        - "--events-replicas=3"
         - "--ansi-colors=true"
         - "--fmt-style=pretty"
         volumeMounts:
@@ -2144,7 +2863,7 @@ metadata:
   labels:
     app: csi-node
     openebs.io/release: openebs
-    openebs.io/version: 2.7.0
+    openebs.io/version: 2.9.2
     openebs.io/csi-node: mayastor
 spec:
   selector:
@@ -2161,23 +2880,30 @@ spec:
       labels:
         app: csi-node
         openebs.io/release: openebs
-        openebs.io/version: 2.7.0
+        openebs.io/version: 2.9.2
         openebs.io/logging: "true"
     spec:
-      serviceAccount: openebs-service-account
+      serviceAccountName: openebs-service-account
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
       imagePullSecrets:
+      priorityClassName: openebs-cluster-critical
       nodeSelector:
         kubernetes.io/arch: amd64
         openebs.io/csi-node: mayastor
+      tolerations: 
+        - effect: NoSchedule
+          key: openebs.io/storage
+          operator: Equal
+          value: mayastor
       initContainers:
         - command:
           - sh
           - -c
-          - trap "exit 1" TERM; until $(lsmod | grep nvme_tcp &>/dev/null); do [ -z "$WARNED"
-            ] && echo "nvme_tcp module not loaded..."; WARNED=1; sleep 60; done;
-          image: busybox:latest
+          - trap "exit 1" TERM; until [ -d /sys/module/nvme_tcp ]; do [ -z "$WARNED" ] &&
+            echo "nvme_tcp module not loaded..."; WARNED=1; sleep 60; done;
+          image: docker.io/openebs/alpine-sh:4.2.0
+          imagePullPolicy: IfNotPresent
           name: nvme-tcp-probe
       # NOTE: Each container must have mem/cpu limits defined in order to
       # belong to Guaranteed QoS class, hence can never get evicted in case of
@@ -2185,7 +2911,7 @@ spec:
       # the same.
       containers:
       - name: csi-node
-        image: "docker.io/openebs/mayastor-csi-node:v2.7.0"
+        image: "docker.io/openebs/mayastor-csi-node:v2.9.2"
         imagePullPolicy: IfNotPresent
         # we need privileged because we mount filesystems and use mknod
         securityContext:
@@ -2207,17 +2933,19 @@ spec:
         - "--csi-socket=/csi/csi.sock"
         - "--node-name=$(MY_NODE_NAME)"
         - "--rest-endpoint=http://openebs-api-rest:8081"
+        - "--enable-rest"
         - "--enable-registration"
-        - "--grpc-endpoint=$(MY_POD_IP):10199"
+        - "--grpc-ip=$(MY_POD_IP)"
+        - "--grpc-port=10199"
         - "--nvme-io-timeout=110s10s"
         - "--nvme-core-io-timeout=110s10s"
         - "--nvme-ctrl-loss-tmo=1980"
         - "--nvme-nr-io-queues=2"
+        - "--nvme-connect-fallback=true"
+        - "--kubelet-path=/var/lib/kubelet"
         - "--node-selector=openebs.io/csi-node=mayastor"
         - "--fmt-style=pretty"
         - "--ansi-colors=true"
-        command:
-        - csi-node
         volumeMounts:
         - name: device
           mountPath: /dev
@@ -2238,7 +2966,7 @@ spec:
             cpu: "100m"
             memory: "64Mi"
       - name: csi-driver-registrar
-        image: "registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.10.0"
+        image: "registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.13.0"
         imagePullPolicy: IfNotPresent
         args:
         - "--csi-address=/csi/csi.sock"
@@ -2294,7 +3022,7 @@ metadata:
   labels:
     app: io-engine
     openebs.io/release: openebs
-    openebs.io/version: 2.7.0
+    openebs.io/version: 2.9.2
 spec:
   selector:
     matchLabels:
@@ -2308,9 +3036,10 @@ spec:
       labels:
         app: io-engine
         openebs.io/release: openebs
-        openebs.io/version: 2.7.0
+        openebs.io/version: 2.9.2
         openebs.io/logging: "true"
     spec:
+      serviceAccountName: openebs-service-account
       imagePullSecrets:
       hostNetwork: true
       # To resolve services in the namespace
@@ -2318,6 +3047,7 @@ spec:
       nodeSelector:
         kubernetes.io/arch: amd64
         openebs.io/engine: mayastor
+      priorityClassName: openebs-cluster-critical
       tolerations: 
         - effect: NoSchedule
           key: openebs.io/storage
@@ -2329,18 +3059,20 @@ spec:
           - -c
           - trap "exit 1" TERM; until nc -vzw 5 openebs-agent-core 50051; do date;
             echo "Waiting for agent-core-grpc services..."; sleep 1; done;
-          image: busybox:latest
+          image: docker.io/openebs/alpine-sh:4.2.0
+          imagePullPolicy: IfNotPresent
           name: agent-core-grpc-probe
         - command:
           - sh
           - -c
           - trap "exit 1" TERM; until nc -vzw 5 openebs-etcd 2379;
             do date; echo "Waiting for etcd..."; sleep 1; done;
-          image: busybox:latest
+          image: docker.io/openebs/alpine-sh:4.2.0
+          imagePullPolicy: IfNotPresent
           name: etcd-probe
       containers:
       - name: metrics-exporter-io-engine
-        image: "docker.io/openebs/mayastor-metrics-exporter-io-engine:v2.7.0"
+        image: "docker.io/openebs/mayastor-metrics-exporter-io-engine:v2.9.2"
         imagePullPolicy: IfNotPresent
         env:
         - name: MY_NODE_NAME
@@ -2359,7 +3091,7 @@ spec:
           - "--fmt-style=pretty"
           - "--ansi-colors=true"
       - name: io-engine
-        image: "docker.io/openebs/mayastor-io-engine:v2.7.0"
+        image: "docker.io/openebs/mayastor-io-engine:v2.9.2"
         imagePullPolicy: IfNotPresent
         env:
         - name: RUST_LOG
@@ -2391,7 +3123,7 @@ spec:
         # For example -l 1,2,10-20 means use core 1, 2, 10 to 20.
         # Note: Ensure that the CPU resources are updated accordingly.
         #       If you use 2 CPUs, the CPU: field should also read 2.
-        - "-g$(MY_POD_IP)"
+        - "--grpc-ip=$(MY_POD_IP)"
         - "-N$(MY_NODE_NAME)"
         - "-Rhttps://openebs-agent-core:50051"
         - "-y/var/local/openebs/io-engine/config.yaml"
@@ -2401,6 +3133,8 @@ spec:
         - "--api-versions=v1"
         - "--tgt-crdt=30"
         - "--events-url=nats://openebs-nats:4222"
+        - "--events-replicas=3"
+        - "--ps-retries=300"
         command:
         - io-engine
         securityContext:
@@ -2456,9 +3190,8 @@ kind: Deployment
 metadata:
   name: openebs-localpv-provisioner
   labels:
-    chart: localpv-provisioner-4.1.0
+    chart: localpv-provisioner-4.3.0
     heritage: Helm
-    openebs.io/version: "4.1.0"
     app: localpv-provisioner
     release: openebs
     component: "localpv-provisioner"
@@ -2476,21 +3209,22 @@ spec:
   template:
     metadata:
       labels:
-        chart: localpv-provisioner-4.1.0
+        chart: localpv-provisioner-4.3.0
         heritage: Helm
-        openebs.io/version: "4.1.0"
         app: localpv-provisioner
         release: openebs
         component: "localpv-provisioner"
         openebs.io/component-name: openebs-localpv-provisioner
         name: openebs-localpv-provisioner
+          
+        openebs.io/logging: "true"
     spec:
       serviceAccountName: openebs-localpv-provisioner
       securityContext:
         {}
       containers:
       - name: openebs-localpv-provisioner
-        image: "openebs/provisioner-localpv:4.1.0"
+        image: "openebs/provisioner-localpv:4.3.0"
         imagePullPolicy: IfNotPresent
         resources:
           null
@@ -2526,7 +3260,9 @@ spec:
         - name: OPENEBS_IO_BASE_PATH
           value: "/var/openebs/local"
         - name: OPENEBS_IO_HELPER_IMAGE
-          value: "openebs/linux-utils:4.1.0"
+          value: "openebs/linux-utils:4.2.0"
+        - name: OPENEBS_IO_HELPER_POD_HOST_NETWORK
+          value: "false"
         - name: OPENEBS_IO_INSTALLER_TYPE
           value: "localpv-charts-helm"
         # LEADER_ELECTION_ENABLED is used to enable/disable leader election. By default
@@ -2547,6 +3283,15 @@ spec:
             - test `pgrep -c "^provisioner-loc.*"` = 1
           initialDelaySeconds: 30
           periodSeconds: 60
+      tolerations: 
+        - effect: NoExecute
+          key: node.kubernetes.io/unreachable
+          operator: Exists
+          tolerationSeconds: 5
+        - effect: NoExecute
+          key: node.kubernetes.io/not-ready
+          operator: Exists
+          tolerationSeconds: 5
 ---
 # Source: openebs/charts/mayastor/templates/mayastor/agents/core/agent-core-deployment.yaml
 apiVersion: apps/v1
@@ -2556,7 +3301,7 @@ metadata:
   labels:
     app: agent-core
     openebs.io/release: openebs
-    openebs.io/version: 2.7.0
+    openebs.io/version: 2.9.2
 spec:
   replicas: 1
   selector:
@@ -2568,10 +3313,10 @@ spec:
       labels:
         app: agent-core
         openebs.io/release: openebs
-        openebs.io/version: 2.7.0
+        openebs.io/version: 2.9.2
         openebs.io/logging: "true"
     spec:
-      serviceAccount: openebs-service-account
+      serviceAccountName: openebs-service-account
       imagePullSecrets:
       initContainers:
         - command:
@@ -2579,7 +3324,8 @@ spec:
           - -c
           - trap "exit 1" TERM; until nc -vzw 5 openebs-etcd 2379;
             do date; echo "Waiting for etcd..."; sleep 1; done;
-          image: busybox:latest
+          image: docker.io/openebs/alpine-sh:4.2.0
+          imagePullPolicy: IfNotPresent
           name: etcd-probe
       priorityClassName: openebs-cluster-critical
       nodeSelector:
@@ -2593,6 +3339,10 @@ spec:
           key: node.kubernetes.io/not-ready
           operator: Exists
           tolerationSeconds: 5
+        - effect: NoSchedule
+          key: openebs.io/storage
+          operator: Equal
+          value: mayastor
       containers:
         - name: agent-core
           resources:
@@ -2602,18 +3352,19 @@ spec:
             requests:
               cpu: "500m"
               memory: "32Mi"
-          image: "docker.io/openebs/mayastor-agent-core:v2.7.0"
+          image: "docker.io/openebs/mayastor-agent-core:v2.9.2"
           imagePullPolicy: IfNotPresent
           args:
-            - "-sopenebs-etcd:2379"
+            - "--store=openebs-etcd:2379"
             - "--request-timeout=5s"
             - "--cache-period=30s"
-            - "--grpc-server-addr=0.0.0.0:50051"
+            - "--grpc-server-addr=[::]:50051"
             - "--pool-commitment=250%"
             - "--snapshot-commitment=40%"
             - "--volume-commitment-initial=40%"
             - "--volume-commitment=40%"
             - "--events-url=nats://openebs-nats:4222"
+            - "--events-replicas=3"
             - "--fmt-style=pretty"
             - "--ansi-colors=true"
             - "--create-volume-limit=10"
@@ -2638,13 +3389,14 @@ spec:
             requests:
               cpu: "100m"
               memory: "16Mi"
-          image: "docker.io/openebs/mayastor-agent-ha-cluster:v2.7.0"
+          image: "docker.io/openebs/mayastor-agent-ha-cluster:v2.9.2"
           imagePullPolicy: IfNotPresent
           args:
-            - "-g=0.0.0.0:50052"
+            - "-g=[::]:50052"
             - "--store=http://openebs-etcd:2379"
             - "--core-grpc=https://openebs-agent-core:50051"
             - "--events-url=nats://openebs-nats:4222"
+            - "--events-replicas=3"
             - "--ansi-colors=true"
             - "--fmt-style=pretty"
           ports:
@@ -2669,7 +3421,7 @@ metadata:
   labels:
     app: api-rest
     openebs.io/release: openebs
-    openebs.io/version: 2.7.0
+    openebs.io/version: 2.9.2
 spec:
   replicas: 1
   selector:
@@ -2681,7 +3433,7 @@ spec:
       labels:
         app: api-rest
         openebs.io/release: openebs
-        openebs.io/version: 2.7.0
+        openebs.io/version: 2.9.2
         openebs.io/logging: "true"
     spec:
       imagePullSecrets:
@@ -2691,14 +3443,16 @@ spec:
           - -c
           - trap "exit 1" TERM; until nc -vzw 5 openebs-agent-core 50051; do date;
             echo "Waiting for agent-core-grpc services..."; sleep 1; done;
-          image: busybox:latest
+          image: docker.io/openebs/alpine-sh:4.2.0
+          imagePullPolicy: IfNotPresent
           name: agent-core-grpc-probe
         - command:
           - sh
           - -c
           - trap "exit 1" TERM; until nc -vzw 5 openebs-etcd 2379;
             do date; echo "Waiting for etcd..."; sleep 1; done;
-          image: busybox:latest
+          image: docker.io/openebs/alpine-sh:4.2.0
+          imagePullPolicy: IfNotPresent
           name: etcd-probe
       priorityClassName: openebs-cluster-critical
       nodeSelector:
@@ -2712,6 +3466,10 @@ spec:
           key: node.kubernetes.io/not-ready
           operator: Exists
           tolerationSeconds: 5
+        - effect: NoSchedule
+          key: openebs.io/storage
+          operator: Equal
+          value: mayastor
       containers:
         - name: api-rest
           resources:
@@ -2721,22 +3479,39 @@ spec:
             requests:
               cpu: "50m"
               memory: "32Mi"
-          image: "docker.io/openebs/mayastor-api-rest:v2.7.0"
+          image: "docker.io/openebs/mayastor-api-rest:v2.9.2"
           imagePullPolicy: IfNotPresent
           args:
             - "--dummy-certificates"
             - "--no-auth"
-            - "--http=0.0.0.0:8081"
+            - "--http=[::]:8081"
             - "--request-timeout=5s"
             - "--core-grpc=https://openebs-agent-core:50051"
             - "--ansi-colors=true"
             - "--fmt-style=pretty"
+            - "--core-health-freq=20s"
           ports:
             - containerPort: 8080
             - containerPort: 8081
           env:
             - name: RUST_LOG
               value: info
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8081
+            failureThreshold: 2
+            initialDelaySeconds: 0
+            periodSeconds: 20
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /live
+              port: 8081
+            failureThreshold: 1
+            initialDelaySeconds: 0
+            periodSeconds: 30
+            timeoutSeconds: 5
 ---
 # Source: openebs/charts/mayastor/templates/mayastor/csi/csi-controller-deployment.yaml
 apiVersion: apps/v1
@@ -2746,7 +3521,7 @@ metadata:
   labels:
     app: csi-controller
     openebs.io/release: openebs
-    openebs.io/version: 2.7.0
+    openebs.io/version: 2.9.2
 spec:
   replicas: 1
   selector:
@@ -2758,11 +3533,11 @@ spec:
       labels:
         app: csi-controller
         openebs.io/release: openebs
-        openebs.io/version: 2.7.0
+        openebs.io/version: 2.9.2
         openebs.io/logging: "true"
     spec:
       hostNetwork: true
-      serviceAccount: openebs-service-account
+      serviceAccountName: openebs-service-account
       dnsPolicy: ClusterFirstWithHostNet
       imagePullSecrets:
       initContainers:
@@ -2771,13 +3546,28 @@ spec:
           - -c
           - trap "exit 1" TERM; until nc -vzw 5 openebs-api-rest 8081; do date;
             echo "Waiting for REST API endpoint to become available"; sleep 1; done;
-          image: busybox:latest
+          image: docker.io/openebs/alpine-sh:4.2.0
+          imagePullPolicy: IfNotPresent
           name: api-rest-probe
+      priorityClassName: openebs-cluster-critical
       nodeSelector:
         kubernetes.io/arch: amd64
+      tolerations: 
+        - effect: NoExecute
+          key: node.kubernetes.io/unreachable
+          operator: Exists
+          tolerationSeconds: 5
+        - effect: NoExecute
+          key: node.kubernetes.io/not-ready
+          operator: Exists
+          tolerationSeconds: 5
+        - effect: NoSchedule
+          key: openebs.io/storage
+          operator: Equal
+          value: mayastor
       containers:
         - name: csi-provisioner
-          image: "registry.k8s.io/sig-storage/csi-provisioner:v3.5.0"
+          image: "registry.k8s.io/sig-storage/csi-provisioner:v5.2.0"
           args:
             - "--v=2"
             - "--csi-address=$(ADDRESS)"
@@ -2796,9 +3586,10 @@ spec:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
         - name: csi-attacher
-          image: "registry.k8s.io/sig-storage/csi-attacher:v4.3.0"
+          image: "registry.k8s.io/sig-storage/csi-attacher:v4.8.1"
           args:
             - "--v=2"
+            - "--timeout=36s"
             - "--csi-address=$(ADDRESS)"
           env:
             - name: ADDRESS
@@ -2808,7 +3599,7 @@ spec:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
         - name: csi-snapshotter
-          image: "registry.k8s.io/sig-storage/csi-snapshotter:v6.3.3"
+          image: "registry.k8s.io/sig-storage/csi-snapshotter:v8.2.0"
           args:
             - "--v=2"
             - "--csi-address=$(ADDRESS)"
@@ -2824,16 +3615,17 @@ spec:
             - "--v=2"
             - "--leader-election=false" # since we are running single container
             - "--prevent-volume-mode-conversion"
-          image: "registry.k8s.io/sig-storage/snapshot-controller:v6.3.3"
+          image: "registry.k8s.io/sig-storage/snapshot-controller:v8.2.0"
           imagePullPolicy: IfNotPresent
         - name: csi-resizer
           args:
             - "--v=2"
             - "--csi-address=$(ADDRESS)"
+            - "--handle-volume-inuse-error=false"
           env:
             - name: ADDRESS
               value: /var/lib/csi/sockets/pluginproxy/csi.sock
-          image: "registry.k8s.io/sig-storage/csi-resizer:v1.9.3"
+          image: "registry.k8s.io/sig-storage/csi-resizer:v1.13.2"
           imagePullPolicy: IfNotPresent
           volumeMounts:
             - name: socket-dir
@@ -2846,7 +3638,7 @@ spec:
             requests:
               cpu: "16m"
               memory: "64Mi"
-          image: "docker.io/openebs/mayastor-csi-controller:v2.7.0"
+          image: "docker.io/openebs/mayastor-csi-controller:v2.9.2"
           imagePullPolicy: IfNotPresent
           args:
             - "--csi-socket=/var/lib/csi/sockets/pluginproxy/csi.sock"
@@ -2855,6 +3647,7 @@ spec:
             - "--ansi-colors=true"
             - "--fmt-style=pretty"
             - "--create-volume-limit=10"
+            - "--enable-orphan-vol-gc=false"
           env:
             - name: RUST_LOG
               value: info
@@ -2873,7 +3666,7 @@ metadata:
   labels:
     app: obs-callhome
     openebs.io/release: openebs
-    openebs.io/version: 2.7.0
+    openebs.io/version: 2.9.2
 spec:
   replicas: 1
   selector:
@@ -2885,16 +3678,21 @@ spec:
       labels:
         app: obs-callhome
         openebs.io/release: openebs
-        openebs.io/version: 2.7.0
+        openebs.io/version: 2.9.2
         openebs.io/logging: "true"
     spec:
       serviceAccountName: openebs-service-account
       imagePullSecrets:
       nodeSelector:
         kubernetes.io/arch: amd64
+      tolerations: 
+        - effect: NoSchedule
+          key: openebs.io/storage
+          operator: Equal
+          value: mayastor
       containers:
         - name: obs-callhome
-          image: "docker.io/openebs/mayastor-obs-callhome:v2.7.0"
+          image: "docker.io/openebs/mayastor-obs-callhome:v2.9.2"
           args:
             - "-e http://openebs-api-rest:8081"
             - "-n openebs"
@@ -2914,11 +3712,12 @@ spec:
               cpu: "50m"
               memory: "16Mi"
         - name: obs-callhome-stats
-          image: "docker.io/openebs/mayastor-obs-callhome-stats:v2.7.0"
+          image: "docker.io/openebs/mayastor-obs-callhome-stats:v2.9.2"
           args:
             - "--namespace=openebs"
             - "--release-name=openebs"
-            - "--mbus-url=nats://openebs-nats:4222"
+            - "--events-url=nats://openebs-nats:4222"
+            - "--events-replicas=3"
             - "--ansi-colors=true"
             - "--fmt-style=pretty"
           ports:
@@ -2945,7 +3744,7 @@ metadata:
   labels:
     app: operator-diskpool
     openebs.io/release: openebs
-    openebs.io/version: 2.7.0
+    openebs.io/version: 2.9.2
 spec:
   replicas: 1
   selector:
@@ -2957,10 +3756,10 @@ spec:
       labels:
         app: operator-diskpool
         openebs.io/release: openebs
-        openebs.io/version: 2.7.0
+        openebs.io/version: 2.9.2
         openebs.io/logging: "true"
     spec:
-      serviceAccount: openebs-service-account
+      serviceAccountName: openebs-service-account
       imagePullSecrets:
       initContainers:
         - command:
@@ -2968,17 +3767,33 @@ spec:
           - -c
           - trap "exit 1" TERM; until nc -vzw 5 openebs-agent-core 50051; do date;
             echo "Waiting for agent-core-grpc services..."; sleep 1; done;
-          image: busybox:latest
+          image: docker.io/openebs/alpine-sh:4.2.0
+          imagePullPolicy: IfNotPresent
           name: agent-core-grpc-probe
         - command:
           - sh
           - -c
           - trap "exit 1" TERM; until nc -vzw 5 openebs-etcd 2379;
             do date; echo "Waiting for etcd..."; sleep 1; done;
-          image: busybox:latest
+          image: docker.io/openebs/alpine-sh:4.2.0
+          imagePullPolicy: IfNotPresent
           name: etcd-probe
+      priorityClassName: openebs-cluster-critical
       nodeSelector:
         kubernetes.io/arch: amd64
+      tolerations: 
+        - effect: NoExecute
+          key: node.kubernetes.io/unreachable
+          operator: Exists
+          tolerationSeconds: 5
+        - effect: NoExecute
+          key: node.kubernetes.io/not-ready
+          operator: Exists
+          tolerationSeconds: 5
+        - effect: NoSchedule
+          key: openebs.io/storage
+          operator: Equal
+          value: mayastor
       containers:
         - name: operator-diskpool
           resources:
@@ -2988,7 +3803,7 @@ spec:
             requests:
               cpu: "50m"
               memory: "16Mi"
-          image: "docker.io/openebs/mayastor-operator-diskpool:v2.7.0"
+          image: "docker.io/openebs/mayastor-operator-diskpool:v2.9.2"
           imagePullPolicy: IfNotPresent
           args:
             - "-e http://openebs-api-rest:8081"
@@ -3004,6 +3819,248 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
+---
+# Source: openebs/charts/loki/charts/minio/templates/statefulset.yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: openebs-minio
+  labels:
+    app: minio
+    chart: minio-5.4.0
+    release: openebs
+    heritage: Helm
+spec:
+  updateStrategy:
+    type: RollingUpdate
+  podManagementPolicy: "Parallel"
+  serviceName: openebs-minio-svc
+  replicas: 3
+  selector:
+    matchLabels:
+      app: minio
+      release: openebs
+  template:
+    metadata:
+      name: openebs-minio
+      labels:
+        app: minio
+        release: openebs
+      annotations:
+        checksum/secrets: b38f14fd791c3ad8559031ba36c0bfb017cad4ce8c06105b5bcb4b3751f0dfb3
+        checksum/config: f5ca60a2b77c53631969cc8fc9913245fdb13daa8f068ccdc003ea32044a9c99
+    spec:
+      securityContext:
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+        runAsGroup: 1000
+        runAsUser: 1000
+      serviceAccountName: minio-sa
+      containers:
+        - name: minio
+          image: quay.io/minio/minio:RELEASE.2024-12-18T13-15-44Z
+          imagePullPolicy: IfNotPresent
+          command: [
+            "/bin/sh",
+            "-ce",
+            "/usr/bin/docker-entrypoint.sh minio server http://openebs-minio-{0...2}.openebs-minio-svc.openebs.svc/export -S /etc/minio/certs/ --address :9000 --console-address :9001"
+          ]
+          volumeMounts:
+            - name: export
+              mountPath: /export            
+          ports:
+            - name: http
+              containerPort: 9000
+            - name: http-console
+              containerPort: 9001
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: openebs-minio
+                  key: rootUser
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: openebs-minio
+                  key: rootPassword
+            - name: MINIO_PROMETHEUS_AUTH_TYPE
+              value: "public"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          securityContext: 
+            readOnlyRootFilesystem: false      
+      volumes:
+        - name: minio-user
+          secret:
+            secretName: openebs-minio        
+  volumeClaimTemplates:
+    - apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        name: export
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        storageClassName: openebs-minio-localpv
+        resources:
+          requests:
+            storage: 2Gi
+---
+# Source: openebs/charts/loki/templates/single-binary/statefulset.yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: openebs-loki
+  namespace: openebs
+  labels:
+    helm.sh/chart: loki-6.29.0
+    app.kubernetes.io/name: loki
+    app.kubernetes.io/instance: openebs
+    app.kubernetes.io/version: "3.4.2"
+    app.kubernetes.io/component: single-binary
+    app.kubernetes.io/part-of: memberlist
+spec:
+  replicas: 3
+  podManagementPolicy: Parallel
+  updateStrategy:
+    rollingUpdate:
+      partition: 0
+  serviceName: openebs-loki-headless
+  revisionHistoryLimit: 10
+  
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Delete
+    whenScaled: Delete
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: loki
+      app.kubernetes.io/instance: openebs
+      app.kubernetes.io/component: single-binary
+  template:
+    metadata:
+      annotations:
+        checksum/config: 74aa55fb70fb5d450fcc3a09376613858b2d37214c8cc86e5cc8ff94301808ad
+      labels:
+        app.kubernetes.io/name: loki
+        app.kubernetes.io/instance: openebs
+        app.kubernetes.io/component: single-binary
+        app: loki
+        app.kubernetes.io/part-of: memberlist
+    spec:
+      serviceAccountName: loki
+      automountServiceAccountToken: true
+      enableServiceLinks: true
+      
+      securityContext:
+        fsGroup: 10001
+        runAsGroup: 10001
+        runAsNonRoot: true
+        runAsUser: 10001
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: loki-sc-rules
+          image: "kiwigrid/k8s-sidecar:1.30.2"
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: METHOD
+              value: WATCH
+            - name: LABEL
+              value: "loki_rule"
+            - name: FOLDER
+              value: "/rules"
+            - name: RESOURCE
+              value: "both"
+            - name: WATCH_SERVER_TIMEOUT
+              value: "60"
+            - name: WATCH_CLIENT_TIMEOUT
+              value: "60"
+            - name: LOG_LEVEL
+              value: "INFO"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - name: sc-rules-volume
+              mountPath: "/rules"
+        - name: loki
+          image: docker.io/grafana/loki:3.4.2
+          imagePullPolicy: IfNotPresent
+          args:
+            - -config.file=/etc/loki/config/config.yaml
+            - -target=all
+          ports:
+            - name: http-metrics
+              containerPort: 3100
+              protocol: TCP
+            - name: grpc
+              containerPort: 9095
+              protocol: TCP
+            - name: http-memberlist
+              containerPort: 7946
+              protocol: TCP
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http-metrics
+            initialDelaySeconds: 30
+            timeoutSeconds: 1
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: config
+              mountPath: /etc/loki/config
+            - name: runtime-config
+              mountPath: /etc/loki/runtime-config
+            - name: storage
+              mountPath: /var/loki
+            - name: sc-rules-volume
+              mountPath: "/rules"
+          resources:
+            {}
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                app.kubernetes.io/component: single-binary
+            topologyKey: kubernetes.io/hostname
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: config
+          configMap:
+            name: loki
+            items:
+              - key: "config.yaml"
+                path: "config.yaml"
+        - name: runtime-config
+          configMap:
+            name: loki-runtime
+        - name: sc-rules-volume
+          emptyDir: {}
+  volumeClaimTemplates:
+    - apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        name: storage
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: openebs-loki-localpv
+        resources:
+          requests:
+            storage: "2Gi"
 ---
 # Source: openebs/charts/mayastor/charts/etcd/templates/statefulset.yaml
 apiVersion: apps/v1
@@ -3036,7 +4093,7 @@ spec:
         app: etcd
         openebs.io/logging: "true"
       annotations:
-        checksum/token-secret: 9640bdaed05c83f14577f025436cb871e869fe54851087e54844b94d824ec9e9
+        checksum/token-secret: 24dcfa3c12c1f925fd9fd3fe84d7e3c7cbe860d308e7c139b05ba2e49a1ab3e8
     spec:
       
       affinity:
@@ -3056,7 +4113,7 @@ spec:
       serviceAccountName: "default"
       initContainers:
         - name: volume-permissions
-          image: docker.io/bitnami/bitnami-shell:11-debian-11-r63
+          image: docker.io/openebs/alpine-bash:4.2.0
           imagePullPolicy: "IfNotPresent"
           command:
             - /bin/bash
@@ -3073,7 +4130,7 @@ spec:
               mountPath: /bitnami/etcd
       containers:
         - name: etcd
-          image: docker.io/bitnami/etcd:3.5.6-debian-11-r10
+          image: docker.io/openebs/etcd:3.5.6-debian-11-r10
           imagePullPolicy: "IfNotPresent"
           securityContext:
             allowPrivilegeEscalation: false
@@ -3183,128 +4240,6 @@ spec:
             storage: "2Gi"
         storageClassName: mayastor-etcd-localpv
 ---
-# Source: openebs/charts/mayastor/charts/loki-stack/charts/loki/templates/statefulset.yaml
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  name: openebs-loki
-  namespace: openebs
-  labels:
-    app: loki
-    chart: loki-2.16.0
-    release: openebs
-    heritage: Helm
-  annotations:
-    {}
-spec:
-  podManagementPolicy: OrderedReady
-  replicas: 1
-  selector:
-    matchLabels:
-      app: loki
-      release: openebs
-  serviceName: openebs-loki-headless
-  updateStrategy:
-    type: RollingUpdate
-  template:
-    metadata:
-      labels:
-        app: loki
-        name: openebs-loki
-        release: openebs
-      annotations:
-        checksum/config: d754b334e2f0f83d14eaa66553982a27439f3f6a19d4625cb63ced56e32602c1
-        prometheus.io/port: http-metrics
-        prometheus.io/scrape: "true"
-    spec:
-      serviceAccountName: openebs-loki
-      securityContext:
-        fsGroup: 1001
-        runAsGroup: 1001
-        runAsNonRoot: false
-        runAsUser: 1001
-      initContainers:
-        - command:
-          - /bin/bash
-          - -ec
-          - chown -R 1001:1001 /data
-          image: docker.io/bitnami/bitnami-shell:10
-          imagePullPolicy: IfNotPresent
-          name: volume-permissions
-          securityContext:
-            runAsUser: 0
-          terminationMessagePath: /dev/termination-log
-          terminationMessagePolicy: File
-          volumeMounts:
-          - mountPath: /data
-            name: storage
-      containers:
-        - name: loki
-          image: "grafana/loki:2.6.1"
-          imagePullPolicy: IfNotPresent
-          args:
-            - "-config.file=/etc/loki/loki.yaml"
-          volumeMounts:
-            - name: tmp
-              mountPath: /tmp
-            - name: config
-              mountPath: /etc/loki
-            - name: storage
-              mountPath: "/data"
-              subPath: 
-          ports:
-            - name: http-metrics
-              containerPort: 3100
-              protocol: TCP
-            - name: grpc
-              containerPort: 9095
-              protocol: TCP
-            - name: memberlist-port
-              containerPort: 7946
-              protocol: TCP
-          livenessProbe:
-            httpGet:
-              path: /ready
-              port: http-metrics
-            initialDelaySeconds: 45
-          readinessProbe:
-            httpGet:
-              path: /ready
-              port: http-metrics
-            initialDelaySeconds: 45
-          resources:
-            {}
-          securityContext:
-            readOnlyRootFilesystem: true
-          env:
-      nodeSelector:
-        {}
-      affinity:
-        {}
-      tolerations:
-        []
-      terminationGracePeriodSeconds: 4800
-      volumes:
-        - name: tmp
-          emptyDir: {}
-        - name: config
-          secret:
-            secretName: openebs-loki
-  volumeClaimTemplates:
-  - metadata:
-      name: storage
-      labels:
-        {}
-      annotations:
-        {}
-    spec:
-      accessModes:
-        - ReadWriteOnce
-      resources:
-        requests:
-          storage: "10Gi"
-      storageClassName: mayastor-loki-localpv
----
 # Source: openebs/charts/mayastor/charts/nats/templates/statefulset.yaml
 apiVersion: apps/v1
 kind: StatefulSet
@@ -3340,6 +4275,13 @@ spec:
         app: nats
         openebs.io/logging: "true"
     spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: nats
+            topologyKey: kubernetes.io/hostname
       dnsPolicy: ClusterFirst
       # Common volumes for the containers.
       volumes:
@@ -3516,8 +4458,8 @@ metadata:
   labels:
     app.kubernetes.io/managed-by: "Helm"
     app.kubernetes.io/instance: "openebs"
-    app.kubernetes.io/version: 4.1.0
-    helm.sh/chart: "openebs-4.1.0"
+    app.kubernetes.io/version: 4.3.3
+    helm.sh/chart: "openebs-4.3.3"
   annotations:
     "helm.sh/hook": pre-upgrade
     "helm.sh/hook-weight": "-2"
@@ -3531,8 +4473,8 @@ metadata:
   labels:
     app.kubernetes.io/managed-by: "Helm"
     app.kubernetes.io/instance: "openebs"
-    app.kubernetes.io/version: 4.1.0
-    helm.sh/chart: "openebs-4.1.0"
+    app.kubernetes.io/version: 4.3.3
+    helm.sh/chart: "openebs-4.3.3"
   annotations:
     "helm.sh/hook": pre-upgrade
     "helm.sh/hook-weight": "-2"
@@ -3553,8 +4495,8 @@ metadata:
   labels:
     app.kubernetes.io/managed-by: "Helm"
     app.kubernetes.io/instance: "openebs"
-    app.kubernetes.io/version: 4.1.0
-    helm.sh/chart: "openebs-4.1.0"
+    app.kubernetes.io/version: 4.3.3
+    helm.sh/chart: "openebs-4.3.3"
   annotations:
     "helm.sh/hook": pre-upgrade
     "helm.sh/hook-weight": "-1"
@@ -3567,39 +4509,6 @@ roleRef:
   kind: ClusterRole
   name: openebs-pre-upgrade-hook
   apiGroup: rbac.authorization.k8s.io
----
-# Source: openebs/charts/mayastor/charts/loki-stack/templates/tests/loki-test-pod.yaml
-apiVersion: v1
-kind: Pod
-metadata:
-  annotations:
-    "helm.sh/hook": test-success
-  labels:
-    app: loki-stack
-    chart: loki-stack-2.9.11
-    release: openebs
-    heritage: Helm
-  name: openebs-loki-stack-test
-spec:
-  containers:
-  - name: test
-    image: "bats/bats:1.8.2"
-    imagePullPolicy: ""
-    args:
-    - /var/lib/loki/test.sh
-    env:
-    - name: LOKI_SERVICE
-      value: openebs-loki
-    - name: LOKI_PORT
-      value: "3100"
-    volumeMounts:
-    - name: tests
-      mountPath: /var/lib/loki
-  restartPolicy: Never
-  volumes:
-  - name: tests
-    configMap:
-      name: openebs-loki-stack-test
 ---
 # Source: openebs/charts/mayastor/charts/nats/templates/tests/test-request-reply.yaml
 apiVersion: v1
@@ -3634,6 +4543,80 @@ spec:
 
   restartPolicy: Never
 ---
+# Source: openebs/charts/loki/charts/minio/templates/post-job.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: openebs-minio-post-job
+  labels:
+    app: minio-post-job
+    chart: minio-5.4.0
+    release: openebs
+    heritage: Helm
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
+spec:
+  template:
+    metadata:
+      labels:
+        app: minio-job
+        release: openebs
+    spec:
+      restartPolicy: OnFailure      
+      volumes:
+        - name: etc-path
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+        - name: minio-configuration
+          projected:
+            sources:
+              - configMap:
+                  name: openebs-minio
+              - secret:
+                  name: openebs-minio
+      serviceAccountName: minio-sa
+      containers:
+        - name: minio-make-bucket
+          image: "quay.io/minio/mc:RELEASE.2024-11-21T17-21-54Z"
+          imagePullPolicy: IfNotPresent
+          command: [ "/bin/sh", "/config/initialize" ]
+          env:
+            - name: MINIO_ENDPOINT
+              value: openebs-minio
+            - name: MINIO_PORT
+              value: "9000"
+          volumeMounts:
+            - name: etc-path
+              mountPath: /etc/minio/mc
+            - name: tmp
+              mountPath: /tmp
+            - name: minio-configuration
+              mountPath: /config
+          resources:
+            requests:
+              memory: 128Mi
+        - name: minio-make-user
+          image: "quay.io/minio/mc:RELEASE.2024-11-21T17-21-54Z"
+          imagePullPolicy: IfNotPresent
+          command: [ "/bin/sh", "/config/add-user" ]
+          env:
+            - name: MINIO_ENDPOINT
+              value: openebs-minio
+            - name: MINIO_PORT
+              value: "9000"
+          volumeMounts:
+            - name: etc-path
+              mountPath: /etc/minio/mc
+            - name: tmp
+              mountPath: /tmp
+            - name: minio-configuration
+              mountPath: /config
+          resources:
+            requests:
+              memory: 128Mi
+---
 # Source: openebs/templates/pre-upgrade-hook.yaml
 apiVersion: batch/v1
 kind: Job
@@ -3642,8 +4625,8 @@ metadata:
   labels:
     app.kubernetes.io/managed-by: "Helm"
     app.kubernetes.io/instance: "openebs"
-    app.kubernetes.io/version: 4.1.0
-    helm.sh/chart: "openebs-4.1.0"
+    app.kubernetes.io/version: 4.3.3
+    helm.sh/chart: "openebs-4.3.3"
   annotations:
     "helm.sh/hook": pre-upgrade
     "helm.sh/hook-weight": "0"
@@ -3655,13 +4638,13 @@ spec:
       labels:
         app.kubernetes.io/managed-by: "Helm"
         app.kubernetes.io/instance: "openebs"
-        helm.sh/chart: "openebs-4.1.0"
+        helm.sh/chart: "openebs-4.3.3"
     spec:
       serviceAccountName: "openebs-pre-upgrade-hook"
       restartPolicy: Never
       containers:
       - name: pre-upgrade-job
-        image: docker.io/bitnami/kubectl:1.25.15
+        image: docker.io/openebs/kubectl:1.25.15
         imagePullPolicy: IfNotPresent
         command:
         - "/bin/sh"
